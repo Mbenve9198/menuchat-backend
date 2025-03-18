@@ -229,7 +229,7 @@ class SetupController {
       }
 
       // Prepara il prompt per Claude con i dati disponibili
-      let prompt = `Generate a friendly and engaging welcome message for the following restaurant:
+      let promptContent = `Generate a friendly and engaging welcome message for the following restaurant:
 
 Restaurant Name: ${restaurantData.name || "our restaurant"}
 ${restaurantData.address ? `Location: ${restaurantData.address}` : ""}
@@ -262,18 +262,16 @@ Enjoy your meal! 😋`;
       const model = modelId || "claude-3-7-sonnet-20250219";
 
       // Genera il messaggio usando Claude
-      const response = await anthropic.messages.create({
-        model,
-        max_tokens: 500,
+      // Utilizzo API compatibile con la versione 0.15.1 dell'SDK
+      const response = await anthropic.completions.create({
+        model: model,
+        prompt: `${Anthropic.HUMAN_PROMPT} ${promptContent} ${Anthropic.AI_PROMPT}`,
+        max_tokens_to_sample: 500,
         temperature: 0.7,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
       });
 
       // Estrai il messaggio dalla risposta
-      const generatedMessage = response.content[0].text.trim();
+      const generatedMessage = response.completion.trim();
 
       res.json({ 
         success: true, 
