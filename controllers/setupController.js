@@ -1,5 +1,11 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
+const Restaurant = require('../models/Restaurant');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 /**
  * Controller per gestire le richieste di setup
@@ -187,6 +193,98 @@ class SetupController {
       res.status(500).json({
         success: false,
         error: 'Errore del server'
+      });
+    }
+  }
+
+  async generateWelcomeMessage(req, res) {
+    try {
+      const { 
+        restaurantId, 
+        restaurantName, 
+        restaurantAddress, 
+        restaurantRating,
+        modelId = "claude-3-7-sonnet-20250219"
+      } = req.body;
+      
+      // Utilizziamo i dati inviati dal frontend o recuperiamo dal database
+      let restaurantData = {
+        name: restaurantName,
+        address: restaurantAddress,
+        rating: restaurantRating
+      };
+      
+      // Se abbiamo l'ID del ristorante ma mancano altri dettagli, li recuperiamo dal database
+      if (restaurantId && (!restaurantName || !restaurantAddress)) {
+        const restaurant = await Restaurant.findById(restaurantId);
+        if (restaurant) {
+          restaurantData = {
+            name: restaurant.name || restaurantData.name,
+            address: restaurant.address || restaurantData.address,
+            rating: restaurant.rating || restaurantData.rating,
+            cuisine: restaurant.cuisine,
+            specialties: restaurant.specialties
+          };
+        }
+      }
+
+      // Prepara il prompt per Claude con i dati disponibili
+      let prompt = `Generate a friendly and engaging welcome message for the following restaurant:
+
+Restaurant Name: ${restaurantData.name || "our restaurant"}
+${restaurantData.address ? `Location: ${restaurantData.address}` : ""}
+${restaurantData.rating ? `Rating: ${restaurantData.rating}/5 stars` : ""}
+${restaurantData.cuisine ? `Cuisine: ${restaurantData.cuisine}` : ""}
+${restaurantData.specialties ? `Specialties: ${restaurantData.specialties.join(', ')}` : ""}
+
+The welcome message should:
+1. Be friendly, warm, and inviting
+2. Include the restaurant name
+3. Include appropriate food emojis related to the restaurant type
+4. Mention something about the menu or food offerings
+5. Include a placeholder like (link menu / pdf) where the menu link will be placed
+6. End with a friendly closing phrase like "Buon appetito!" or "Enjoy your meal!"
+7. Be around 4-6 lines long with proper spacing
+8. Be in English
+9. Include a personalized greeting with {customerName} placeholder
+
+Example format (but create your own unique message):
+
+Hello {customerName}, welcome to [Restaurant Name] 🍽️
+
+Our menu features delicious [type of food] specialties prepared with fresh ingredients. We're known for our [famous dish].
+
+(link menu / pdf)
+
+Enjoy your meal! 😋`;
+
+      // Determina il modello da utilizzare
+      const model = modelId || "claude-3-7-sonnet-20250219";
+
+      // Genera il messaggio usando Claude
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: 500,
+        temperature: 0.7,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      });
+
+      // Estrai il messaggio dalla risposta
+      const generatedMessage = response.content[0].text.trim();
+
+      res.json({ 
+        success: true, 
+        message: generatedMessage
+      });
+    } catch (error) {
+      console.error('Error generating welcome message:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Error generating welcome message',
+        details: error.message 
       });
     }
   }
