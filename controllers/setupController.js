@@ -214,6 +214,7 @@ class SetupController {
       }
 
       // Prepara il prompt per Claude con i dati dettagliati
+      let promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words):
       let promptContent = `Generate a friendly and engaging welcome message for the following restaurant:
 
 Restaurant Name: ${restaurantDetails.name}
