@@ -2,6 +2,7 @@ const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
+const BotConfiguration = require('../models/BotConfiguration');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -342,6 +343,27 @@ Do not include the review link or any placeholders for it in the templates.`;
         error: 'Error generating review templates',
         details: error.message 
       });
+    }
+  }
+
+  async checkTrigger(req, res) {
+    try {
+      const { triggerPhrase } = req.body;
+      
+      if (!triggerPhrase || triggerPhrase.trim() === '') {
+        return res.json({ available: false, error: 'Trigger phrase cannot be empty' });
+      }
+      
+      const existingBot = await BotConfiguration.findOne({
+        triggerWord: { $regex: new RegExp(`^${triggerPhrase}$`, 'i') },
+        active: true
+      });
+      
+      return res.json({ available: !existingBot });
+      
+    } catch (error) {
+      console.error('Error checking trigger availability:', error);
+      return res.status(500).json({ available: false, error: 'Server error' });
     }
   }
 }
