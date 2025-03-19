@@ -213,44 +213,31 @@ class SetupController {
         });
       }
 
-      // Prepara il prompt per Claude con i dati dettagliati
-      let promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words):
-      let promptContent = `Generate a friendly and engaging welcome message for the following restaurant:
+      const promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words):
 
 Restaurant Name: ${restaurantDetails.name}
-Location: ${restaurantDetails.address}
-Rating: ${restaurantDetails.rating}/5 stars (${restaurantDetails.ratingsTotal} reviews)
-Cuisine Types: ${restaurantDetails.cuisineTypes.join(', ')}
-${restaurantDetails.priceLevel ? `Price Level: ${'€'.repeat(restaurantDetails.priceLevel)}` : ''}
-${restaurantDetails.openingHours ? `Opening Hours:\n${restaurantDetails.openingHours.join('\n')}` : ''}
-${restaurantDetails.website ? `Website: ${restaurantDetails.website}` : ''}
-${restaurantDetails.phoneNumber ? `Phone: ${restaurantDetails.phoneNumber}` : ''}
+Rating: ${restaurantDetails.rating}/5 (${restaurantDetails.ratingsTotal} reviews)
+Cuisine: ${restaurantDetails.cuisineTypes?.join(', ')}
 
-Sample Reviews:
-${restaurantDetails.reviews?.slice(0, 3).map(review => 
+Top 5 Reviews:
+${restaurantDetails.reviews?.slice(0, 5).map(review => 
   `- "${review.text.slice(0, 100)}..."`
 ).join('\n') || ''}
 
-The welcome message should:
-1. Be friendly, warm, and inviting
-2. Include the restaurant name
-3. Include appropriate food emojis related to the specific cuisine type
-4. Mention something unique about the restaurant based on the reviews or cuisine type
-5. Include a placeholder like (link menu / pdf) where the menu link will be placed
-6. End with a friendly closing phrase appropriate for the cuisine type
-7. Be around 4-6 lines long with proper spacing
-8. Be in English
-9. Include a personalized greeting with {customerName} placeholder
+Requirements:
+1. Maximum 40 words
+2. Include {customerName} placeholder
+3. Include restaurant name
+4. Add relevant food emojis based on cuisine and reviews
+5. Include (menu_link) placeholder
+6. Highlight what customers love most based on reviews
+7. Keep it friendly and welcoming
 
-Example format (but create your own unique message):
-
-Hello {customerName}, welcome to [Restaurant Name] 🍽️
-
-Our menu features delicious [type of food] specialties prepared with fresh ingredients. We're known for our [famous dish].
-
-(link menu / pdf)
-
-Enjoy your meal! 😋`;
+Example (32 words):
+Hi {customerName}! Welcome to Luigi's 🍝
+Our homemade pasta got 200+ five-star reviews! Check our menu:
+(menu_link)
+Buon appetito! 🇮🇹`;
 
       // Determina il modello da utilizzare
       const model = modelId || "claude-3-7-sonnet-20250219";
