@@ -201,49 +201,42 @@ class SetupController {
     try {
       const { 
         restaurantId, 
-        restaurantName, 
-        restaurantAddress, 
-        restaurantRating,
+        restaurantName,
+        restaurantDetails,
         modelId = "claude-3-7-sonnet-20250219"
       } = req.body;
       
-      // Utilizziamo i dati inviati dal frontend o recuperiamo dal database
-      let restaurantData = {
-        name: restaurantName,
-        address: restaurantAddress,
-        rating: restaurantRating
-      };
-      
-      // Se abbiamo l'ID del ristorante ma mancano altri dettagli, li recuperiamo dal database
-      if (restaurantId && (!restaurantName || !restaurantAddress)) {
-        const restaurant = await Restaurant.findById(restaurantId);
-        if (restaurant) {
-          restaurantData = {
-            name: restaurant.name || restaurantData.name,
-            address: restaurant.address || restaurantData.address,
-            rating: restaurant.rating || restaurantData.rating,
-            cuisine: restaurant.cuisine,
-            specialties: restaurant.specialties
-          };
-        }
+      if (!restaurantDetails) {
+        return res.status(400).json({
+          success: false,
+          error: 'Restaurant details are required'
+        });
       }
 
-      // Prepara il prompt per Claude con i dati disponibili
+      // Prepara il prompt per Claude con i dati dettagliati
       let promptContent = `Generate a friendly and engaging welcome message for the following restaurant:
 
-Restaurant Name: ${restaurantData.name || "our restaurant"}
-${restaurantData.address ? `Location: ${restaurantData.address}` : ""}
-${restaurantData.rating ? `Rating: ${restaurantData.rating}/5 stars` : ""}
-${restaurantData.cuisine ? `Cuisine: ${restaurantData.cuisine}` : ""}
-${restaurantData.specialties ? `Specialties: ${restaurantData.specialties.join(', ')}` : ""}
+Restaurant Name: ${restaurantDetails.name}
+Location: ${restaurantDetails.address}
+Rating: ${restaurantDetails.rating}/5 stars (${restaurantDetails.ratingsTotal} reviews)
+Cuisine Types: ${restaurantDetails.cuisineTypes.join(', ')}
+${restaurantDetails.priceLevel ? `Price Level: ${'€'.repeat(restaurantDetails.priceLevel)}` : ''}
+${restaurantDetails.openingHours ? `Opening Hours:\n${restaurantDetails.openingHours.join('\n')}` : ''}
+${restaurantDetails.website ? `Website: ${restaurantDetails.website}` : ''}
+${restaurantDetails.phoneNumber ? `Phone: ${restaurantDetails.phoneNumber}` : ''}
+
+Sample Reviews:
+${restaurantDetails.reviews?.slice(0, 3).map(review => 
+  `- "${review.text.slice(0, 100)}..."`
+).join('\n') || ''}
 
 The welcome message should:
 1. Be friendly, warm, and inviting
 2. Include the restaurant name
-3. Include appropriate food emojis related to the restaurant type
-4. Mention something about the menu or food offerings
+3. Include appropriate food emojis related to the specific cuisine type
+4. Mention something unique about the restaurant based on the reviews or cuisine type
 5. Include a placeholder like (link menu / pdf) where the menu link will be placed
-6. End with a friendly closing phrase like "Buon appetito!" or "Enjoy your meal!"
+6. End with a friendly closing phrase appropriate for the cuisine type
 7. Be around 4-6 lines long with proper spacing
 8. Be in English
 9. Include a personalized greeting with {customerName} placeholder
@@ -262,7 +255,6 @@ Enjoy your meal! 😋`;
       const model = modelId || "claude-3-7-sonnet-20250219";
 
       // Genera il messaggio usando Claude
-      // Utilizzo API compatibile con la versione 0.15.1 dell'SDK
       const response = await anthropic.messages.create({
         model: model,
         max_tokens: 500,
