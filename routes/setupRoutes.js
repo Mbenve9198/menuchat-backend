@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Rotte pubbliche
 router.post('/', setupController.setupRestaurant);
+router.post('/generate-welcome-message', setupController.generateWelcomeMessage);
 
 // Rotte protette (richiedono autenticazione)
 router.get('/:id', protect, setupController.getRestaurant);

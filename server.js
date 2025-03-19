@@ -17,7 +17,35 @@ connectDB();
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:3000',                // development
+      'https://menuchat.com',                 // production (aggiungi il tuo dominio principale)
+      /^https:\/\/.*\.vercel\.app$/          // tutti i domini vercel.app
+    ];
+
+    // Permetti richieste senza origin (es. Postman)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Controlla se l'origin è nella lista o matcha il pattern vercel.app
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return allowedOrigin === origin;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 // Commentato temporaneamente per il deploy
 // app.use(helmet());
 
