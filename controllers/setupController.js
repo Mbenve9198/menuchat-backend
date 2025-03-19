@@ -263,15 +263,20 @@ Enjoy your meal! 😋`;
 
       // Genera il messaggio usando Claude
       // Utilizzo API compatibile con la versione 0.15.1 dell'SDK
-      const response = await anthropic.completions.create({
+      const response = await anthropic.messages.create({
         model: model,
-        prompt: `${Anthropic.HUMAN_PROMPT} ${promptContent} ${Anthropic.AI_PROMPT}`,
-        max_tokens_to_sample: 500,
+        max_tokens: 500,
         temperature: 0.7,
+        messages: [
+          {
+            role: "user",
+            content: promptContent
+          }
+        ]
       });
 
       // Estrai il messaggio dalla risposta
-      const generatedMessage = response.completion.trim();
+      const generatedMessage = response.content[0].text;
 
       res.json({ 
         success: true, 
