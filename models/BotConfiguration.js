@@ -21,14 +21,15 @@ const BotConfigurationSchema = new Schema({
   },
   triggerWord: {
     type: String,
-    required: [true, 'Parola di attivazione è obbligatoria'],
+    required: [true, 'Trigger phrase is required'],
     trim: true,
     validate: {
       validator: function(v) {
-        return v.length >= 3; // La parola di attivazione deve essere di almeno 3 caratteri
+        return v.length >= 2 && v.length <= 50; // Allow trigger phrases between 2-50 characters
       },
-      message: props => `La parola di attivazione deve essere di almeno 3 caratteri!`
-    }
+      message: props => `Trigger phrase must be between 2 and 50 characters long!`
+    },
+    index: true // Ensure this field is indexed for quick lookups and uniqueness checks
   },
   welcomeMessage: {
     type: MessageTemplateSchema,
