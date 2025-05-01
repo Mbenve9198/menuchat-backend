@@ -233,6 +233,7 @@ Requirements:
 5. Include (menu_link) placeholder
 6. Highlight what customers love most based on reviews
 7. Keep it friendly and welcoming
+8. IMPORTANT: Return ONLY the welcome message without any description, explanation, or comments. Do not include quotes around the message.
 
 Example (32 words):
 Hi {customerName}! Welcome to Luigi's 🍝
@@ -257,7 +258,21 @@ Buon appetito! 🇮🇹`;
       });
 
       // Estrai il messaggio dalla risposta
-      const generatedMessage = response.content[0].text;
+      const fullText = response.content[0].text;
+      
+      // Estrae solo il messaggio di benvenuto, escludendo eventuali spiegazioni
+      // Prende il primo paragrafo che contiene il testo del messaggio di benvenuto
+      // e rimuove eventuali virgolette
+      let generatedMessage = fullText;
+      
+      // Se il messaggio contiene una spiegazione dopo il messaggio vero e proprio
+      if (fullText.includes("\n\n")) {
+        // Prendi solo la prima parte del testo, che dovrebbe essere il messaggio
+        generatedMessage = fullText.split("\n\n")[0];
+      }
+      
+      // Rimuovi eventuali virgolette attorno al messaggio
+      generatedMessage = generatedMessage.replace(/^["']|["']$/g, "");
 
       res.json({ 
         success: true, 
