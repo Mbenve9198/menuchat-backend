@@ -1,5 +1,6 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
+const botConfigurationService = require('../services/botConfigurationService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
@@ -52,11 +53,15 @@ class SetupController {
       // Crea il nuovo ristorante
       const restaurant = await restaurantService.createRestaurant(formData, user._id);
 
+      // Crea la configurazione del bot per il ristorante
+      const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
+
       // Ritorna la risposta con i dati dell'utente e del ristorante
       res.status(201).json({
         success: true,
         userId: user._id,
-        restaurantId: restaurant._id
+        restaurantId: restaurant._id,
+        botConfigId: botConfig._id
       });
     } catch (error) {
       console.error('Errore in setupRestaurant:', error);

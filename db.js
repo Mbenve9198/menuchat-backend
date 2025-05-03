@@ -16,21 +16,29 @@ const client = new MongoClient(uri, {
 // Connect to MongoDB with Mongoose
 const connectDB = async () => {
   try {
+    // Connessione con Mongoose
     await mongoose.connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      }
     });
-    console.log('MongoDB connected with Mongoose');
+    console.log('MongoDB connesso con Mongoose');
     
-    // Send a ping to confirm a successful connection with direct client
+    // Ping per verificare la connessione
+    await mongoose.connection.db.admin().command({ ping: 1 });
+    console.log("Ping MongoDB eseguito con successo");
+    
+    // Anche se non strettamente necessario, manteniamo una connessione diretta
+    // per compatibilità con codice esistente
     await client.connect();
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log("Connessione client MongoDB diretta verificata");
     
-    // Close the direct client connection
-    await client.close();
+    return mongoose.connection;
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error.message);
+    console.error('Errore di connessione MongoDB:', error.message);
     process.exit(1);
   }
 };

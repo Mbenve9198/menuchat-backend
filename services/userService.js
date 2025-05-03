@@ -22,7 +22,10 @@ class UserService {
         passwordHash: passwordHash,
         salt: salt,
         languagePreference: userData.languagePreference || 'italiano',
-        fullName: userData.fullName
+        fullName: userData.fullName,
+        subscriptionTier: userData.subscriptionTier || 'free',
+        isActive: true,
+        lastLogin: new Date() // Imposta il primo accesso al momento della creazione
       });
 
       // Salva l'utente
