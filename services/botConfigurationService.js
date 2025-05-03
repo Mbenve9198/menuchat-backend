@@ -16,7 +16,14 @@ class BotConfigurationService {
       const welcomeMsg = configData.welcomeMessage || 'Benvenuto nel nostro ristorante! Come posso aiutarti?';
       const reviewMsg = configData.reviewTemplate || 'Ti è piaciuta la tua esperienza? Ci farebbe piacere ricevere una tua recensione!';
       const triggerWord = configData.triggerWord || 'menu';
-      const reviewTimer = configData.reviewTimer || 2;
+      
+      // Converti minuti in ore, con un default di 2 ore se non specificato
+      // e limitando a 72 ore (valore massimo consentito dal modello)
+      let reviewTimerHours = 2; // Default 2 ore
+      if (configData.reviewTimer) {
+        // Assumiamo che reviewTimer sia in minuti nel frontend
+        reviewTimerHours = Math.min(Math.max(Math.round(configData.reviewTimer / 60), 1), 72);
+      }
 
       // Preparazione dei dati per il modello di BotConfiguration
       const botConfigInfo = {
@@ -32,7 +39,7 @@ class BotConfigurationService {
           en: reviewMsg, // Per ora usiamo lo stesso messaggio per tutte le lingue
           es: reviewMsg
         },
-        hoursDelayBeforeReviewRequest: reviewTimer,
+        hoursDelayBeforeReviewRequest: reviewTimerHours, // Ora in ore
         whatsappNumberType: 'system', // Default
         active: true
       };
@@ -122,7 +129,12 @@ class BotConfigurationService {
         if (!botConfig.reviewRequestMessage.es) botConfig.reviewRequestMessage.es = configData.reviewTemplate;
       }
       
-      if (configData.reviewTimer) botConfig.hoursDelayBeforeReviewRequest = configData.reviewTimer;
+      if (configData.reviewTimer) {
+        // Converti minuti in ore
+        const reviewTimerHours = Math.min(Math.max(Math.round(configData.reviewTimer / 60), 1), 72);
+        botConfig.hoursDelayBeforeReviewRequest = reviewTimerHours;
+      }
+      
       if (configData.active !== undefined) botConfig.active = configData.active;
 
       // Salva le modifiche
