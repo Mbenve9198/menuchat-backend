@@ -106,6 +106,7 @@ const webhookHandler = async (req, res) => {
     const interaction = new CustomerInteraction({
       restaurant: restaurant._id,
       customerPhoneNumber: fromNumber,
+      customerPhoneHash: require('crypto').createHash('md5').update(fromNumber).digest('hex'),
       lastMessageReceived: messageBody,
       lastMessageSent: null,
       status: 'active',
