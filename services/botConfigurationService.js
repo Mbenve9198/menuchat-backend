@@ -12,21 +12,27 @@ class BotConfigurationService {
    */
   async createBotConfiguration(configData, restaurantId) {
     try {
+      // Uso di default se mancano dei dati
+      const welcomeMsg = configData.welcomeMessage || 'Benvenuto nel nostro ristorante! Come posso aiutarti?';
+      const reviewMsg = configData.reviewTemplate || 'Ti è piaciuta la tua esperienza? Ci farebbe piacere ricevere una tua recensione!';
+      const triggerWord = configData.triggerWord || 'menu';
+      const reviewTimer = configData.reviewTimer || 2;
+
       // Preparazione dei dati per il modello di BotConfiguration
       const botConfigInfo = {
         restaurant: restaurantId,
-        triggerWord: configData.triggerWord,
+        triggerWord: triggerWord,
         welcomeMessage: {
-          it: configData.welcomeMessage,
-          en: configData.welcomeMessage, // Per ora usiamo lo stesso messaggio per tutte le lingue
-          es: configData.welcomeMessage
+          it: welcomeMsg,
+          en: welcomeMsg, // Per ora usiamo lo stesso messaggio per tutte le lingue
+          es: welcomeMsg
         },
         reviewRequestMessage: {
-          it: configData.reviewTemplate,
-          en: configData.reviewTemplate, // Per ora usiamo lo stesso messaggio per tutte le lingue
-          es: configData.reviewTemplate
+          it: reviewMsg,
+          en: reviewMsg, // Per ora usiamo lo stesso messaggio per tutte le lingue
+          es: reviewMsg
         },
-        hoursDelayBeforeReviewRequest: configData.reviewTimer || 2,
+        hoursDelayBeforeReviewRequest: reviewTimer,
         whatsappNumberType: 'system', // Default
         active: true
       };

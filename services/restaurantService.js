@@ -12,25 +12,96 @@ class RestaurantService {
    */
   async createRestaurant(restaurantData, userId) {
     try {
+      // Estrai informazioni dall'indirizzo se è una stringa
+      let addressComponents = {
+        street: '',
+        streetNumber: '',
+        city: '',
+        province: '',
+        postalCode: '',
+        country: 'Italia'
+      };
+      
+      // Se abbiamo l'indirizzo come stringa, proviamo a estrarre le componenti
+      if (restaurantData.address && typeof restaurantData.address === 'string') {
+        const addressString = restaurantData.address;
+        
+        // Estrai il CAP se presente
+        const postalCodeMatch = addressString.match(/(\d{5})/);
+        if (postalCodeMatch) {
+          addressComponents.postalCode = postalCodeMatch[0];
+        }
+        
+        // Cerca la sigla della provincia (2 lettere maiuscole)
+        const provinceMatch = addressString.match(/\b([A-Z]{2})\b/);
+        if (provinceMatch) {
+          addressComponents.province = provinceMatch[0];
+        } else {
+          // Se non trova la sigla, usiamo un valore predefinito
+          addressComponents.province = 'FI'; // Default a Firenze
+        }
+        
+        // Estrai la città (assumiamo che sia prima del CAP o della sigla provincia)
+        let cityMatch = addressString.match(/,\s*([^,]+)(?=,\s*\d{5})/);
+        if (cityMatch) {
+          addressComponents.city = cityMatch[1].trim();
+        } else {
+          // Tentiamo un altro pattern
+          cityMatch = addressString.match(/,\s*([^,]+)(?=\s+[A-Z]{2})/);
+          if (cityMatch) {
+            addressComponents.city = cityMatch[1].trim();
+          } else {
+            // Default o uso nome città dal nome ristorante
+            addressComponents.city = 'Firenze'; // Default
+          }
+        }
+        
+        // Per la via, prendiamo la prima parte dell'indirizzo
+        const streetParts = addressString.split(',')[0].trim().split(' ');
+        if (streetParts.length > 1) {
+          // L'ultimo elemento potrebbe essere il numero civico
+          const lastPart = streetParts.pop();
+          if (/^\d+[a-zA-Z]?$/.test(lastPart)) {
+            // Se sembra un numero civico
+            addressComponents.streetNumber = lastPart;
+            addressComponents.street = streetParts.join(' ');
+          } else {
+            // Altrimenti tutto è il nome della via
+            streetParts.push(lastPart);
+            addressComponents.street = streetParts.join(' ');
+            addressComponents.streetNumber = 'SN'; // Senza numero
+          }
+        } else if (streetParts.length === 1) {
+          addressComponents.street = streetParts[0];
+          addressComponents.streetNumber = 'SN'; // Senza numero
+        }
+      }
+      
+      // Usa i componenti estratti o quelli forniti direttamente
+      const addressInfo = {
+        street: restaurantData.street || addressComponents.street,
+        streetNumber: restaurantData.streetNumber || addressComponents.streetNumber,
+        city: restaurantData.city || addressComponents.city,
+        province: restaurantData.province || addressComponents.province,
+        postalCode: restaurantData.postalCode || addressComponents.postalCode,
+        country: restaurantData.country || addressComponents.country,
+        latitude: restaurantData.location?.lat,
+        longitude: restaurantData.location?.lng
+      };
+      
+      // Genera un numero di telefono predefinito se non fornito
+      const phoneNumber = restaurantData.phone || '+39 055 123456'; // Numero fittizio per Firenze
+      
       // Prepara i dati per il modello di Restaurant
       const restaurantInfo = {
         user: userId,
         name: restaurantData.restaurantName,
-        address: {
-          street: restaurantData.street || '',
-          streetNumber: restaurantData.streetNumber || '',
-          city: restaurantData.city || '',
-          province: restaurantData.province || '',
-          postalCode: restaurantData.postalCode || '',
-          country: restaurantData.country || 'Italia',
-          latitude: restaurantData.location?.lat,
-          longitude: restaurantData.location?.lng
-        },
+        address: addressInfo,
         googlePlaceId: restaurantData.restaurantId,
         googleMapsUrl: restaurantData.googleMapsUrl,
         customReviewLink: restaurantData.reviewLink,
         contact: {
-          phone: restaurantData.phone || '',
+          phone: phoneNumber,
           email: restaurantData.email || '',
           website: restaurantData.menuUrl || '',
           socialMedia: {
