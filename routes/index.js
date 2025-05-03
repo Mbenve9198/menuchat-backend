@@ -11,7 +11,7 @@ router.use('/auth', authRoutes);
 // Rotte di setup
 router.use('/setup', setupRoutes);
 
-// Rotte di Twilio
-router.use('/api/twilio', twilioRoutes);
+// Rotte di Twilio - importante: per il webhook usiamo direttamente /twilio/webhook
+router.use('/twilio', twilioRoutes);
 
 module.exports = router; 

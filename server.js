@@ -57,6 +57,26 @@ if (process.env.NODE_ENV === 'development') {
 // Rotte API
 app.use('/api', routes);
 
+// Aggiungi una rotta diretta per il webhook di Twilio
+const twilioController = require('./controllers/twilioController');
+app.post('/twilio/webhook', twilioController.webhookHandler);
+
+// Route di debug per verificare che il server sia attivo
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running', timestamp: new Date().toISOString() });
+});
+
+// Altro endpoint di debug che mostra le variabili d'ambiente (attivo solo in development)
+if (process.env.NODE_ENV === 'development') {
+  app.get('/debug/env', (req, res) => {
+    res.status(200).json({ 
+      base_url: process.env.BASE_URL,
+      node_env: process.env.NODE_ENV,
+      twilio_configured: !!process.env.TWILIO_ACCOUNT_SID
+    });
+  });
+}
+
 // Rotta di base per verifica che il server funzioni
 app.get('/', (req, res) => {
   res.json({ message: 'MenuChat API' });

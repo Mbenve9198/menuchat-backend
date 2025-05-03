@@ -13,11 +13,13 @@ const twilio = require('twilio');
  */
 const webhookHandler = async (req, res) => {
   try {
-    console.log('Webhook ricevuto:', req.body);
+    console.log('========= WEBHOOK TWILIO RICEVUTO =========');
+    console.log('Headers:', JSON.stringify(req.headers));
+    console.log('Body:', JSON.stringify(req.body));
     
     // Validazione della richiesta di Twilio (opzionale ma consigliata)
     // const twilioSignature = req.headers['x-twilio-signature'];
-    // const url = process.env.BASE_URL + '/api/twilio/webhook';
+    // const url = process.env.BASE_URL + '/twilio/webhook';
     // const authToken = process.env.TWILIO_AUTH_TOKEN;
     // const requestIsValid = twilio.validateRequest(authToken, twilioSignature, url, req.body);
     
@@ -27,11 +29,22 @@ const webhookHandler = async (req, res) => {
     // }
 
     // Estrai i dati dalla richiesta
-    const { Body: messageBody, From: fromNumber, To: toNumber } = req.body;
+    const messageBody = req.body.Body || req.body.body;
+    const fromNumber = req.body.From || req.body.from;
+    const toNumber = req.body.To || req.body.to;
     
-    console.log(`Messaggio ricevuto: "${messageBody}" da ${fromNumber}`);
+    // Log più dettagliato con formattazione
+    console.log(`📥 Messaggio: "${messageBody}"`);
+    console.log(`📱 Da: ${fromNumber}`);
+    console.log(`📲 A: ${toNumber}`);
+
+    if (!messageBody || !fromNumber) {
+      console.log('⚠️ Messaggio incompleto, mancano dati essenziali');
+      return res.status(400).send('Bad Request - Missing message data');
+    }
 
     // Trova la configurazione del bot in base al trigger word
+    console.log(`🔍 Ricerca bot per trigger: "${messageBody.trim()}"`);
     const botConfig = await BotConfiguration.findOne({ 
       triggerWord: messageBody.trim(),
       active: true
@@ -140,10 +153,13 @@ const webhookHandler = async (req, res) => {
     const twiml = new twilio.twiml.MessagingResponse();
     twiml.message(responseMessage);
     
-    console.log(`Risposta inviata a ${fromNumber}`);
+    console.log(`✅ Risposta inviata a ${fromNumber}`);
+    console.log('Contenuto risposta:', responseMessage);
+    console.log('TwiML generato:', twiml.toString());
     return res.type('text/xml').send(twiml.toString());
   } catch (error) {
-    console.error('Errore nel webhook Twilio:', error);
+    console.error('❌ ERRORE NEL WEBHOOK TWILIO:', error);
+    console.error('Stack trace:', error.stack);
     
     // Invia una risposta anche in caso di errore per evitare timeout
     const twiml = new twilio.twiml.MessagingResponse();
