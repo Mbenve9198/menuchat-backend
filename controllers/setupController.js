@@ -1,6 +1,7 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
 const botConfigurationService = require('../services/botConfigurationService');
+const whatsappTemplateService = require('./services/whatsappTemplateService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
@@ -56,13 +57,39 @@ class SetupController {
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
-      // Ritorna la risposta con i dati dell'utente e del ristorante
-      res.status(201).json({
-        success: true,
-        userId: user._id,
-        restaurantId: restaurant._id,
-        botConfigId: botConfig._id
-      });
+      // Determina il tipo di menu e crea il template appropriato
+      const hasMenuFile = formData.menuLanguages.some(lang => lang.menuFile);
+      const menuUrl = formData.menuLanguages.find(lang => lang.menuUrl)?.menuUrl;
+
+      try {
+        // Crea il template appropriato in base al tipo di menu
+        const template = await whatsappTemplateService.createMenuTemplate(
+          restaurant._id,
+          hasMenuFile ? 'pdf' : 'url',
+          formData.welcomeMessage,
+          menuUrl
+        );
+
+        // Ritorna la risposta con i dati dell'utente, del ristorante e del template
+        res.status(201).json({
+          success: true,
+          userId: user._id,
+          restaurantId: restaurant._id,
+          botConfigId: botConfig._id,
+          templateId: template._id,
+          templateStatus: template.status
+        });
+      } catch (templateError) {
+        console.error('Errore nella creazione del template WhatsApp:', templateError);
+        // Procedi comunque con la risposta anche se la creazione del template fallisce
+        res.status(201).json({
+          success: true,
+          userId: user._id,
+          restaurantId: restaurant._id,
+          botConfigId: botConfig._id,
+          templateError: templateError.message
+        });
+      }
     } catch (error) {
       console.error('Errore in setupRestaurant:', error);
 
