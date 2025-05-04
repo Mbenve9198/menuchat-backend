@@ -318,30 +318,31 @@ Our homemade pasta got 200+ five-star reviews! Check out our menu with all our s
         });
       }
 
-      const promptContent = `Create 3 different review request messages for a restaurant. Each should be unique but follow these guidelines:
+      const promptContent = `Create an optimized review request message for a restaurant. The message should encourage customers to leave a review by clicking a button that will be shown below the message.
 
 Restaurant Name: ${restaurantDetails.name}
 Rating: ${restaurantDetails.rating}/5 (${restaurantDetails.ratingsTotal} reviews)
 Cuisine: ${restaurantDetails.cuisineTypes?.join(', ') || 'Various'}
 
-Requirements for EACH template:
+Requirements:
 1. Be friendly and conversational
-2. Keep each message to 120-150 characters
-3. Ask customers to leave a review
-4. Don't include the review link directly in the message (it will be added automatically)
-5. Each template should have a different style:
-   - Template 1: Direct and simple
-   - Template 2: Emphasize how feedback helps the restaurant
-   - Template 3: Thank the customer for their order first
+2. Keep the message between 100-120 characters
+3. Don't mention or include the review link (it will be in a button below)
+4. Focus on one of these approaches:
+   - Thank the customer for their order
+   - Emphasize how feedback helps the restaurant improve
+   - Highlight the value of customer opinions
+5. Use appropriate emojis (max 2)
+6. Don't use generic phrases like "leave a review"
+7. Make it personal and engaging
 
-Response format must be EXACTLY:
-Template 1: [first template text]
-Template 2: [second template text]
-Template 3: [third template text]
+Response format:
+Return ONLY the message text, without quotes or any additional explanation.
 
-Do not include the review link or any placeholders for it in the templates.`;
+Example:
+Thanks for dining with us today! 🌟 Your opinion means the world to us - we'd love to hear about your experience with our dishes.`;
 
-      // Genera i template usando Claude
+      // Genera il messaggio usando Claude
       const response = await anthropic.messages.create({
         model: modelId,
         max_tokens: 500,
@@ -354,22 +355,18 @@ Do not include the review link or any placeholders for it in the templates.`;
         ]
       });
 
-      // Estrai i template dalla risposta
-      const fullText = response.content[0].text;
-      const templates = fullText
-        .split(/Template \d+: /)
-        .filter(text => text.trim().length > 0)
-        .map(text => text.trim());
+      // Estrai il messaggio dalla risposta
+      const message = response.content[0].text.trim();
 
       res.json({ 
         success: true, 
-        templates: templates
+        templates: [message] // Manteniamo l'array per retrocompatibilità
       });
     } catch (error) {
-      console.error('Error generating review templates:', error);
+      console.error('Error generating review message:', error);
       res.status(500).json({ 
         success: false, 
-        error: 'Error generating review templates',
+        error: 'Error generating review message',
         details: error.message 
       });
     }
