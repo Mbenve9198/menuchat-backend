@@ -1,174 +1,180 @@
 const BotConfiguration = require('../models/BotConfiguration');
+const menuService = require('./menuService');
 
 /**
- * Service per la gestione delle configurazioni del bot
+ * Servizio per la gestione delle configurazioni del bot
  */
 class BotConfigurationService {
   /**
-   * Crea una nuova configurazione per il bot
-   * @param {Object} configData - Dati di configurazione del bot
-   * @param {string} restaurantId - ID del ristorante a cui associare il bot
-   * @returns {Promise<Object>} - Configurazione del bot creata
+   * Crea una nuova configurazione del bot
+   * @param {Object} formData - Dati del form
+   * @param {String} restaurantId - ID del ristorante
+   * @returns {Promise<BotConfiguration>} Configurazione del bot creata
    */
-  async createBotConfiguration(configData, restaurantId) {
+  async createBotConfiguration(formData, restaurantId) {
     try {
-      // Uso di default se mancano dei dati
-      const welcomeMsg = configData.welcomeMessage || 'Benvenuto nel nostro ristorante! Come posso aiutarti?';
-      const reviewMsg = configData.reviewTemplate || 'Ti è piaciuta la tua esperienza? Ci farebbe piacere ricevere una tua recensione!';
-      const triggerWord = configData.triggerWord || 'menu';
-      
-      // Converti minuti in ore, con un default di 2 ore se non specificato
-      // e limitando a 72 ore (valore massimo consentito dal modello)
-      let reviewTimerHours = 2; // Default 2 ore
-      if (configData.reviewTimer) {
-        // Assumiamo che reviewTimer sia in minuti nel frontend
-        reviewTimerHours = Math.min(Math.max(Math.round(configData.reviewTimer / 60), 1), 72);
-      }
-
-      // Preparazione dei dati per il modello di BotConfiguration
-      const botConfigInfo = {
+      // Mappa i dati dal form alla configurazione del bot
+      const botConfigData = {
         restaurant: restaurantId,
-        triggerWord: triggerWord,
-        welcomeMessage: {
-          it: welcomeMsg,
-          en: welcomeMsg, // Per ora usiamo lo stesso messaggio per tutte le lingue
-          es: welcomeMsg
-        },
-        reviewRequestMessage: {
-          it: reviewMsg,
-          en: reviewMsg, // Per ora usiamo lo stesso messaggio per tutte le lingue
-          es: reviewMsg
-        },
-        hoursDelayBeforeReviewRequest: reviewTimerHours, // Ora in ore
-        whatsappNumberType: 'system', // Default
+        triggerWord: formData.triggerWord,
+        welcomeMessage: formData.welcomeMessage,
+        reviewLink: formData.reviewLink,
+        reviewPlatform: formData.reviewPlatform || 'google',
+        reviewTimer: formData.reviewTimer || 120,
+        reviewMessage: formData.reviewTemplate,
+        defaultMenuUrl: formData.menuUrl || '',
         active: true
       };
 
-      // Crea una nuova configurazione bot
-      const botConfiguration = new BotConfiguration(botConfigInfo);
-
-      // Salva la configurazione
-      await botConfiguration.save();
+      console.log("Creating bot configuration with data:", botConfigData);
       
-      return botConfiguration;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Trova la configurazione del bot per un ristorante
-   * @param {string} restaurantId - ID del ristorante
-   * @returns {Promise<Object>} - Configurazione trovata
-   */
-  async findByRestaurant(restaurantId) {
-    try {
-      return await BotConfiguration.findOne({ restaurant: restaurantId, active: true });
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Trova una configurazione bot per ID
-   * @param {string} id - ID della configurazione
-   * @returns {Promise<Object>} - Configurazione trovata
-   */
-  async findById(id) {
-    try {
-      return await BotConfiguration.findById(id);
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Trova una configurazione bot per parola trigger
-   * @param {string} triggerWord - Parola trigger da cercare
-   * @returns {Promise<Object>} - Configurazione trovata
-   */
-  async findByTriggerWord(triggerWord) {
-    try {
-      return await BotConfiguration.findOne({ 
-        triggerWord: { $regex: new RegExp(`^${triggerWord}$`, 'i') },
-        active: true 
-      });
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Aggiorna la configurazione del bot
-   * @param {string} id - ID della configurazione
-   * @param {Object} configData - Dati aggiornati della configurazione
-   * @returns {Promise<Object>} - Configurazione aggiornata
-   */
-  async updateConfiguration(id, configData) {
-    try {
-      const botConfig = await BotConfiguration.findById(id);
+      // Crea la configurazione del bot nel database
+      const botConfig = await BotConfiguration.create(botConfigData);
       
-      if (!botConfig) {
-        throw new Error('Configurazione bot non trovata');
+      // Se abbiamo dati dei menu in diverse lingue, creiamo i menu
+      if (formData.menuLanguages && formData.menuLanguages.length > 0) {
+        // Crea i menu usando il servizio menu
+        const menus = await menuService.createOrUpdateMenusFromArray(
+          formData.menuLanguages,
+          restaurantId
+        );
+        
+        // Aggiorna la configurazione del bot con i riferimenti ai menu
+        botConfig.menus = menus.map(menu => menu._id);
+        await botConfig.save();
       }
-
-      // Aggiorna i campi forniti
-      if (configData.triggerWord) botConfig.triggerWord = configData.triggerWord;
-      
-      if (configData.welcomeMessage) {
-        botConfig.welcomeMessage.it = configData.welcomeMessage;
-        // Aggiorna anche le altre lingue se necessario
-        if (!botConfig.welcomeMessage.en) botConfig.welcomeMessage.en = configData.welcomeMessage;
-        if (!botConfig.welcomeMessage.es) botConfig.welcomeMessage.es = configData.welcomeMessage;
-      }
-      
-      if (configData.reviewTemplate) {
-        botConfig.reviewRequestMessage.it = configData.reviewTemplate;
-        // Aggiorna anche le altre lingue se necessario
-        if (!botConfig.reviewRequestMessage.en) botConfig.reviewRequestMessage.en = configData.reviewTemplate;
-        if (!botConfig.reviewRequestMessage.es) botConfig.reviewRequestMessage.es = configData.reviewTemplate;
-      }
-      
-      if (configData.reviewTimer) {
-        // Converti minuti in ore
-        const reviewTimerHours = Math.min(Math.max(Math.round(configData.reviewTimer / 60), 1), 72);
-        botConfig.hoursDelayBeforeReviewRequest = reviewTimerHours;
-      }
-      
-      if (configData.active !== undefined) botConfig.active = configData.active;
-
-      // Salva le modifiche
-      await botConfig.save();
       
       return botConfig;
     } catch (error) {
+      console.error('Error creating bot configuration:', error);
       throw error;
     }
   }
 
   /**
-   * Disattiva un bot
-   * @param {string} id - ID della configurazione
-   * @param {string} reason - Motivo della disattivazione
-   * @returns {Promise<Object>} - Configurazione aggiornata
+   * Trova una configurazione del bot per ID
+   * @param {String} id - ID della configurazione del bot
+   * @returns {Promise<BotConfiguration>} Configurazione del bot trovata
    */
-  async deactivateBot(id, reason = '') {
-    try {
-      const botConfig = await BotConfiguration.findById(id);
+  async findBotConfigurationById(id) {
+    return await BotConfiguration.findById(id)
+      .populate('restaurant')
+      .populate('menus');
+  }
+
+  /**
+   * Trova configurazioni del bot per ristorante
+   * @param {String} restaurantId - ID del ristorante
+   * @returns {Promise<Array<BotConfiguration>>} Array di configurazioni del bot
+   */
+  async findBotConfigurationsByRestaurant(restaurantId) {
+    return await BotConfiguration.find({ restaurant: restaurantId, active: true })
+      .populate('menus');
+  }
+
+  /**
+   * Trova una configurazione del bot per trigger word
+   * @param {String} triggerWord - Trigger word
+   * @returns {Promise<BotConfiguration>} Configurazione del bot trovata
+   */
+  async findBotConfigurationByTrigger(triggerWord) {
+    return await BotConfiguration.findOne({ 
+      triggerWord: { $regex: new RegExp(`^${triggerWord}$`, 'i') }, 
+      active: true 
+    })
+    .populate('restaurant')
+    .populate('menus');
+  }
+
+  /**
+   * Aggiorna una configurazione del bot
+   * @param {String} id - ID della configurazione del bot
+   * @param {Object} updateData - Dati da aggiornare
+   * @returns {Promise<BotConfiguration>} Configurazione del bot aggiornata
+   */
+  async updateBotConfiguration(id, updateData) {
+    // Se ci sono dati dei menu nell'aggiornamento, gestiamoli separatamente
+    let menuLanguages;
+    if (updateData.menuLanguages) {
+      menuLanguages = updateData.menuLanguages;
+      delete updateData.menuLanguages;
+    }
+    
+    // Aggiorna la configurazione del bot
+    const botConfig = await BotConfiguration.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true
+    });
+
+    if (!botConfig) {
+      throw new Error('Configurazione del bot non trovata');
+    }
+
+    // Se abbiamo dati dei menu, aggiorniamoli
+    if (menuLanguages && menuLanguages.length > 0) {
+      // Crea o aggiorna i menu usando il servizio menu
+      const menus = await menuService.createOrUpdateMenusFromArray(
+        menuLanguages,
+        botConfig.restaurant
+      );
       
-      if (!botConfig) {
-        throw new Error('Configurazione bot non trovata');
-      }
-
-      botConfig.active = false;
-      botConfig.deactivationReason = reason || 'Disattivato manualmente';
-
+      // Aggiorna i riferimenti ai menu
+      botConfig.menus = menus.map(menu => menu._id);
       await botConfig.save();
       
-      return botConfig;
-    } catch (error) {
-      throw error;
+      // Popola i menu per il risultato
+      await botConfig.populate('menus');
     }
+
+    return botConfig;
+  }
+
+  /**
+   * Aggiorna il menu per una specifica lingua
+   * @param {String} id - ID della configurazione del bot
+   * @param {String} languageCode - Codice della lingua
+   * @param {Object} menuData - Dati del menu
+   * @returns {Promise<BotConfiguration>} Configurazione del bot aggiornata
+   */
+  async updateMenuForLanguage(id, languageCode, menuData) {
+    // Trova la configurazione del bot
+    const botConfig = await BotConfiguration.findById(id);
+    
+    if (!botConfig) {
+      throw new Error('Configurazione del bot non trovata');
+    }
+
+    // Crea o aggiorna il menu per la lingua specificata
+    const menu = await menuService.createMenu({
+      ...menuData,
+      language: {
+        code: languageCode,
+        name: menuData.languageName || languageCode,
+        phonePrefix: menuData.phonePrefix || []
+      }
+    }, botConfig.restaurant);
+    
+    // Aggiorna l'array dei menu se non contiene già questo menu
+    if (!botConfig.menus.includes(menu._id)) {
+      botConfig.menus.push(menu._id);
+      await botConfig.save();
+    }
+    
+    // Popola i menu per il risultato
+    await botConfig.populate('menus');
+    
+    return botConfig;
+  }
+
+  /**
+   * Elimina una configurazione del bot (disattivazione)
+   * @param {String} id - ID della configurazione del bot
+   * @returns {Promise<Boolean>} True se eliminato con successo
+   */
+  async deleteBotConfiguration(id) {
+    // Invece di eliminare, imposta active = false
+    const botConfig = await BotConfiguration.findByIdAndUpdate(id, { active: false }, { new: true });
+    return !!botConfig;
   }
 }
 
