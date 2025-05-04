@@ -138,9 +138,10 @@ class WhatsAppTemplateService {
       // Genera un nome univoco per il template
       const templateName = await this.generateTemplateUniqueName(restaurant.name, 'review');
 
-      // Usa il messaggio personalizzato o un messaggio di default
-      const defaultMessage = `Grazie per aver ordinato da ${restaurant.name}! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.`;
-      const finalMessage = reviewMessage || defaultMessage;
+      // Verifica che il messaggio di recensione sia fornito
+      if (!reviewMessage) {
+        throw new Error('Review message is required');
+      }
 
       const templateData = {
         restaurant: restaurantId,
@@ -149,9 +150,9 @@ class WhatsAppTemplateService {
         language: 'it',
         components: {
           body: {
-            text: finalMessage,
+            text: reviewMessage,
             example: {
-              body_text: [finalMessage.replace(restaurant.name, "Esempio Ristorante")]
+              body_text: [reviewMessage.replace(restaurant.name, "Esempio Ristorante")]
             }
           },
           buttons: [{
@@ -190,9 +191,10 @@ class WhatsAppTemplateService {
     switch (template.type) {
       case 'MEDIA':
         // Template per menu PDF
+        const pdfUrl = template.components.header?.example;
         types['twilio/card'] = {
           body: template.components.body.text,
-          media: ["{{1}}"],
+          media: [pdfUrl || "{{1}}"], // Usiamo l'URL di Cloudinary se disponibile
           actions: [{
             type: "QUICK_REPLY",
             title: "Grazie",
@@ -206,7 +208,6 @@ class WhatsAppTemplateService {
         // Template per menu URL o recensioni
         if (template.components.buttons && template.components.buttons.length > 0) {
           const button = template.components.buttons[0];
-          // Verifica che il testo del bottone non superi i 25 caratteri
           const buttonTitle = button.text.length > 25 ? button.text.substring(0, 25) : button.text;
           
           types['twilio/call-to-action'] = {
@@ -225,7 +226,10 @@ class WhatsAppTemplateService {
       friendly_name: template.name,
       types,
       language: template.language,
-      variables: template.type === 'MEDIA' ? {"1": "menu.pdf"} : {}
+      // Se abbiamo un URL del PDF, lo usiamo come valore di default per la variabile
+      variables: template.type === 'MEDIA' ? 
+        {"1": template.components.header?.example || "menu.pdf"} : 
+        {}
     };
   }
 
