@@ -35,10 +35,25 @@ class WhatsAppTemplateService {
     const sanitizedName = this.sanitizeRestaurantName(restaurantName);
     const timestamp = Date.now();
     const randomString = crypto.randomBytes(4).toString('hex');
-    const templateType = type === 'pdf' ? 'menu_pdf' : 'menu_url';
     
-    // Formato: nomeristorante_menutype_timestamp_random
-    // Esempio: pizzeria_italia_menu_pdf_1684847576_a1b2c3d4
+    // Determina il tipo di template
+    let templateType;
+    switch (type) {
+      case 'pdf':
+        templateType = 'menu_pdf';
+        break;
+      case 'url':
+        templateType = 'menu_url';
+        break;
+      case 'review':
+        templateType = 'review';
+        break;
+      default:
+        templateType = type;
+    }
+    
+    // Formato: nomeristorante_tipo_timestamp_random
+    // Esempio: pizzeria_italia_review_1684847576_a1b2c3d4
     const templateName = `${sanitizedName}_${templateType}_${timestamp}_${randomString}`;
     
     // Verifica che il nome non sia già in uso
@@ -123,6 +138,10 @@ class WhatsAppTemplateService {
       // Genera un nome univoco per il template
       const templateName = await this.generateTemplateUniqueName(restaurant.name, 'review');
 
+      // Usa il messaggio personalizzato o un messaggio di default
+      const defaultMessage = `Grazie per aver ordinato da ${restaurant.name}! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.`;
+      const finalMessage = reviewMessage || defaultMessage;
+
       const templateData = {
         restaurant: restaurantId,
         type: 'REVIEW',
@@ -130,9 +149,9 @@ class WhatsAppTemplateService {
         language: 'it',
         components: {
           body: {
-            text: reviewMessage,
+            text: finalMessage,
             example: {
-              body_text: [[restaurant.name]]
+              body_text: [finalMessage.replace(restaurant.name, "Esempio Ristorante")]
             }
           },
           buttons: [{
