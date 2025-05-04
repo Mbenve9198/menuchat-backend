@@ -109,6 +109,46 @@ class WhatsAppTemplateService {
   }
 
   /**
+   * Converte il nostro formato template in quello di Twilio
+   */
+  convertToTwilioFormat(template) {
+    // Prepara i tipi di contenuto
+    const types = {};
+
+    // Configura il tipo twilio/text per il messaggio base
+    types['twilio/text'] = {
+      body: template.components.body.text
+    };
+
+    // Se c'è un header di tipo documento, aggiungi twilio/document
+    if (template.components.header && template.components.header.type === 'DOCUMENT') {
+      types['twilio/document'] = {
+        media: [template.components.header.example.header_handle[0]]
+      };
+    }
+
+    // Se ci sono bottoni, aggiungi twilio/button
+    if (template.components.buttons && template.components.buttons.length > 0) {
+      const button = template.components.buttons[0];
+      types['twilio/button'] = {
+        type: button.type,
+        text: button.text,
+        url: button.url
+      };
+    }
+
+    return {
+      friendly_name: template.name,
+      types,
+      language: template.language,
+      variables: {
+        "1": "Customer Name",
+        "2": "Restaurant Name"
+      }
+    };
+  }
+
+  /**
    * Invia il template a Twilio per approvazione
    */
   async submitTemplateToTwilio(template) {
@@ -116,23 +156,29 @@ class WhatsAppTemplateService {
       // Converti il nostro formato in quello di Twilio
       const twilioTemplate = this.convertToTwilioFormat(template);
 
-      // Invia la richiesta a Twilio usando l'endpoint corretto per i Content Templates
-      const response = await this.client.messaging.v1.contentTemplates.create({
-        contentSid: process.env.TWILIO_CONTENT_SID,
-        contentVariables: twilioTemplate.components,
-        friendlyName: twilioTemplate.name,
-        language: twilioTemplate.language,
-        category: 'MARKETING', // o altra categoria appropriata
-        channels: ['whatsapp']
-      });
+      // 1. Prima crea il template usando l'API Content
+      const contentResponse = await this.client.content.v1.contents.create(twilioTemplate);
+
+      // 2. Poi richiedi l'approvazione per WhatsApp
+      const approvalResponse = await this.client.content.v1
+        .contents(contentResponse.sid)
+        .approvalRequests
+        .create({
+          channel: 'whatsapp',
+          name: template.name.toLowerCase(), // WhatsApp richiede nomi in minuscolo
+          category: 'MARKETING' // o 'UTILITY' a seconda del caso
+        });
 
       // Aggiorna il template con l'ID Twilio e lo stato
-      template.twilioTemplateId = response.sid;
+      template.twilioTemplateId = contentResponse.sid;
       template.status = 'PENDING';
       template.lastSubmissionDate = new Date();
       await template.save();
 
-      return response;
+      return {
+        contentSid: contentResponse.sid,
+        approvalStatus: approvalResponse.status
+      };
     } catch (error) {
       console.error('Errore nell\'invio del template a Twilio:', error);
       template.status = 'REJECTED';
@@ -140,53 +186,6 @@ class WhatsAppTemplateService {
       await template.save();
       throw error;
     }
-  }
-
-  /**
-   * Converte il nostro formato template in quello di Twilio
-   */
-  convertToTwilioFormat(template) {
-    const twilioTemplate = {
-      name: template.name,
-      language: template.language,
-      components: []
-    };
-
-    // Prepara le variabili del contenuto
-    const contentVariables = [];
-
-    // Aggiungi header se presente
-    if (template.components.header && template.components.header.type !== 'NONE') {
-      contentVariables.push({
-        type: 'HEADER',
-        mediaType: template.components.header.format.toUpperCase(),
-        text: null,
-        example: template.components.header.example.header_handle[0]
-      });
-    }
-
-    // Aggiungi body
-    contentVariables.push({
-      type: 'BODY',
-      text: template.components.body.text,
-      example: template.components.body.example.body_text.join(' ')
-    });
-
-    // Aggiungi buttons se presenti
-    if (template.components.buttons && template.components.buttons.length > 0) {
-      template.components.buttons.forEach(button => {
-        contentVariables.push({
-          type: 'BUTTON',
-          buttonType: button.type,
-          text: button.text,
-          url: button.url,
-          phoneNumber: button.phone_number
-        });
-      });
-    }
-
-    twilioTemplate.components = contentVariables;
-    return twilioTemplate;
   }
 
   /**
@@ -199,13 +198,16 @@ class WhatsAppTemplateService {
         throw new Error('Template non trovato o non ancora inviato a Twilio');
       }
 
-      const twilioTemplate = await this.client.messaging.v1.contentTemplates(template.twilioTemplateId).fetch();
+      // Usa l'API Content per controllare lo stato
+      const approvalStatus = await this.client.content.v1
+        .contents(template.twilioTemplateId)
+        .approvalRequests()
+        .fetch();
       
       // Aggiorna lo stato nel nostro database
-      template.status = twilioTemplate.status === 'approved' ? 'APPROVED' : 
-                       twilioTemplate.status === 'rejected' ? 'REJECTED' : 'PENDING';
-      if (twilioTemplate.status === 'rejected') {
-        template.rejectionReason = twilioTemplate.rejection_reason;
+      template.status = approvalStatus.whatsapp.status.toUpperCase();
+      if (approvalStatus.whatsapp.rejection_reason) {
+        template.rejectionReason = approvalStatus.whatsapp.rejection_reason;
       }
       await template.save();
 
