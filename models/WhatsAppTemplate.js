@@ -8,7 +8,7 @@ const whatsAppTemplateSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['MEDIA', 'CALL_TO_ACTION'],
+    enum: ['MEDIA', 'CALL_TO_ACTION', 'REVIEW'],
     required: true
   },
   name: {

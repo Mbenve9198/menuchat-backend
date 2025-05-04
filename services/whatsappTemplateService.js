@@ -74,7 +74,7 @@ class WhatsAppTemplateService {
           body: {
             text: welcomeMessage,
             example: {
-              body_text: [["Marco", restaurant.name]]
+              body_text: [welcomeMessage]
             }
           }
         }
@@ -84,12 +84,10 @@ class WhatsAppTemplateService {
       if (type === 'pdf') {
         templateData.components.header = {
           type: 'DOCUMENT',
-          format: 'DOCUMENT',
-          example: {
-            header_handle: ["menu.pdf"]
-          }
+          format: 'PDF',
+          example: menuUrl // Salviamo l'URL del PDF come esempio
         };
-      } else {
+      } else if (type === 'url' && menuUrl) {
         templateData.components.buttons = [{
           type: 'URL',
           text: 'Vedi Menu',
@@ -173,9 +171,14 @@ class WhatsAppTemplateService {
     switch (template.type) {
       case 'MEDIA':
         // Template per menu PDF
-        types['twilio/document'] = {
-          media: ["https://example.com/menu.pdf"],
-          text: "Menu PDF"
+        types['twilio/card'] = {
+          title: template.components.body.text,
+          media: ["{{1}}"], // Il PDF verrà sostituito durante l'invio
+          actions: [{
+            type: "QUICK_REPLY",
+            text: "Grazie",
+            id: "thanks"
+          }]
         };
         break;
 
@@ -199,10 +202,7 @@ class WhatsAppTemplateService {
       friendly_name: template.name,
       types,
       language: template.language,
-      variables: {
-        "1": "Customer Name",
-        "2": "Restaurant Name"
-      }
+      variables: template.type === 'MEDIA' ? {"1": "menu.pdf"} : {}
     };
   }
 
