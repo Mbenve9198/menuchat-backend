@@ -182,7 +182,7 @@ class WhatsAppTemplateService {
   convertToTwilioFormat(template) {
     const types = {};
     
-    // Base text type per tutti i template
+    // Configurazione base del testo per tutti i tipi
     types['twilio/text'] = {
       body: template.components.body.text
     };
@@ -191,12 +191,11 @@ class WhatsAppTemplateService {
       case 'MEDIA':
         // Template per menu PDF
         types['twilio/card'] = {
-          title: template.components.body.text,
           body: template.components.body.text,
           media: ["{{1}}"],
           actions: [{
             type: "QUICK_REPLY",
-            text: "Grazie",
+            title: "Grazie",
             id: "thanks"
           }]
         };
@@ -207,11 +206,14 @@ class WhatsAppTemplateService {
         // Template per menu URL o recensioni
         if (template.components.buttons && template.components.buttons.length > 0) {
           const button = template.components.buttons[0];
-          types['twilio/button'] = {
+          // Verifica che il testo del bottone non superi i 25 caratteri
+          const buttonTitle = button.text.length > 25 ? button.text.substring(0, 25) : button.text;
+          
+          types['twilio/call-to-action'] = {
             body: template.components.body.text,
-            buttons: [{
-              type: "url",
-              text: button.text,
+            actions: [{
+              type: "URL",
+              title: buttonTitle,
               url: button.url
             }]
           };
