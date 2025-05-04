@@ -182,7 +182,7 @@ class WhatsAppTemplateService {
   convertToTwilioFormat(template) {
     const types = {};
     
-    // Configurazione base del testo per tutti i tipi
+    // Base text type per tutti i template
     types['twilio/text'] = {
       body: template.components.body.text
     };
@@ -192,7 +192,8 @@ class WhatsAppTemplateService {
         // Template per menu PDF
         types['twilio/card'] = {
           title: template.components.body.text,
-          media: ["{{1}}"], // Il PDF verrà sostituito durante l'invio
+          body: template.components.body.text,
+          media: ["{{1}}"],
           actions: [{
             type: "QUICK_REPLY",
             text: "Grazie",
@@ -207,6 +208,7 @@ class WhatsAppTemplateService {
         if (template.components.buttons && template.components.buttons.length > 0) {
           const button = template.components.buttons[0];
           types['twilio/button'] = {
+            body: template.components.body.text,
             buttons: [{
               type: "url",
               text: button.text,
