@@ -1,7 +1,7 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
 const botConfigurationService = require('../services/botConfigurationService');
-const whatsAppTemplateService = require('../services/whatsAppTemplateService');
+const whatsappTemplateService = require('../services/whatsappTemplateService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
@@ -67,7 +67,7 @@ class SetupController {
         const menuUrl = formData.menuLanguages.find(lang => lang.menuUrl)?.menuUrl;
 
         // Crea il template del menu
-        menuTemplate = await whatsAppTemplateService.createMenuTemplate(
+        menuTemplate = await whatsappTemplateService.createMenuTemplate(
           restaurant._id,
           hasMenuFile ? 'pdf' : 'url',
           formData.welcomeMessage,
@@ -75,7 +75,7 @@ class SetupController {
         );
 
         // Crea il template per le recensioni
-        reviewTemplate = await whatsAppTemplateService.createReviewTemplate(
+        reviewTemplate = await whatsappTemplateService.createReviewTemplate(
           restaurant._id,
           formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.",
           formData.reviewLink
