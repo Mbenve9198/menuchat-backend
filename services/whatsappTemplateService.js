@@ -192,9 +192,16 @@ class WhatsAppTemplateService {
       case 'MEDIA':
         // Template per menu PDF
         const pdfUrl = template.components.header?.example;
-        types['twilio/card'] = {
+        if (!pdfUrl) {
+          throw new Error('PDF URL is required for MEDIA template');
+        }
+        
+        types['twilio/media'] = {
           body: template.components.body.text,
-          media: [pdfUrl || "{{1}}"], // Usiamo l'URL di Cloudinary se disponibile
+          media: {
+            type: "document",
+            url: pdfUrl
+          },
           actions: [{
             type: "QUICK_REPLY",
             title: "Grazie",
@@ -226,10 +233,7 @@ class WhatsAppTemplateService {
       friendly_name: template.name,
       types,
       language: template.language,
-      // Se abbiamo un URL del PDF, lo usiamo come valore di default per la variabile
-      variables: template.type === 'MEDIA' ? 
-        {"1": template.components.header?.example || "menu.pdf"} : 
-        {}
+      variables: {}  // Non abbiamo più bisogno di variabili per il PDF
     };
   }
 
