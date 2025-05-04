@@ -2,14 +2,17 @@ const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const Restaurant = require('../models/Restaurant');
 const twilio = require('twilio');
 const crypto = require('crypto');
+const axios = require('axios');
 
 class WhatsAppTemplateService {
   constructor() {
-    this.client = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    this.accountSid = process.env.TWILIO_ACCOUNT_SID;
+    this.authToken = process.env.TWILIO_AUTH_TOKEN;
+    this.client = twilio(this.accountSid, this.authToken);
     this.whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+    
+    // Base URL per le API Content di Twilio
+    this.contentApiBaseUrl = `https://content.twilio.com/v1/Content`;
   }
 
   /**
@@ -109,32 +112,87 @@ class WhatsAppTemplateService {
   }
 
   /**
+   * Crea un nuovo template per la richiesta di recensione
+   */
+  async createReviewTemplate(restaurantId, reviewMessage, reviewLink) {
+    try {
+      // Trova il ristorante per ottenere il nome
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+        throw new Error('Ristorante non trovato');
+      }
+
+      // Genera un nome univoco per il template
+      const templateName = await this.generateTemplateUniqueName(restaurant.name, 'review');
+
+      const templateData = {
+        restaurant: restaurantId,
+        type: 'REVIEW',
+        name: templateName,
+        language: 'it',
+        components: {
+          body: {
+            text: reviewMessage,
+            example: {
+              body_text: [[restaurant.name]]
+            }
+          },
+          buttons: [{
+            type: 'URL',
+            text: 'Lascia una recensione',
+            url: reviewLink
+          }]
+        }
+      };
+
+      // Crea il template nel database
+      const template = new WhatsAppTemplate(templateData);
+      await template.save();
+
+      // Invia il template a Twilio per approvazione
+      await this.submitTemplateToTwilio(template);
+
+      return template;
+    } catch (error) {
+      console.error('Errore nella creazione del template di recensione:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Converte il nostro formato template in quello di Twilio
    */
   convertToTwilioFormat(template) {
-    // Prepara i tipi di contenuto
     const types = {};
-
-    // Configura il tipo twilio/text per il messaggio base
+    
+    // Configurazione base del testo per tutti i tipi
     types['twilio/text'] = {
       body: template.components.body.text
     };
 
-    // Se c'è un header di tipo documento, aggiungi twilio/document
-    if (template.components.header && template.components.header.type === 'DOCUMENT') {
-      types['twilio/document'] = {
-        media: [template.components.header.example.header_handle[0]]
-      };
-    }
+    switch (template.type) {
+      case 'MEDIA':
+        // Template per menu PDF
+        types['twilio/document'] = {
+          media: ["https://example.com/menu.pdf"],
+          text: "Menu PDF"
+        };
+        break;
 
-    // Se ci sono bottoni, aggiungi twilio/button
-    if (template.components.buttons && template.components.buttons.length > 0) {
-      const button = template.components.buttons[0];
-      types['twilio/button'] = {
-        type: button.type,
-        text: button.text,
-        url: button.url
-      };
+      case 'CALL_TO_ACTION':
+      case 'REVIEW':
+        // Template per menu URL o recensioni
+        if (template.components.buttons && template.components.buttons.length > 0) {
+          const button = template.components.buttons[0];
+          types['twilio/button'] = {
+            buttons: [{
+              type: "url",
+              text: button.text,
+              url: button.url
+            }]
+          };
+        }
+        break;
     }
 
     return {
@@ -149,40 +207,55 @@ class WhatsAppTemplateService {
   }
 
   /**
-   * Invia il template a Twilio per approvazione
+   * Invia il template a Twilio per approvazione usando direttamente l'API REST
    */
   async submitTemplateToTwilio(template) {
     try {
-      // Converti il nostro formato in quello di Twilio
       const twilioTemplate = this.convertToTwilioFormat(template);
+      
+      // 1. Crea il template
+      const contentResponse = await axios({
+        method: 'post',
+        url: this.contentApiBaseUrl,
+        auth: {
+          username: this.accountSid,
+          password: this.authToken
+        },
+        data: twilioTemplate
+      });
 
-      // 1. Prima crea il template usando l'API Content
-      const contentResponse = await this.client.content.v1.contents.create(twilioTemplate);
+      const contentSid = contentResponse.data.sid;
 
-      // 2. Poi richiedi l'approvazione per WhatsApp
-      const approvalResponse = await this.client.content.v1
-        .contents(contentResponse.sid)
-        .approvalRequests
-        .create({
-          channel: 'whatsapp',
-          name: template.name.toLowerCase(), // WhatsApp richiede nomi in minuscolo
-          category: 'MARKETING' // o 'UTILITY' a seconda del caso
-        });
+      // 2. Richiedi l'approvazione per WhatsApp
+      const approvalResponse = await axios({
+        method: 'post',
+        url: `${this.contentApiBaseUrl}/${contentSid}/ApprovalRequests/whatsapp`,
+        auth: {
+          username: this.accountSid,
+          password: this.authToken
+        },
+        data: {
+          name: template.name.toLowerCase(),
+          // Le recensioni sono sempre di tipo UTILITY perché sono una risposta a un'azione dell'utente
+          category: template.type === 'REVIEW' ? 'UTILITY' : 
+                   template.type === 'MEDIA' ? 'UTILITY' : 'MARKETING'
+        }
+      });
 
       // Aggiorna il template con l'ID Twilio e lo stato
-      template.twilioTemplateId = contentResponse.sid;
+      template.twilioTemplateId = contentSid;
       template.status = 'PENDING';
       template.lastSubmissionDate = new Date();
       await template.save();
 
       return {
-        contentSid: contentResponse.sid,
-        approvalStatus: approvalResponse.status
+        contentSid,
+        approvalStatus: approvalResponse.data.status
       };
     } catch (error) {
-      console.error('Errore nell\'invio del template a Twilio:', error);
+      console.error('Errore nell\'invio del template a Twilio:', error.response?.data || error);
       template.status = 'REJECTED';
-      template.rejectionReason = error.message;
+      template.rejectionReason = error.response?.data?.message || error.message;
       await template.save();
       throw error;
     }
@@ -198,22 +271,27 @@ class WhatsAppTemplateService {
         throw new Error('Template non trovato o non ancora inviato a Twilio');
       }
 
-      // Usa l'API Content per controllare lo stato
-      const approvalStatus = await this.client.content.v1
-        .contents(template.twilioTemplateId)
-        .approvalRequests()
-        .fetch();
+      const response = await axios({
+        method: 'get',
+        url: `${this.contentApiBaseUrl}/${template.twilioTemplateId}/ApprovalRequests`,
+        auth: {
+          username: this.accountSid,
+          password: this.authToken
+        }
+      });
+
+      const approvalStatus = response.data.whatsapp;
       
       // Aggiorna lo stato nel nostro database
-      template.status = approvalStatus.whatsapp.status.toUpperCase();
-      if (approvalStatus.whatsapp.rejection_reason) {
-        template.rejectionReason = approvalStatus.whatsapp.rejection_reason;
+      template.status = approvalStatus.status.toUpperCase();
+      if (approvalStatus.rejection_reason) {
+        template.rejectionReason = approvalStatus.rejection_reason;
       }
       await template.save();
 
       return template;
     } catch (error) {
-      console.error('Errore nel controllo dello stato del template:', error);
+      console.error('Errore nel controllo dello stato del template:', error.response?.data || error);
       throw error;
     }
   }

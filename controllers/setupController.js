@@ -1,7 +1,7 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
 const botConfigurationService = require('../services/botConfigurationService');
-const whatsappTemplateService = require('../services/whatsappTemplateService');
+const whatsAppTemplateService = require('../services/whatsAppTemplateService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
@@ -57,39 +57,54 @@ class SetupController {
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
-      // Determina il tipo di menu e crea il template appropriato
-      const hasMenuFile = formData.menuLanguages.some(lang => lang.menuFile);
-      const menuUrl = formData.menuLanguages.find(lang => lang.menuUrl)?.menuUrl;
+      let menuTemplate = null;
+      let reviewTemplate = null;
+      let templateError = null;
 
       try {
-        // Crea il template appropriato in base al tipo di menu
-        const template = await whatsappTemplateService.createMenuTemplate(
+        // Determina il tipo di menu e crea il template appropriato
+        const hasMenuFile = formData.menuLanguages.some(lang => lang.menuFile);
+        const menuUrl = formData.menuLanguages.find(lang => lang.menuUrl)?.menuUrl;
+
+        // Crea il template del menu
+        menuTemplate = await whatsAppTemplateService.createMenuTemplate(
           restaurant._id,
           hasMenuFile ? 'pdf' : 'url',
           formData.welcomeMessage,
           menuUrl
         );
 
-        // Ritorna la risposta con i dati dell'utente, del ristorante e del template
-        res.status(201).json({
-          success: true,
-          userId: user._id,
-          restaurantId: restaurant._id,
-          botConfigId: botConfig._id,
-          templateId: template._id,
-          templateStatus: template.status
-        });
-      } catch (templateError) {
-        console.error('Errore nella creazione del template WhatsApp:', templateError);
-        // Procedi comunque con la risposta anche se la creazione del template fallisce
-        res.status(201).json({
-          success: true,
-          userId: user._id,
-          restaurantId: restaurant._id,
-          botConfigId: botConfig._id,
-          templateError: templateError.message
-        });
+        // Crea il template per le recensioni
+        reviewTemplate = await whatsAppTemplateService.createReviewTemplate(
+          restaurant._id,
+          formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.",
+          formData.reviewLink
+        );
+
+      } catch (error) {
+        console.error('Errore nella creazione dei template WhatsApp:', error);
+        templateError = error.message;
       }
+
+      // Ritorna la risposta con i dati dell'utente, del ristorante e dei template
+      res.status(201).json({
+        success: true,
+        userId: user._id,
+        restaurantId: restaurant._id,
+        botConfigId: botConfig._id,
+        templates: {
+          menu: menuTemplate ? {
+            id: menuTemplate._id,
+            status: menuTemplate.status
+          } : null,
+          review: reviewTemplate ? {
+            id: reviewTemplate._id,
+            status: reviewTemplate.status
+          } : null,
+          error: templateError
+        }
+      });
+
     } catch (error) {
       console.error('Errore in setupRestaurant:', error);
 
