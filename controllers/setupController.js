@@ -209,7 +209,7 @@ class SetupController {
         restaurantId, 
         restaurantName,
         restaurantDetails,
-        menuType = 'url', // Default to URL if not specified
+        menuType, // 'pdf' or 'url'
         modelId = "claude-3-7-sonnet-20250219"
       } = req.body;
       
@@ -220,11 +220,11 @@ class SetupController {
         });
       }
 
-      // Create a dynamic prompt based on the menu type
-      let promptContent = '';
-      
-      if (menuType === 'pdf') {
-        promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words) for a restaurant that will attach a PDF menu:
+      const menuPromptSuffix = menuType === 'pdf' 
+        ? "The menu will be attached as a PDF file to this message."
+        : "The menu will be accessible via a button below this message.";
+
+      const promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words):
 
 Restaurant Name: ${restaurantDetails.name}
 Rating: ${restaurantDetails.rating}/5 (${restaurantDetails.ratingsTotal} reviews)
@@ -235,47 +235,25 @@ ${restaurantDetails.reviews?.slice(0, 5).map(review =>
   `- "${review.text.slice(0, 100)}..."`
 ).join('\n') || ''}
 
-Requirements:
-1. Maximum 40 words
-2. Include {customerName} placeholder
-3. Include restaurant name
-4. Add relevant food emojis based on cuisine and reviews
-5. Reference that a PDF menu is attached to this message, without mentioning any URL/link
-6. Highlight what customers love most based on reviews
-7. Keep it friendly and welcoming
-8. IMPORTANT: Return ONLY the welcome message without any description, explanation, or comments. Do not include quotes around the message.
-
-Example (35 words):
-Hi {customerName}! Welcome to Luigi's 🍝
-Our homemade pasta got 200+ five-star reviews! Check our menu attached to this message.
-Buon appetito! 🇮🇹`;
-      } else {
-        promptContent = `Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words) for a restaurant that will include a "View Menu" button:
-
-Restaurant Name: ${restaurantDetails.name}
-Rating: ${restaurantDetails.rating}/5 (${restaurantDetails.ratingsTotal} reviews)
-Cuisine: ${restaurantDetails.cuisineTypes?.join(', ')}
-
-Top 5 Reviews:
-${restaurantDetails.reviews?.slice(0, 5).map(review => 
-  `- "${review.text.slice(0, 100)}..."`
-).join('\n') || ''}
+Context: ${menuPromptSuffix}
 
 Requirements:
 1. Maximum 40 words
 2. Include {customerName} placeholder
 3. Include restaurant name
 4. Add relevant food emojis based on cuisine and reviews
-5. Reference that the menu can be viewed by clicking the button below, without including any URL/link
-6. Highlight what customers love most based on reviews
-7. Keep it friendly and welcoming
+5. Highlight what customers love most based on reviews
+6. Keep it friendly and welcoming
+7. DO NOT include any URLs or placeholders for menu links
 8. IMPORTANT: Return ONLY the welcome message without any description, explanation, or comments. Do not include quotes around the message.
 
-Example (34 words):
+Example for PDF menu (32 words):
 Hi {customerName}! Welcome to Luigi's 🍝
-Our homemade pasta got 200+ five-star reviews! Click the button below to check our menu.
-Buon appetito! 🇮🇹`;
-      }
+Our homemade pasta got 200+ five-star reviews! I've attached our menu with all our specialties.
+
+Example for URL menu (32 words):
+Hi {customerName}! Welcome to Luigi's 🍝
+Our homemade pasta got 200+ five-star reviews! Check out our menu with all our specialties below.`;
 
       // Determina il modello da utilizzare
       const model = modelId || "claude-3-7-sonnet-20250219";
