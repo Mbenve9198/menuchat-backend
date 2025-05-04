@@ -1,30 +1,20 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+// Schema semplificato per l'indirizzo per adattarsi meglio ai dati di Google Places
 const AddressSchema = new Schema({
-  street: {
+  formattedAddress: {
     type: String,
-    required: [true, 'Via/Piazza è obbligatoria']
+    required: [true, 'Indirizzo completo è obbligatorio']
   },
-  streetNumber: {
-    type: String,
-    required: [true, 'Numero civico è obbligatorio']
-  },
-  city: {
-    type: String,
-    required: [true, 'Città è obbligatoria']
-  },
-  province: {
-    type: String,
-    required: [true, 'Provincia è obbligatoria']
-  },
-  postalCode: {
-    type: String,
-    required: [true, 'CAP è obbligatorio']
-  },
+  // Campi opzionali se disponibili da Google Places
+  street: String,
+  streetNumber: String,
+  city: String,
+  province: String,
+  postalCode: String,
   country: {
     type: String,
-    required: [true, 'Paese è obbligatorio'],
     default: 'Italia'
   },
   latitude: Number,
@@ -34,11 +24,12 @@ const AddressSchema = new Schema({
 const ContactSchema = new Schema({
   phone: {
     type: String,
-    required: [true, 'Numero di telefono è obbligatorio']
+    required: false // Reso non obbligatorio se non disponibile da Google Places
   },
   email: {
     type: String,
-    match: [/^\S+@\S+\.\S+$/, 'Formato email non valido']
+    match: [/^\S+@\S+\.\S+$/, 'Formato email non valido'],
+    required: false
   },
   website: String,
   socialMedia: {
@@ -48,19 +39,23 @@ const ContactSchema = new Schema({
   }
 }, { _id: false });
 
+// Schema semplificato per gli orari di apertura
 const OperatingHoursSchema = new Schema({
   day: {
     type: String,
-    enum: ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'],
+    enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'],
     required: true
   },
-  open: Boolean, // true se aperto, false se chiuso
-  openTime: String, // formato HH:MM
-  closeTime: String, // formato HH:MM
-  splitTimes: [{ // per gestire le pause pranzo/cena
-    openTime: String,
-    closeTime: String
-  }]
+  open: {
+    type: Boolean,
+    default: true
+  },
+  periods: [{
+    open: String, // formato HH:MM
+    close: String // formato HH:MM
+  }],
+  // Conserviamo il formato originale da Google Places
+  rawText: String
 }, { _id: false });
 
 const RestaurantSchema = new Schema({
@@ -68,13 +63,13 @@ const RestaurantSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Proprietario è obbligatorio'],
-    index: true // Indicizzazione per trovare ristoranti per proprietario
+    index: true
   },
   name: {
     type: String,
     required: [true, 'Nome del ristorante è obbligatorio'],
     trim: true,
-    index: true // Indicizzazione per ricerche per nome
+    index: true
   },
   address: {
     type: AddressSchema,
@@ -83,52 +78,69 @@ const RestaurantSchema = new Schema({
   googlePlaceId: {
     type: String,
     sparse: true,
-    index: true // Indicizzazione per cercare per Google Place ID
+    index: true
   },
   googleMapsUrl: String,
+  // Aggiunto campo per le foto del ristorante
+  photos: [String],
+  // Foto principale del ristorante (per l'identificativo visivo)
+  mainPhoto: String,
+  // Formato semplificato per i rating da Google
   googleRating: {
-    rating: {
-      type: Number,
-      min: 0,
-      max: 5
-    },
-    reviewCount: {
-      type: Number,
-      default: 0
-    },
-    lastUpdated: Date
+    rating: Number,
+    reviewCount: Number,
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   },
+  // Conserviamo anche le recensioni se disponibili
+  reviews: [{
+    authorName: String,
+    rating: Number,
+    text: String,
+    time: Date
+  }],
   customReviewLink: String,
+  reviewPlatform: {
+    type: String,
+    enum: ['google', 'yelp', 'tripadvisor', 'custom'],
+    default: 'google'
+  },
   contact: {
     type: ContactSchema,
-    required: [true, 'Informazioni di contatto sono obbligatorie']
+    default: {} // Impostato come oggetto vuoto di default per evitare errori
   },
   operatingHours: [OperatingHoursSchema],
   description: {
     type: String,
-    required: [true, 'Descrizione del ristorante è obbligatoria per il bot AI']
+    required: false // Reso non obbligatorio inizialmente, può essere generato dopo
   },
-  cuisineType: [String],
+  // Rinominato per coerenza con i dati di Google Places
+  cuisineTypes: [String],
+  priceLevel: {
+    type: Number,
+    min: 0,
+    max: 4 // Google usa 0-4 per i livelli di prezzo
+  },
   features: [String], // es. ["Wi-Fi gratuito", "Terrazzo", "Pet-friendly"]
   isActive: {
     type: Boolean,
     default: true,
-    index: true // Indicizzazione per trovare ristoranti attivi/inattivi
+    index: true
   }
 }, {
-  timestamps: true // Aggiunge automaticamente i campi createdAt e updatedAt
+  timestamps: true
 });
 
-// Indicizzazione composta per ottimizzare query frequenti
+// Mantenuti gli indici per ottimizzare le query
 RestaurantSchema.index({ user: 1, isActive: 1 });
 RestaurantSchema.index({ 'address.city': 1, 'address.province': 1 });
-RestaurantSchema.index({ 'address.postalCode': 1 });
-RestaurantSchema.index({ cuisineType: 1 });
+RestaurantSchema.index({ cuisineTypes: 1 });
 
-// Aggiunta del metodo fullAddress per ottenere l'indirizzo completo
+// Metodo fullAddress adattato al nuovo schema
 RestaurantSchema.methods.fullAddress = function() {
-  const addr = this.address;
-  return `${addr.street}, ${addr.streetNumber}, ${addr.postalCode} ${addr.city} (${addr.province}), ${addr.country}`;
+  return this.address.formattedAddress;
 };
 
 module.exports = mongoose.model('Restaurant', RestaurantSchema); 
