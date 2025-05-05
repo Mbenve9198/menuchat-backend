@@ -63,15 +63,43 @@ class SetupController {
 
       try {
         // Determina il tipo di menu e crea il template appropriato
-        const hasMenuFile = formData.menuLanguages.some(lang => lang.menuFile);
-        const menuUrl = formData.menuLanguages.find(lang => lang.menuUrl)?.menuUrl;
+        const menuLanguages = formData.menuLanguages || [];
+
+        // Trova una lingua con menuPdfUrl (file PDF caricato)
+        const languageWithPdf = menuLanguages.find(lang => 
+          lang.menuPdfUrl && lang.menuPdfUrl.trim() !== ''
+        );
+
+        // Trova una lingua con menuUrl (URL esterno)
+        const languageWithUrl = menuLanguages.find(lang => 
+          lang.menuUrl && lang.menuUrl.trim() !== ''
+        );
+
+        let menuType, menuLinkUrl;
+
+        // Priorità al PDF se disponibile
+        if (languageWithPdf) {
+          console.log('Trovato PDF caricato:', languageWithPdf.menuPdfUrl);
+          menuType = 'pdf';
+          menuLinkUrl = languageWithPdf.menuPdfUrl;
+        } else if (languageWithUrl) {
+          console.log('Trovato URL del menu:', languageWithUrl.menuUrl);
+          menuType = 'url';
+          menuLinkUrl = languageWithUrl.menuUrl;
+        } else {
+          console.error('Nessun URL del menu o PDF trovato');
+          throw new Error('Nessun URL del menu o PDF trovato');
+        }
+
+        console.log('Tipo di menu selezionato:', menuType);
+        console.log('URL selezionato:', menuLinkUrl);
 
         // Crea il template del menu
         menuTemplate = await whatsappTemplateService.createMenuTemplate(
           restaurant._id,
-          hasMenuFile ? 'pdf' : 'url',
+          menuType,
           formData.welcomeMessage,
-          menuUrl
+          menuLinkUrl
         );
 
         // Crea il template per le recensioni
