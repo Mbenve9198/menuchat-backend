@@ -215,19 +215,14 @@ class WhatsAppTemplateService {
             }]
           };
         } else {
-          // Se non ci sono bottoni, almeno aggiungiamo un tipo text
-          // altrimenti Twilio darà errore "Invalid types"
-          types['twilio/text'] = {
-            body: template.components.body.text
-          };
+          // Questo è il problema - se non ci sono bottoni, invece di avere un template vuoto,
+          // lanciamo un errore perché un template CTA DEVE avere bottoni
+          throw new Error('CALL_TO_ACTION or REVIEW templates must have buttons');
         }
         break;
         
       default:
-        // Per qualsiasi altro tipo, utilizziamo almeno twilio/text
-        types['twilio/text'] = {
-          body: template.components.body.text
-        };
+        throw new Error(`Unsupported template type: ${template.type}`);
     }
     
     // Controlla che ci sia almeno un tipo
