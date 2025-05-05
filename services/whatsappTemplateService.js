@@ -198,15 +198,7 @@ class WhatsAppTemplateService {
         
         types['twilio/media'] = {
           body: template.components.body.text,
-          media: {
-            type: "document",
-            url: pdfUrl
-          },
-          actions: [{
-            type: "QUICK_REPLY",
-            title: "Grazie",
-            id: "thanks"
-          }]
+          media: [pdfUrl]
         };
         break;
 
