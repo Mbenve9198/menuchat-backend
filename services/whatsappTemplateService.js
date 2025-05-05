@@ -183,11 +183,6 @@ class WhatsAppTemplateService {
   convertToTwilioFormat(template) {
     const types = {};
     
-    // Configurazione base del testo per tutti i tipi
-    types['twilio/text'] = {
-      body: template.components.body.text
-    };
-
     switch (template.type) {
       case 'MEDIA':
         // Template per menu PDF
@@ -196,6 +191,7 @@ class WhatsAppTemplateService {
           throw new Error('PDF URL is required for MEDIA template');
         }
         
+        // Per i template MEDIA, utilizziamo SOLO il tipo twilio/media
         types['twilio/media'] = {
           body: template.components.body.text,
           media: [pdfUrl]
@@ -209,6 +205,7 @@ class WhatsAppTemplateService {
           const button = template.components.buttons[0];
           const buttonTitle = button.text.length > 25 ? button.text.substring(0, 25) : button.text;
           
+          // Utilizziamo SOLO twilio/call-to-action per CTA e Review
           types['twilio/call-to-action'] = {
             body: template.components.body.text,
             actions: [{
@@ -225,7 +222,7 @@ class WhatsAppTemplateService {
       friendly_name: template.name,
       types,
       language: template.language,
-      variables: {}  // Non abbiamo più bisogno di variabili per il PDF
+      variables: {}
     };
   }
 
