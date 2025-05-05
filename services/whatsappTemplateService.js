@@ -214,8 +214,25 @@ class WhatsAppTemplateService {
               url: button.url
             }]
           };
+        } else {
+          // Se non ci sono bottoni, almeno aggiungiamo un tipo text
+          // altrimenti Twilio darà errore "Invalid types"
+          types['twilio/text'] = {
+            body: template.components.body.text
+          };
         }
         break;
+        
+      default:
+        // Per qualsiasi altro tipo, utilizziamo almeno twilio/text
+        types['twilio/text'] = {
+          body: template.components.body.text
+        };
+    }
+    
+    // Controlla che ci sia almeno un tipo
+    if (Object.keys(types).length === 0) {
+      throw new Error('At least one content type is required');
     }
 
     return {
