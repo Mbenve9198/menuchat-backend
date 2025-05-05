@@ -71,6 +71,10 @@ class WhatsAppTemplateService {
    */
   async createMenuTemplate(restaurantId, type, welcomeMessage, menuUrl = null) {
     try {
+      console.log('=== CREATING MENU TEMPLATE ===');
+      console.log('Type:', type);
+      console.log('Menu URL:', menuUrl);
+      
       // Trova il ristorante per ottenere il nome
       const restaurant = await Restaurant.findById(restaurantId);
       if (!restaurant) {
@@ -97,25 +101,39 @@ class WhatsAppTemplateService {
 
       // Aggiungi componenti specifici in base al tipo
       if (type === 'pdf') {
+        if (!menuUrl) {
+          console.error('ERRORE: PDF URL mancante per il template MEDIA');
+          throw new Error('PDF URL is required for MEDIA template');
+        }
+        
+        console.log('Setting up PDF template with URL:', menuUrl);
         templateData.components.header = {
           type: 'DOCUMENT',
           format: 'PDF',
-          example: menuUrl // Salviamo l'URL del PDF come esempio
+          example: menuUrl
         };
       } else if (type === 'url' && menuUrl) {
+        console.log('Setting up URL template with URL:', menuUrl);
         templateData.components.buttons = [{
           type: 'URL',
           text: 'Vedi Menu',
           url: menuUrl
         }];
+      } else {
+        console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
+        throw new Error('URL is required for CALL_TO_ACTION template');
       }
+
+      console.log('Template data:', JSON.stringify(templateData, null, 2));
 
       // Crea il template nel database
       const template = new WhatsAppTemplate(templateData);
       await template.save();
 
       // Invia il template a Twilio per approvazione
-      await this.submitTemplateToTwilio(template);
+      console.log('Submitting template to Twilio...');
+      const twilioResponse = await this.submitTemplateToTwilio(template);
+      console.log('Twilio response:', twilioResponse);
 
       return template;
     } catch (error) {
@@ -181,13 +199,20 @@ class WhatsAppTemplateService {
    * Converte il nostro formato template in quello di Twilio
    */
   convertToTwilioFormat(template) {
+    console.log('=== CONVERTING TEMPLATE TO TWILIO FORMAT ===');
+    console.log('Template type:', template.type);
+    console.log('Template components:', JSON.stringify(template.components, null, 2));
+    
     const types = {};
     
     switch (template.type) {
       case 'MEDIA':
         // Template per menu PDF
         const pdfUrl = template.components.header?.example;
+        console.log('PDF URL for MEDIA template:', pdfUrl);
+        
         if (!pdfUrl) {
+          console.error('ERRORE: PDF URL mancante per il template MEDIA');
           throw new Error('PDF URL is required for MEDIA template');
         }
         
@@ -201,6 +226,8 @@ class WhatsAppTemplateService {
       case 'CALL_TO_ACTION':
       case 'REVIEW':
         // Template per menu URL o recensioni
+        console.log('Buttons:', JSON.stringify(template.components.buttons, null, 2));
+        
         if (template.components.buttons && template.components.buttons.length > 0) {
           const button = template.components.buttons[0];
           const buttonTitle = button.text.length > 25 ? button.text.substring(0, 25) : button.text;
@@ -215,21 +242,24 @@ class WhatsAppTemplateService {
             }]
           };
         } else {
-          // Questo è il problema - se non ci sono bottoni, invece di avere un template vuoto,
-          // lanciamo un errore perché un template CTA DEVE avere bottoni
+          console.error('ERRORE: Bottoni mancanti per il template CALL_TO_ACTION o REVIEW');
           throw new Error('CALL_TO_ACTION or REVIEW templates must have buttons');
         }
         break;
         
       default:
+        console.error(`ERRORE: Tipo di template non supportato: ${template.type}`);
         throw new Error(`Unsupported template type: ${template.type}`);
     }
     
     // Controlla che ci sia almeno un tipo
     if (Object.keys(types).length === 0) {
+      console.error('ERRORE: Nessun tipo definito nel template');
       throw new Error('At least one content type is required');
     }
 
+    console.log('Final Twilio template types:', JSON.stringify(types, null, 2));
+    
     return {
       friendly_name: template.name,
       types,
