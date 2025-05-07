@@ -29,6 +29,11 @@ const whatsAppTemplateSchema = new mongoose.Schema({
     type: String,
     sparse: true // Permette null/undefined ma deve essere unico se presente
   },
+  variables: [{
+    index: Number,
+    name: String,
+    example: String
+  }],
   components: {
     header: {
       type: {

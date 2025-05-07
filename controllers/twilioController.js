@@ -32,11 +32,13 @@ const webhookHandler = async (req, res) => {
     const messageBody = req.body.Body || req.body.body;
     const fromNumber = req.body.From || req.body.from;
     const toNumber = req.body.To || req.body.to;
+    const profileName = req.body.ProfileName || req.body.profileName || 'Cliente';
     
     // Log più dettagliato con formattazione
     console.log(`📥 Messaggio: "${messageBody}"`);
     console.log(`📱 Da: ${fromNumber}`);
     console.log(`📲 A: ${toNumber}`);
+    console.log(`👤 Nome profilo: ${profileName}`);
 
     if (!messageBody || !fromNumber) {
       console.log('⚠️ Messaggio incompleto, mancano dati essenziali');
@@ -51,50 +53,17 @@ const webhookHandler = async (req, res) => {
     });
 
     if (!botConfig) {
-      console.log(`Nessun bot trovato per il trigger "${messageBody}"`);
-      
-      // Se non è un trigger valido, cerchiamo se c'è un'interazione già attiva con questo numero
-      const activeInteraction = await CustomerInteraction.findOne({
-        customerPhoneNumber: fromNumber,
-        status: 'active'
-      }).populate({
-        path: 'restaurant',
-        populate: {
-          path: 'botConfiguration'
-        }
-      });
-
-      if (activeInteraction) {
-        // Se l'interazione è attiva, inoltriamo il messaggio al ristorante
-        console.log(`Interazione attiva trovata per ${fromNumber} con il ristorante ${activeInteraction.restaurant.name}`);
-        // Qui si implementerebbe la logica per inoltrare il messaggio al ristorante...
-        
-        // TwilioResponse generica per ora
-        const twiml = new twilio.twiml.MessagingResponse();
-        twiml.message('Il tuo messaggio è stato inoltrato al ristorante.');
-        
-        return res.type('text/xml').send(twiml.toString());
-      }
-      
-      // Se nessuna condizione è soddisfatta, rispondiamo con un messaggio generico
-      const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message('Mi dispiace, non ho capito il tuo messaggio. Riprova con una parola chiave valida.');
-      
-      return res.type('text/xml').send(twiml.toString());
+      console.log('❌ Nessun bot trovato per questo trigger');
+      return res.status(404).send('Bot not found');
     }
 
-    // Trova il ristorante associato al bot
+    // Trova il ristorante associato
     const restaurant = await Restaurant.findById(botConfig.restaurant);
     
     if (!restaurant) {
-      console.log(`Ristorante non trovato per il bot ${botConfig._id}`);
-      const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message('Si è verificato un errore. Riprova più tardi.');
-      
-      return res.type('text/xml').send(twiml.toString());
+      console.log('❌ Ristorante non trovato');
+      return res.status(404).send('Restaurant not found');
     }
-    
-    console.log(`Ristorante trovato: ${restaurant.name}`);
 
     // Trova il menu del ristorante
     const menu = await Menu.findOne({ restaurant: restaurant._id });
@@ -107,6 +76,7 @@ const webhookHandler = async (req, res) => {
       restaurant: restaurant._id,
       customerPhoneNumber: fromNumber,
       customerPhoneHash: require('crypto').createHash('md5').update(fromNumber).digest('hex'),
+      customerName: profileName,
       lastMessageReceived: messageBody,
       lastMessageSent: null,
       status: 'active',
@@ -123,7 +93,7 @@ const webhookHandler = async (req, res) => {
     
     // Sostituisci eventuali segnaposto
     responseMessage = responseMessage
-      .replace('{customerName}', 'Cliente')
+      .replace('{{1}}', profileName)
       .replace('{restaurantName}', restaurant.name);
     
     // Aggiungi il menu se disponibile

@@ -57,8 +57,8 @@ class SetupController {
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
-      let menuTemplates = [];
-      let reviewTemplates = [];
+      let menuTemplate = null;
+      let reviewTemplate = null;
       let templateError = null;
 
       try {
@@ -94,30 +94,18 @@ class SetupController {
         console.log('Tipo di menu selezionato:', menuType);
         console.log('URL selezionato:', menuLinkUrl);
 
-        // Assicurati che il messaggio di benvenuto utilizzi {{1}} invece di {customerName}
-        let welcomeMessage = formData.welcomeMessage;
-        if (welcomeMessage.includes('{customerName}')) {
-          welcomeMessage = welcomeMessage.replace(/{customerName}/g, '{{1}}');
-        }
-
-        // Crea i template del menu in diverse lingue
-        menuTemplates = await whatsappTemplateService.createMultiLanguageMenuTemplates(
+        // Crea il template del menu
+        menuTemplate = await whatsappTemplateService.createMenuTemplate(
           restaurant._id,
           menuType,
-          welcomeMessage,
+          formData.welcomeMessage,
           menuLinkUrl
         );
 
-        // Assicurati che il messaggio di recensione utilizzi {{1}} invece di {customerName}
-        let reviewMessage = formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.";
-        if (reviewMessage.includes('{customerName}')) {
-          reviewMessage = reviewMessage.replace(/{customerName}/g, '{{1}}');
-        }
-
-        // Crea i template per le recensioni in diverse lingue
-        reviewTemplates = await whatsappTemplateService.createMultiLanguageReviewTemplates(
+        // Crea il template per le recensioni
+        reviewTemplate = await whatsappTemplateService.createReviewTemplate(
           restaurant._id,
-          reviewMessage,
+          formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.",
           formData.reviewLink
         );
 
@@ -133,16 +121,14 @@ class SetupController {
         restaurantId: restaurant._id,
         botConfigId: botConfig._id,
         templates: {
-          menu: menuTemplates.length > 0 ? menuTemplates.map(template => ({
-            id: template._id,
-            language: template.language,
-            status: template.status
-          })) : null,
-          review: reviewTemplates.length > 0 ? reviewTemplates.map(template => ({
-            id: template._id,
-            language: template.language,
-            status: template.status
-          })) : null,
+          menu: menuTemplate ? {
+            id: menuTemplate._id,
+            status: menuTemplate.status
+          } : null,
+          review: reviewTemplate ? {
+            id: reviewTemplate._id,
+            status: reviewTemplate.status
+          } : null,
           error: templateError
         }
       });
@@ -323,7 +309,7 @@ Context: ${menuPromptSuffix}
 
 Requirements:
 1. Maximum 40 words
-2. Include {{1}} placeholder instead of {customerName} for the customer's name (this is required for WhatsApp templates)
+2. Include {{1}} as a placeholder for the customer's name (IMPORTANT: use exactly {{1}}, not {customerName} or other variations)
 3. Include restaurant name
 4. Add relevant food emojis based on cuisine and reviews
 5. Highlight what customers love most based on reviews
@@ -419,13 +405,13 @@ Requirements:
 5. Use appropriate emojis (max 2)
 6. Don't use generic phrases like "leave a review"
 7. Make it personal and engaging
-8. If you want to include the customer name, use the Twilio variable format {{1}} instead of {customerName}
+8. Use {{1}} as a placeholder for the customer's name (IMPORTANT: use exactly {{1}}, not {customerName} or other variations)
 
 Response format:
 Return ONLY the message text, without quotes or any additional explanation.
 
 Example:
-Thanks for dining with us today, {{1}}! 🌟 Your opinion means the world to us - we'd love to hear about your experience with our dishes.`;
+Thanks for dining with us, {{1}}! 🌟 Your opinion means the world to us - we'd love to hear about your experience with our dishes.`;
 
       // Genera il messaggio usando Claude
       const response = await anthropic.messages.create({
@@ -445,7 +431,7 @@ Thanks for dining with us today, {{1}}! 🌟 Your opinion means the world to us 
 
       res.json({ 
         success: true, 
-        templates: [message] // Manteniamo l'array per retrocompatibilità
+        templates: [message]
       });
     } catch (error) {
       console.error('Error generating review message:', error);

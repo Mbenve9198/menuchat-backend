@@ -3,6 +3,7 @@ const Restaurant = require('../models/Restaurant');
 const twilio = require('twilio');
 const crypto = require('crypto');
 const axios = require('axios');
+const anthropic = require('../services/anthropic');
 
 class WhatsAppTemplateService {
   constructor() {
@@ -67,135 +68,6 @@ class WhatsAppTemplateService {
   }
 
   /**
-   * Crea un nuovo template per il menu (PDF o URL)
-   */
-  async createMenuTemplate(restaurantId, type, welcomeMessage, menuUrl = null) {
-    try {
-      console.log('=== CREATING MENU TEMPLATE ===');
-      console.log('Type:', type);
-      console.log('Menu URL:', menuUrl);
-      
-      // Trova il ristorante per ottenere il nome
-      const restaurant = await Restaurant.findById(restaurantId);
-      if (!restaurant) {
-        throw new Error('Ristorante non trovato');
-      }
-
-      // Genera un nome univoco per il template
-      const templateName = await this.generateTemplateUniqueName(restaurant.name, type);
-
-      const templateData = {
-        restaurant: restaurantId,
-        type: type === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
-        name: templateName,
-        language: 'it',
-        components: {
-          body: {
-            text: welcomeMessage,
-            example: {
-              body_text: [welcomeMessage]
-            }
-          }
-        }
-      };
-
-      // Aggiungi componenti specifici in base al tipo
-      if (type === 'pdf') {
-        if (!menuUrl) {
-          console.error('ERRORE: PDF URL mancante per il template MEDIA');
-          throw new Error('PDF URL is required for MEDIA template');
-        }
-        
-        console.log('Setting up PDF template with URL:', menuUrl);
-        templateData.components.header = {
-          type: 'DOCUMENT',
-          format: 'PDF',
-          example: menuUrl
-        };
-      } else if (type === 'url' && menuUrl) {
-        console.log('Setting up URL template with URL:', menuUrl);
-        templateData.components.buttons = [{
-          type: 'URL',
-          text: 'Vedi Menu',
-          url: menuUrl
-        }];
-      } else {
-        console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
-        throw new Error('URL is required for CALL_TO_ACTION template');
-      }
-
-      console.log('Template data:', JSON.stringify(templateData, null, 2));
-
-      // Crea il template nel database
-      const template = new WhatsAppTemplate(templateData);
-      await template.save();
-
-      // Invia il template a Twilio per approvazione
-      console.log('Submitting template to Twilio...');
-      const twilioResponse = await this.submitTemplateToTwilio(template);
-      console.log('Twilio response:', twilioResponse);
-
-      return template;
-    } catch (error) {
-      console.error('Errore nella creazione del template:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Crea un nuovo template per la richiesta di recensione
-   */
-  async createReviewTemplate(restaurantId, reviewMessage, reviewLink) {
-    try {
-      // Trova il ristorante per ottenere il nome
-      const restaurant = await Restaurant.findById(restaurantId);
-      if (!restaurant) {
-        throw new Error('Ristorante non trovato');
-      }
-
-      // Genera un nome univoco per il template
-      const templateName = await this.generateTemplateUniqueName(restaurant.name, 'review');
-
-      // Verifica che il messaggio di recensione sia fornito
-      if (!reviewMessage) {
-        throw new Error('Review message is required');
-      }
-
-      const templateData = {
-        restaurant: restaurantId,
-        type: 'REVIEW',
-        name: templateName,
-        language: 'it',
-        components: {
-          body: {
-            text: reviewMessage,
-            example: {
-              body_text: [reviewMessage.replace(restaurant.name, "Esempio Ristorante")]
-            }
-          },
-          buttons: [{
-            type: 'URL',
-            text: 'Lascia una recensione',
-            url: reviewLink
-          }]
-        }
-      };
-
-      // Crea il template nel database
-      const template = new WhatsAppTemplate(templateData);
-      await template.save();
-
-      // Invia il template a Twilio per approvazione
-      await this.submitTemplateToTwilio(template);
-
-      return template;
-    } catch (error) {
-      console.error('Errore nella creazione del template di recensione:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Converte il nostro formato template in quello di Twilio
    */
   convertToTwilioFormat(template) {
@@ -204,6 +76,17 @@ class WhatsAppTemplateService {
     console.log('Template components:', JSON.stringify(template.components, null, 2));
     
     const types = {};
+    
+    // Prepara le variabili per Twilio
+    const variables = {};
+    if (template.variables && template.variables.length > 0) {
+      template.variables.forEach(variable => {
+        variables[variable.index] = {
+          type: "text",
+          example: variable.example
+        };
+      });
+    }
     
     switch (template.type) {
       case 'MEDIA':
@@ -264,8 +147,278 @@ class WhatsAppTemplateService {
       friendly_name: template.name,
       types,
       language: template.language,
-      variables: {}
+      variables
     };
+  }
+
+  /**
+   * Crea un nuovo template per il menu (PDF o URL) in tutte le lingue supportate
+   */
+  async createMenuTemplate(restaurantId, type, welcomeMessage, menuUrl = null) {
+    try {
+      console.log('=== CREATING MENU TEMPLATE ===');
+      console.log('Type:', type);
+      console.log('Menu URL:', menuUrl);
+      
+      // Trova il ristorante per ottenere il nome
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+        throw new Error('Ristorante non trovato');
+      }
+
+      // Genera un nome univoco per il template base
+      const baseTemplateName = await this.generateTemplateUniqueName(restaurant.name, type);
+
+      // Lingue supportate
+      const languages = ['it', 'en', 'es', 'de', 'fr'];
+      
+      // Traduci il messaggio in tutte le lingue usando Claude
+      const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, languages);
+
+      // Crea un template per ogni lingua
+      const templates = await Promise.all(languages.map(async (lang) => {
+        const templateName = `${baseTemplateName}_${lang}`;
+        
+        const templateData = {
+          restaurant: restaurantId,
+          type: type === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
+          name: templateName,
+          language: lang,
+          variables: [{
+            index: 1,
+            name: "customerName",
+            example: "John"
+          }],
+          components: {
+            body: {
+              text: translatedMessages[lang],
+              example: {
+                body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
+              }
+            }
+          }
+        };
+
+        // Aggiungi componenti specifici in base al tipo
+        if (type === 'pdf') {
+          if (!menuUrl) {
+            console.error('ERRORE: PDF URL mancante per il template MEDIA');
+            throw new Error('PDF URL is required for MEDIA template');
+          }
+          
+          console.log('Setting up PDF template with URL:', menuUrl);
+          templateData.components.header = {
+            type: 'DOCUMENT',
+            format: 'PDF',
+            example: menuUrl
+          };
+        } else if (type === 'url' && menuUrl) {
+          console.log('Setting up URL template with URL:', menuUrl);
+          templateData.components.buttons = [{
+            type: 'URL',
+            text: lang === 'it' ? 'Vedi Menu' :
+                  lang === 'en' ? 'View Menu' :
+                  lang === 'es' ? 'Ver Menú' :
+                  lang === 'de' ? 'Menü anzeigen' :
+                  'Voir le Menu',
+            url: menuUrl
+          }];
+        } else {
+          console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
+          throw new Error('URL is required for CALL_TO_ACTION template');
+        }
+
+        // Crea il template nel database
+        const template = new WhatsAppTemplate(templateData);
+        await template.save();
+
+        // Invia il template a Twilio per approvazione
+        await this.submitTemplateToTwilio(template);
+
+        return template;
+      }));
+
+      return templates;
+    } catch (error) {
+      console.error('Errore nella creazione dei template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crea un nuovo template per la richiesta di recensione in tutte le lingue supportate
+   */
+  async createReviewTemplate(restaurantId, reviewMessage, reviewLink) {
+    try {
+      // Trova il ristorante per ottenere il nome
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+        throw new Error('Ristorante non trovato');
+      }
+
+      // Genera un nome univoco per il template base
+      const baseTemplateName = await this.generateTemplateUniqueName(restaurant.name, 'review');
+
+      // Lingue supportate
+      const languages = ['it', 'en', 'es', 'de', 'fr'];
+      
+      // Traduci il messaggio in tutte le lingue usando Claude
+      const translatedMessages = await this.translateReviewMessage(reviewMessage, languages);
+
+      // Crea un template per ogni lingua
+      const templates = await Promise.all(languages.map(async (lang) => {
+        const templateName = `${baseTemplateName}_${lang}`;
+
+        const templateData = {
+          restaurant: restaurantId,
+          type: 'REVIEW',
+          name: templateName,
+          language: lang,
+          variables: [{
+            index: 1,
+            name: "customerName",
+            example: "John"
+          }],
+          components: {
+            body: {
+              text: translatedMessages[lang],
+              example: {
+                body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
+              }
+            },
+            buttons: [{
+              type: 'URL',
+              text: lang === 'it' ? 'Lascia una recensione' :
+                    lang === 'en' ? 'Leave a review' :
+                    lang === 'es' ? 'Dejar una reseña' :
+                    lang === 'de' ? 'Bewertung abgeben' :
+                    'Laisser un avis',
+              url: reviewLink
+            }]
+          }
+        };
+
+        // Crea il template nel database
+        const template = new WhatsAppTemplate(templateData);
+        await template.save();
+
+        // Invia il template a Twilio per approvazione
+        await this.submitTemplateToTwilio(template);
+
+        return template;
+      }));
+
+      return templates;
+    } catch (error) {
+      console.error('Errore nella creazione dei template di recensione:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Traduce il messaggio di benvenuto in tutte le lingue specificate usando Claude
+   */
+  async translateWelcomeMessage(message, languages) {
+    try {
+      // Sostituisci {customerName} con {{1}} nel messaggio originale
+      const messageWithTwilioVar = message.replace(/\{customerName\}/g, '{{1}}');
+
+      const prompt = `Translate this restaurant welcome message into the following languages: ${languages.join(', ')}
+
+Original message:
+${messageWithTwilioVar}
+
+Requirements:
+1. Keep the same tone and style
+2. Preserve all formatting and emojis
+3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+4. Return ONLY the translations in a JSON format like this:
+{
+  "it": "Italian translation",
+  "en": "English translation",
+  ...
+}`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 1000,
+        temperature: 0.7,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      });
+
+      // Parse la risposta JSON
+      const translations = JSON.parse(response.content[0].text);
+
+      // Verifica che tutte le lingue richieste siano presenti
+      languages.forEach(lang => {
+        if (!translations[lang]) {
+          throw new Error(`Traduzione mancante per la lingua: ${lang}`);
+        }
+      });
+
+      return translations;
+    } catch (error) {
+      console.error('Errore nella traduzione del messaggio di benvenuto:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Traduce il messaggio di recensione in tutte le lingue specificate usando Claude
+   */
+  async translateReviewMessage(message, languages) {
+    try {
+      // Sostituisci {customerName} con {{1}} nel messaggio originale
+      const messageWithTwilioVar = message.replace(/\{customerName\}/g, '{{1}}');
+
+      const prompt = `Translate this restaurant review request message into the following languages: ${languages.join(', ')}
+
+Original message:
+${messageWithTwilioVar}
+
+Requirements:
+1. Keep the same tone and style
+2. Preserve all formatting and emojis
+3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+4. Return ONLY the translations in a JSON format like this:
+{
+  "it": "Italian translation",
+  "en": "English translation",
+  ...
+}`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 1000,
+        temperature: 0.7,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      });
+
+      // Parse la risposta JSON
+      const translations = JSON.parse(response.content[0].text);
+
+      // Verifica che tutte le lingue richieste siano presenti
+      languages.forEach(lang => {
+        if (!translations[lang]) {
+          throw new Error(`Traduzione mancante per la lingua: ${lang}`);
+        }
+      });
+
+      return translations;
+    } catch (error) {
+      console.error('Errore nella traduzione del messaggio di recensione:', error);
+      throw error;
+    }
   }
 
   /**
