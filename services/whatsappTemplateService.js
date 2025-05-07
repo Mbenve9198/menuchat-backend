@@ -332,12 +332,14 @@ Requirements:
 1. Keep the same tone and style
 2. Preserve all formatting and emojis
 3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY the translations in a JSON format like this:
+4. Return ONLY a valid JSON object with language codes as keys and translations as values, like this example:
 {
-  "it": "Italian translation",
-  "en": "English translation",
-  ...
-}`;
+  "it": "Ciao {{1}}, benvenuto!",
+  "en": "Hi {{1}}, welcome!",
+  "es": "¡Hola {{1}}, bienvenido!"
+}
+
+DO NOT include any markdown formatting, backticks, or the word "json" in your response. Return ONLY the JSON object.`;
 
       const response = await anthropic.messages.create({
         model: "claude-3-7-sonnet-20250219",
@@ -351,8 +353,17 @@ Requirements:
         ]
       });
 
+      // Estrai solo il JSON dalla risposta
+      const responseText = response.content[0].text;
+      let jsonStr = responseText;
+      
+      // Rimuovi eventuali backtick e la parola "json" se presenti
+      if (responseText.includes('```')) {
+        jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
+      }
+
       // Parse la risposta JSON
-      const translations = JSON.parse(response.content[0].text);
+      const translations = JSON.parse(jsonStr);
 
       // Verifica che tutte le lingue richieste siano presenti
       languages.forEach(lang => {
@@ -364,6 +375,7 @@ Requirements:
       return translations;
     } catch (error) {
       console.error('Errore nella traduzione del messaggio di benvenuto:', error);
+      console.error('Risposta completa:', error.response?.content[0]?.text);
       throw error;
     }
   }
@@ -385,12 +397,14 @@ Requirements:
 1. Keep the same tone and style
 2. Preserve all formatting and emojis
 3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY the translations in a JSON format like this:
+4. Return ONLY a valid JSON object with language codes as keys and translations as values, like this example:
 {
-  "it": "Italian translation",
-  "en": "English translation",
-  ...
-}`;
+  "it": "Grazie {{1}} per aver ordinato!",
+  "en": "Thank you {{1}} for ordering!",
+  "es": "¡Gracias {{1}} por tu pedido!"
+}
+
+DO NOT include any markdown formatting, backticks, or the word "json" in your response. Return ONLY the JSON object.`;
 
       const response = await anthropic.messages.create({
         model: "claude-3-7-sonnet-20250219",
@@ -404,8 +418,17 @@ Requirements:
         ]
       });
 
+      // Estrai solo il JSON dalla risposta
+      const responseText = response.content[0].text;
+      let jsonStr = responseText;
+      
+      // Rimuovi eventuali backtick e la parola "json" se presenti
+      if (responseText.includes('```')) {
+        jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
+      }
+
       // Parse la risposta JSON
-      const translations = JSON.parse(response.content[0].text);
+      const translations = JSON.parse(jsonStr);
 
       // Verifica che tutte le lingue richieste siano presenti
       languages.forEach(lang => {
@@ -417,6 +440,7 @@ Requirements:
       return translations;
     } catch (error) {
       console.error('Errore nella traduzione del messaggio di recensione:', error);
+      console.error('Risposta completa:', error.response?.content[0]?.text);
       throw error;
     }
   }
