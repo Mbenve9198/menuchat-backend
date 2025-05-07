@@ -81,72 +81,93 @@ class WhatsAppTemplateService {
     const variables = {};
     if (template.variables && template.variables.length > 0) {
       template.variables.forEach(variable => {
-        variables[variable.index] = {
-          type: "text",
-          example: variable.example
-        };
+        // Per WhatsApp, dobbiamo fornire un esempio specifico per il tipo di variabile
+        variables[variable.index] = variable.name || "customer_name";
       });
     }
     
+    // Limita la lunghezza del friendly_name a 64 caratteri e rimuovi caratteri speciali
+    const sanitizedName = template.name
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '_')
+      .substring(0, 64);
+    
     switch (template.type) {
       case 'MEDIA':
-        // Template per menu PDF
         const pdfUrl = template.components.header?.example;
         console.log('PDF URL for MEDIA template:', pdfUrl);
         
         if (!pdfUrl) {
-          console.error('ERRORE: PDF URL mancante per il template MEDIA');
           throw new Error('PDF URL is required for MEDIA template');
         }
         
-        // Per i template MEDIA, utilizziamo SOLO il tipo twilio/media
+        // Verifica che l'URL sia valido e pubblicamente accessibile
+        try {
+          new URL(pdfUrl);
+        } catch (e) {
+          throw new Error('Invalid PDF URL format');
+        }
+        
+        // Per WhatsApp, il body è richiesto per l'approvazione e non può iniziare o finire con una variabile
+        const bodyText = template.components.body.text;
+        if (bodyText.length > 1600) {
+          throw new Error('Body text exceeds maximum length of 1,600 characters');
+        }
+        
+        // Verifica che il testo non inizi o finisca con una variabile
+        if (bodyText.startsWith('{{') || bodyText.endsWith('}}')) {
+          throw new Error('Body text cannot start or end with a variable');
+        }
+        
         types['twilio/media'] = {
-          body: template.components.body.text,
+          body: bodyText,
           media: [pdfUrl]
         };
         break;
 
       case 'CALL_TO_ACTION':
       case 'REVIEW':
-        // Template per menu URL o recensioni
-        console.log('Buttons:', JSON.stringify(template.components.buttons, null, 2));
-        
-        if (template.components.buttons && template.components.buttons.length > 0) {
-          const button = template.components.buttons[0];
-          const buttonTitle = button.text.length > 25 ? button.text.substring(0, 25) : button.text;
-          
-          // Utilizziamo SOLO twilio/call-to-action per CTA e Review
-          types['twilio/call-to-action'] = {
-            body: template.components.body.text,
-            actions: [{
-              type: "URL",
-              title: buttonTitle,
-              url: button.url
-            }]
-          };
-        } else {
-          console.error('ERRORE: Bottoni mancanti per il template CALL_TO_ACTION o REVIEW');
+        if (!template.components.buttons || template.components.buttons.length === 0) {
           throw new Error('CALL_TO_ACTION or REVIEW templates must have buttons');
         }
+
+        const button = template.components.buttons[0];
+        const buttonTitle = button.text.length > 20 ? button.text.substring(0, 20) : button.text;
+        
+        // Verifica che il testo non inizi o finisca con una variabile
+        const ctaBodyText = template.components.body.text;
+        if (ctaBodyText.length > 640) {
+          throw new Error('Body text exceeds maximum length of 640 characters for call-to-action');
+        }
+        
+        if (ctaBodyText.startsWith('{{') || ctaBodyText.endsWith('}}')) {
+          throw new Error('Body text cannot start or end with a variable');
+        }
+
+        types['twilio/call-to-action'] = {
+          body: ctaBodyText,
+          actions: [{
+            type: "URL",
+            title: buttonTitle, // Non supporta variabili nel titolo
+            url: button.url // Supporta variabili solo alla fine dell'URL
+          }]
+        };
         break;
         
       default:
-        console.error(`ERRORE: Tipo di template non supportato: ${template.type}`);
         throw new Error(`Unsupported template type: ${template.type}`);
     }
     
-    // Controlla che ci sia almeno un tipo
     if (Object.keys(types).length === 0) {
-      console.error('ERRORE: Nessun tipo definito nel template');
       throw new Error('At least one content type is required');
     }
 
     console.log('Final Twilio template types:', JSON.stringify(types, null, 2));
     
     return {
-      friendly_name: template.name,
+      friendly_name: sanitizedName,
       types,
-      language: template.language,
+      language: template.language.toLowerCase(),
       variables
     };
   }
@@ -178,64 +199,64 @@ class WhatsAppTemplateService {
       // Crea un template per ogni lingua
       const templates = await Promise.all(languages.map(async (lang) => {
         const templateName = `${baseTemplateName}_${lang}`;
-        
-        const templateData = {
-          restaurant: restaurantId,
-          type: type === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
-          name: templateName,
+
+      const templateData = {
+        restaurant: restaurantId,
+        type: type === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
+        name: templateName,
           language: lang,
           variables: [{
             index: 1,
             name: "customerName",
             example: "John"
           }],
-          components: {
-            body: {
+        components: {
+          body: {
               text: translatedMessages[lang],
-              example: {
+            example: {
                 body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
               }
-            }
           }
-        };
+        }
+      };
 
-        // Aggiungi componenti specifici in base al tipo
-        if (type === 'pdf') {
-          if (!menuUrl) {
-            console.error('ERRORE: PDF URL mancante per il template MEDIA');
-            throw new Error('PDF URL is required for MEDIA template');
-          }
-          
-          console.log('Setting up PDF template with URL:', menuUrl);
-          templateData.components.header = {
-            type: 'DOCUMENT',
-            format: 'PDF',
-            example: menuUrl
-          };
-        } else if (type === 'url' && menuUrl) {
-          console.log('Setting up URL template with URL:', menuUrl);
-          templateData.components.buttons = [{
-            type: 'URL',
+      // Aggiungi componenti specifici in base al tipo
+      if (type === 'pdf') {
+        if (!menuUrl) {
+          console.error('ERRORE: PDF URL mancante per il template MEDIA');
+          throw new Error('PDF URL is required for MEDIA template');
+        }
+        
+        console.log('Setting up PDF template with URL:', menuUrl);
+        templateData.components.header = {
+          type: 'DOCUMENT',
+          format: 'PDF',
+          example: menuUrl
+        };
+      } else if (type === 'url' && menuUrl) {
+        console.log('Setting up URL template with URL:', menuUrl);
+        templateData.components.buttons = [{
+          type: 'URL',
             text: lang === 'it' ? 'Vedi Menu' :
                   lang === 'en' ? 'View Menu' :
                   lang === 'es' ? 'Ver Menú' :
                   lang === 'de' ? 'Menü anzeigen' :
                   'Voir le Menu',
-            url: menuUrl
-          }];
-        } else {
-          console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
-          throw new Error('URL is required for CALL_TO_ACTION template');
-        }
+          url: menuUrl
+        }];
+      } else {
+        console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
+        throw new Error('URL is required for CALL_TO_ACTION template');
+      }
 
-        // Crea il template nel database
-        const template = new WhatsAppTemplate(templateData);
-        await template.save();
+      // Crea il template nel database
+      const template = new WhatsAppTemplate(templateData);
+      await template.save();
 
-        // Invia il template a Twilio per approvazione
+      // Invia il template a Twilio per approvazione
         await this.submitTemplateToTwilio(template);
 
-        return template;
+      return template;
       }));
 
       return templates;
@@ -269,43 +290,43 @@ class WhatsAppTemplateService {
       const templates = await Promise.all(languages.map(async (lang) => {
         const templateName = `${baseTemplateName}_${lang}`;
 
-        const templateData = {
-          restaurant: restaurantId,
-          type: 'REVIEW',
-          name: templateName,
+      const templateData = {
+        restaurant: restaurantId,
+        type: 'REVIEW',
+        name: templateName,
           language: lang,
           variables: [{
             index: 1,
             name: "customerName",
             example: "John"
           }],
-          components: {
-            body: {
+        components: {
+          body: {
               text: translatedMessages[lang],
-              example: {
+            example: {
                 body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
-              }
-            },
-            buttons: [{
-              type: 'URL',
+            }
+          },
+          buttons: [{
+            type: 'URL',
               text: lang === 'it' ? 'Lascia una recensione' :
                     lang === 'en' ? 'Leave a review' :
                     lang === 'es' ? 'Dejar una reseña' :
                     lang === 'de' ? 'Bewertung abgeben' :
                     'Laisser un avis',
-              url: reviewLink
-            }]
-          }
-        };
+            url: reviewLink
+          }]
+        }
+      };
 
-        // Crea il template nel database
-        const template = new WhatsAppTemplate(templateData);
-        await template.save();
+      // Crea il template nel database
+      const template = new WhatsAppTemplate(templateData);
+      await template.save();
 
-        // Invia il template a Twilio per approvazione
-        await this.submitTemplateToTwilio(template);
+      // Invia il template a Twilio per approvazione
+      await this.submitTemplateToTwilio(template);
 
-        return template;
+      return template;
       }));
 
       return templates;
@@ -399,9 +420,9 @@ Requirements:
 3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
 4. Return ONLY a valid JSON object with language codes as keys and translations as values, like this example:
 {
-  "it": "Grazie {{1}} per aver ordinato!",
-  "en": "Thank you {{1}} for ordering!",
-  "es": "¡Gracias {{1}} por tu pedido!"
+  "it": "Grazie {{1}}!",
+  "en": "Thank you {{1}}",
+  "es": "¡Gracias {{1}}!"
 }
 
 DO NOT include any markdown formatting, backticks, or the word "json" in your response. Return ONLY the JSON object.`;
