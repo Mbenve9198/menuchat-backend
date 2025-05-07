@@ -45,7 +45,8 @@ const protect = async (req, res, next) => {
     req.user = {
       id: user._id,
       email: user.email,
-      subscriptionTier: user.subscriptionTier
+      subscriptionTier: user.subscriptionTier,
+      restaurantId: decoded.restaurantId || null
     };
 
     next();

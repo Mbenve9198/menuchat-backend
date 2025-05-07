@@ -1,5 +1,6 @@
 const userService = require('../services/userService');
 const jwt = require('jsonwebtoken');
+const Restaurant = require('../models/Restaurant');
 
 // Chiave segreta per firmare i token JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
@@ -37,9 +38,16 @@ class AuthController {
         });
       }
 
-      // Genera il token JWT
+      // Trova il ristorante associato all'utente
+      const restaurant = await Restaurant.findOne({ user: user._id });
+      
+      // Genera il token JWT con restaurantId se disponibile
       const token = jwt.sign(
-        { userId: user._id, email: user.email },
+        { 
+          userId: user._id, 
+          email: user.email,
+          restaurantId: restaurant?._id 
+        },
         JWT_SECRET,
         { expiresIn: TOKEN_EXPIRY }
       );
@@ -49,10 +57,11 @@ class AuthController {
         success: true,
         token,
         user: {
-          id: user._id,
+          _id: user._id,
           email: user.email,
           fullName: user.fullName,
-          subscriptionTier: user.subscriptionTier
+          subscriptionTier: user.subscriptionTier,
+          restaurant: restaurant?._id
         }
       });
     } catch (error) {
