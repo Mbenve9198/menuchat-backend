@@ -5,6 +5,7 @@ const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // Rotte protette (richiedono autenticazione)
+router.get('/', protect, templateController.getTemplates);
 router.get('/:restaurantId', protect, templateController.getTemplates);
 router.put('/:templateId', protect, templateController.updateTemplate);
 router.get('/:templateId/status', protect, templateController.checkTemplateStatus);

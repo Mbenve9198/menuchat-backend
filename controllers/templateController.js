@@ -7,7 +7,15 @@ class TemplateController {
    */
   async getTemplates(req, res) {
     try {
-      const { restaurantId } = req.params;
+      // Accetta sia path parameter che query parameter
+      const restaurantId = req.params.restaurantId || req.query.restaurantId;
+      
+      if (!restaurantId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Restaurant ID is required'
+        });
+      }
 
       const templates = await WhatsAppTemplate.find({
         restaurant: restaurantId,
