@@ -19,6 +19,12 @@ const UserSchema = new Schema({
     type: String,
     required: [true, 'Salt è obbligatorio']
   },
+  restaurant: {
+    type: Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: false,
+    index: true
+  },
   subscriptionTier: {
     type: String,
     enum: ['free', 'premium'],

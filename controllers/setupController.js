@@ -54,6 +54,9 @@ class SetupController {
       // Crea il nuovo ristorante
       const restaurant = await restaurantService.createRestaurant(formData, user._id);
 
+      // Aggiorna l'utente con il riferimento al ristorante
+      await userService.updateUser(user._id, { restaurant: restaurant._id });
+
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
