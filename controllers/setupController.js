@@ -466,6 +466,58 @@ Thanks for dining with us, {{1}}! 🌟 Your opinion means the world to us - we'd
       return res.status(500).json({ available: false, error: 'Server error' });
     }
   }
+
+  /**
+   * Ottiene l'immagine del profilo di un ristorante
+   * @param {Object} req - Richiesta HTTP
+   * @param {Object} res - Risposta HTTP
+   * @returns {Promise<void>}
+   */
+  async getRestaurantProfileImage(req, res) {
+    try {
+      const { id } = req.params;
+
+      // Trova il ristorante per ID
+      const restaurant = await restaurantService.findRestaurantById(id);
+
+      if (!restaurant) {
+        return res.status(404).json({
+          success: false,
+          error: 'Ristorante non trovato'
+        });
+      }
+
+      // Controlla se esiste un'immagine principale
+      if (restaurant.mainPhoto) {
+        return res.status(200).json({
+          success: true,
+          profileImage: restaurant.mainPhoto
+        });
+      }
+      
+      // Se non c'è un'immagine principale ma ci sono altre foto, usa la prima
+      if (restaurant.photos && restaurant.photos.length > 0) {
+        return res.status(200).json({
+          success: true,
+          profileImage: restaurant.photos[0]
+        });
+      }
+
+      // Se non ci sono immagini
+      return res.status(404).json({
+        success: false,
+        error: 'Nessuna immagine del profilo trovata per questo ristorante'
+      });
+      
+    } catch (error) {
+      console.error('Errore in getRestaurantProfileImage:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: 'Errore del server'
+      });
+    }
+  }
 }
 
 module.exports = new SetupController(); 

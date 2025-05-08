@@ -10,6 +10,7 @@ router.post('/restaurants', setupController.setupRestaurant);
 router.get('/restaurants/:id', setupController.getRestaurant);
 router.put('/restaurants/:id', setupController.updateRestaurant);
 router.delete('/restaurants/:id', setupController.deleteRestaurant);
+router.get('/restaurants/:id/profile-image', setupController.getRestaurantProfileImage);
 
 // Rotte per la generazione di messaggi di benvenuto
 router.post('/welcome', setupController.generateWelcomeMessage);
