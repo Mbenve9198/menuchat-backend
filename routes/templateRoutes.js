@@ -10,6 +10,7 @@ router.get('/:restaurantId', protect, templateController.getTemplates);
 router.put('/:templateId', protect, templateController.updateTemplate);
 router.get('/:templateId/status', protect, templateController.checkTemplateStatus);
 router.delete('/:templateId', protect, templateController.deleteTemplate);
+router.post('/:templateId/convert', protect, templateController.convertTemplate);
 
 // Rotte per le impostazioni di recensione
 router.get('/:restaurantId/review-settings', protect, templateController.getReviewSettings);

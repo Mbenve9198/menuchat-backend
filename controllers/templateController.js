@@ -109,6 +109,85 @@ async function updateButtonTextInAllLanguages(sourceTemplate, newButtonText) {
   return updatedTemplates;
 }
 
+/**
+ * Crea un nuovo template per sostituirne uno esistente con un tipo diverso
+ */
+async function createConvertedTemplate(sourceTemplate, newType, updatedMessage, menuUrl, menuPdfUrl) {
+  try {
+    // Ottieni i dati dal template sorgente
+    const restaurantId = sourceTemplate.restaurant;
+    const language = sourceTemplate.language;
+    
+    // Genera un nuovo nome basato sul vecchio ma con un identificatore di conversione
+    const nameParts = sourceTemplate.name.split('_');
+    const timestamp = Date.now();
+    const newName = `${nameParts[0]}_${newType.toLowerCase()}_${timestamp}_${language}`;
+    
+    // Prepara il nuovo oggetto template
+    const newTemplateData = {
+      restaurant: restaurantId,
+      type: newType,
+      name: newName,
+      language: language,
+      status: 'PENDING',
+      variables: sourceTemplate.variables || [],
+      components: {
+        body: {
+          text: updatedMessage || sourceTemplate.components.body.text
+        }
+      },
+      isActive: true
+    };
+    
+    // Configura i componenti specifici in base al nuovo tipo
+    if (newType === 'MEDIA') {
+      if (!menuPdfUrl) {
+        throw new Error('Menu PDF URL is required for MEDIA template');
+      }
+      
+      newTemplateData.components.header = {
+        type: 'DOCUMENT',
+        format: 'PDF',
+        example: menuPdfUrl
+      };
+    } else if (newType === 'CALL_TO_ACTION') {
+      if (!menuUrl) {
+        throw new Error('Menu URL is required for CALL_TO_ACTION template');
+      }
+      
+      const buttonTexts = {
+        'it': 'Vedi Menu',
+        'en': 'View Menu',
+        'es': 'Ver Menú',
+        'de': 'Menü anzeigen',
+        'fr': 'Voir le Menu'
+      };
+      
+      newTemplateData.components.buttons = [{
+        type: 'URL',
+        text: buttonTexts[language] || 'View Menu',
+        url: menuUrl
+      }];
+    }
+    
+    // Crea il nuovo template nel database
+    const newTemplate = new WhatsAppTemplate(newTemplateData);
+    await newTemplate.save();
+    
+    // Invia il nuovo template a Twilio per approvazione
+    await whatsappTemplateService.submitTemplateToTwilio(newTemplate);
+    
+    // Disattiva il vecchio template
+    sourceTemplate.isActive = false;
+    await sourceTemplate.save();
+    
+    return newTemplate;
+  } catch (error) {
+    console.error('Error creating converted template:', error);
+    throw error;
+  }
+}
+
 class TemplateController {
   /**
    * Ottiene tutti i template di un ristorante
@@ -458,6 +537,100 @@ class TemplateController {
       res.status(500).json({
         success: false,
         error: 'Failed to get button text'
+      });
+    }
+  }
+
+  /**
+   * Converte un template da un tipo all'altro (MEDIA <-> CALL_TO_ACTION)
+   */
+  async convertTemplate(req, res) {
+    try {
+      const { templateId } = req.params;
+      const { message, newType, updateAllLanguages, menuUrl, menuPdfUrl } = req.body;
+
+      // Verifica dati obbligatori
+      if (!newType || !['MEDIA', 'CALL_TO_ACTION'].includes(newType)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid new template type is required'
+        });
+      }
+
+      // Trova il template esistente
+      const template = await WhatsAppTemplate.findById(templateId);
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          error: 'Template not found'
+        });
+      }
+
+      // Verifica che il tipo sia effettivamente diverso
+      if (template.type === newType) {
+        return res.status(400).json({
+          success: false,
+          error: 'New type must be different from current type'
+        });
+      }
+
+      let convertedTemplates = [];
+
+      if (updateAllLanguages) {
+        // Estrai le informazioni necessarie dal template sorgente
+        const templateType = template.type;
+        const restaurantId = template.restaurant;
+        const baseName = template.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
+        
+        // Trova tutti i template correlati (stesso tipo e ristorante)
+        const relatedTemplates = await WhatsAppTemplate.find({
+          restaurant: restaurantId,
+          type: templateType,
+          isActive: true,
+          name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
+        });
+        
+        // Estrai le lingue disponibili
+        const languages = relatedTemplates.map(t => t.language);
+        
+        // Traduci il messaggio in tutte le lingue
+        const translatedMessages = await whatsappTemplateService.translateWelcomeMessage(message, languages);
+        
+        // Crea nuovi template per ogni lingua
+        for (const template of relatedTemplates) {
+          const lang = template.language;
+          if (translatedMessages[lang]) {
+            const convertedTemplate = await createConvertedTemplate(
+              template,
+              newType,
+              translatedMessages[lang],
+              menuUrl,
+              menuPdfUrl
+            );
+            convertedTemplates.push(convertedTemplate);
+          }
+        }
+      } else {
+        // Converti solo il template specifico
+        const convertedTemplate = await createConvertedTemplate(
+          template,
+          newType,
+          message,
+          menuUrl,
+          menuPdfUrl
+        );
+        convertedTemplates.push(convertedTemplate);
+      }
+
+      return res.json({
+        success: true,
+        templates: convertedTemplates
+      });
+    } catch (error) {
+      console.error('Error converting template:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to convert template'
       });
     }
   }
