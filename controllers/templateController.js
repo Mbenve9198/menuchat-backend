@@ -2,6 +2,113 @@ const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const whatsappTemplateService = require('../services/whatsappTemplateService');
 const Restaurant = require('../models/Restaurant');
 
+/**
+ * Aggiorna un template in tutte le lingue disponibili
+ */
+async function updateTemplatesInAllLanguages(sourceTemplate, newMessage) {
+  // Estrai le informazioni necessarie dal template sorgente
+  const templateType = sourceTemplate.type;
+  const restaurantId = sourceTemplate.restaurant;
+  const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
+  
+  // Trova tutti i template correlati (stesso tipo e ristorante)
+  const relatedTemplates = await WhatsAppTemplate.find({
+    restaurant: restaurantId,
+    type: templateType,
+    isActive: true,
+    name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
+  });
+  
+  // Se non ci sono template correlati, ritorna un array vuoto
+  if (!relatedTemplates || relatedTemplates.length === 0) {
+    return [];
+  }
+  
+  // Estrai le lingue disponibili
+  const languages = relatedTemplates.map(t => t.language);
+  
+  // Traduci il messaggio in tutte le lingue
+  let translatedMessages;
+  if (templateType === 'REVIEW') {
+    translatedMessages = await whatsappTemplateService.translateReviewMessage(newMessage, languages);
+  } else {
+    translatedMessages = await whatsappTemplateService.translateWelcomeMessage(newMessage, languages);
+  }
+  
+  // Aggiorna i template in tutte le lingue e invia a Twilio
+  const updatedTemplates = [];
+  for (const template of relatedTemplates) {
+    const lang = template.language;
+    if (translatedMessages[lang]) {
+      template.components.body.text = translatedMessages[lang];
+      template.status = 'PENDING';
+      await template.save();
+      
+      // Invia il template aggiornato a Twilio
+      await whatsappTemplateService.submitTemplateToTwilio(template);
+      updatedTemplates.push(template);
+    }
+  }
+  
+  return updatedTemplates;
+}
+
+/**
+ * Aggiorna il testo del pulsante in tutte le lingue disponibili
+ */
+async function updateButtonTextInAllLanguages(sourceTemplate, newButtonText) {
+  // Estrai le informazioni necessarie dal template sorgente
+  const templateType = sourceTemplate.type;
+  const restaurantId = sourceTemplate.restaurant;
+  const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
+  
+  // Trova tutti i template correlati (stesso tipo e ristorante)
+  const relatedTemplates = await WhatsAppTemplate.find({
+    restaurant: restaurantId,
+    type: templateType,
+    isActive: true,
+    name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
+  });
+  
+  // Se non ci sono template correlati, ritorna un array vuoto
+  if (!relatedTemplates || relatedTemplates.length === 0) {
+    return [];
+  }
+  
+  // Mappa dei testi dei pulsanti in base alla lingua
+  const buttonTexts = {
+    'it': templateType === 'REVIEW' ? 'Lascia una recensione' : 'Vedi Menu',
+    'en': templateType === 'REVIEW' ? 'Leave a review' : 'View Menu',
+    'es': templateType === 'REVIEW' ? 'Dejar una reseña' : 'Ver Menú',
+    'de': templateType === 'REVIEW' ? 'Bewertung abgeben' : 'Menü anzeigen',
+    'fr': templateType === 'REVIEW' ? 'Laisser un avis' : 'Voir le Menu'
+  };
+  
+  // Se è stato fornito un testo personalizzato, usa quello come predefinito
+  if (newButtonText) {
+    Object.keys(buttonTexts).forEach(lang => {
+      buttonTexts[lang] = newButtonText;
+    });
+  }
+  
+  // Aggiorna i template in tutte le lingue e invia a Twilio
+  const updatedTemplates = [];
+  for (const template of relatedTemplates) {
+    const lang = template.language;
+    if (template.components.buttons && template.components.buttons.length > 0 && buttonTexts[lang]) {
+      template.components.buttons[0].text = buttonTexts[lang];
+      template.status = 'PENDING';
+      await template.save();
+      
+      // Invia il template aggiornato a Twilio
+      await whatsappTemplateService.submitTemplateToTwilio(template);
+      updatedTemplates.push(template);
+    }
+  }
+  
+  return updatedTemplates;
+}
+
 class TemplateController {
   /**
    * Ottiene tutti i template di un ristorante
@@ -55,7 +162,7 @@ class TemplateController {
 
       if (updateAllLanguages) {
         // Se richiesto, aggiorna il template in tutte le lingue
-        const updatedTemplates = await this.updateTemplatesInAllLanguages(template, message);
+        const updatedTemplates = await updateTemplatesInAllLanguages(template, message);
         
         return res.json({
           success: true,
@@ -82,58 +189,6 @@ class TemplateController {
         error: 'Failed to update template'
       });
     }
-  }
-
-  /**
-   * Aggiorna un template in tutte le lingue disponibili
-   * @private
-   */
-  async updateTemplatesInAllLanguages(sourceTemplate, newMessage) {
-    // Estrai le informazioni necessarie dal template sorgente
-    const templateType = sourceTemplate.type;
-    const restaurantId = sourceTemplate.restaurant;
-    const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
-    
-    // Trova tutti i template correlati (stesso tipo e ristorante)
-    const relatedTemplates = await WhatsAppTemplate.find({
-      restaurant: restaurantId,
-      type: templateType,
-      isActive: true,
-      name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
-    });
-    
-    // Se non ci sono template correlati, ritorna un array vuoto
-    if (!relatedTemplates || relatedTemplates.length === 0) {
-      return [];
-    }
-    
-    // Estrai le lingue disponibili
-    const languages = relatedTemplates.map(t => t.language);
-    
-    // Traduci il messaggio in tutte le lingue
-    let translatedMessages;
-    if (templateType === 'REVIEW') {
-      translatedMessages = await whatsappTemplateService.translateReviewMessage(newMessage, languages);
-    } else {
-      translatedMessages = await whatsappTemplateService.translateWelcomeMessage(newMessage, languages);
-    }
-    
-    // Aggiorna i template in tutte le lingue e invia a Twilio
-    const updatedTemplates = [];
-    for (const template of relatedTemplates) {
-      const lang = template.language;
-      if (translatedMessages[lang]) {
-        template.components.body.text = translatedMessages[lang];
-        template.status = 'PENDING';
-        await template.save();
-        
-        // Invia il template aggiornato a Twilio
-        await whatsappTemplateService.submitTemplateToTwilio(template);
-        updatedTemplates.push(template);
-      }
-    }
-    
-    return updatedTemplates;
   }
 
   /**
@@ -341,7 +396,7 @@ class TemplateController {
 
       if (updateAllLanguages) {
         // Se richiesto, aggiorna il testo del pulsante in tutte le lingue
-        const updatedTemplates = await this.updateButtonTextInAllLanguages(template, buttonText);
+        const updatedTemplates = await updateButtonTextInAllLanguages(template, buttonText);
         
         return res.json({
           success: true,
@@ -368,63 +423,6 @@ class TemplateController {
         error: 'Failed to update button text'
       });
     }
-  }
-
-  /**
-   * Aggiorna il testo del pulsante in tutte le lingue disponibili
-   * @private
-   */
-  async updateButtonTextInAllLanguages(sourceTemplate, newButtonText) {
-    // Estrai le informazioni necessarie dal template sorgente
-    const templateType = sourceTemplate.type;
-    const restaurantId = sourceTemplate.restaurant;
-    const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
-    
-    // Trova tutti i template correlati (stesso tipo e ristorante)
-    const relatedTemplates = await WhatsAppTemplate.find({
-      restaurant: restaurantId,
-      type: templateType,
-      isActive: true,
-      name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
-    });
-    
-    // Se non ci sono template correlati, ritorna un array vuoto
-    if (!relatedTemplates || relatedTemplates.length === 0) {
-      return [];
-    }
-    
-    // Mappa dei testi dei pulsanti in base alla lingua
-    const buttonTexts = {
-      'it': templateType === 'REVIEW' ? 'Lascia una recensione' : 'Vedi Menu',
-      'en': templateType === 'REVIEW' ? 'Leave a review' : 'View Menu',
-      'es': templateType === 'REVIEW' ? 'Dejar una reseña' : 'Ver Menú',
-      'de': templateType === 'REVIEW' ? 'Bewertung abgeben' : 'Menü anzeigen',
-      'fr': templateType === 'REVIEW' ? 'Laisser un avis' : 'Voir le Menu'
-    };
-    
-    // Se è stato fornito un testo personalizzato, usa quello come predefinito
-    if (newButtonText) {
-      Object.keys(buttonTexts).forEach(lang => {
-        buttonTexts[lang] = newButtonText;
-      });
-    }
-    
-    // Aggiorna i template in tutte le lingue e invia a Twilio
-    const updatedTemplates = [];
-    for (const template of relatedTemplates) {
-      const lang = template.language;
-      if (template.components.buttons && template.components.buttons.length > 0 && buttonTexts[lang]) {
-        template.components.buttons[0].text = buttonTexts[lang];
-        template.status = 'PENDING';
-        await template.save();
-        
-        // Invia il template aggiornato a Twilio
-        await whatsappTemplateService.submitTemplateToTwilio(template);
-        updatedTemplates.push(template);
-      }
-    }
-    
-    return updatedTemplates;
   }
 
   /**
