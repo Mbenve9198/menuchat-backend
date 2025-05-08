@@ -118,10 +118,29 @@ async function createConvertedTemplate(sourceTemplate, newType, updatedMessage, 
     const restaurantId = sourceTemplate.restaurant;
     const language = sourceTemplate.language;
     
-    // Genera un nuovo nome basato sul vecchio ma con un identificatore di conversione
-    const nameParts = sourceTemplate.name.split('_');
+    // Ottieni il nome del ristorante per includere nel nome del template
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      throw new Error('Ristorante non trovato');
+    }
+    
+    // Sanitizza il nome del ristorante per l'uso nel nome del template
+    const sanitizedName = restaurant.name
+      .toLowerCase()
+      .replace(/[']/g, '') // rimuove apostrofi
+      .replace(/[^a-z0-9]/g, '_') // sostituisce caratteri speciali e spazi con underscore
+      .replace(/_+/g, '_') // rimuove underscore multipli
+      .replace(/^_|_$/g, ''); // rimuove underscore iniziali e finali
+    
+    // Determina il tipo di template in un formato leggibile
+    const templateTypeLabel = newType === 'MEDIA' ? 'menu_pdf' : 'menu_url';
+    
+    // Genera un timestamp e un identificatore univoco
     const timestamp = Date.now();
-    const newName = `${nameParts[0]}_${newType.toLowerCase()}_${timestamp}_${language}`;
+    const randomId = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    // Formato: {nome_ristorante}_{tipo_template}_{timestamp}_{id}_{lingua}
+    const newName = `${sanitizedName}_${templateTypeLabel}_${timestamp}_${randomId}_${language}`;
     
     // Prepara il nuovo oggetto template
     const newTemplateData = {
