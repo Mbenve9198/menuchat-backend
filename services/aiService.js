@@ -168,8 +168,7 @@ const generateImage = async (prompt) => {
 
     console.log('DALL-E response:', response);
 
-    // La risposta ha questa struttura:
-    // { created: timestamp, data: [{ revised_prompt: string, url: string }] }
+    // Non usare la risposta come nuovo prompt
     if (!response.data?.[0]?.url) {
       throw new Error('URL immagine non trovato nella risposta');
     }
@@ -177,18 +176,11 @@ const generateImage = async (prompt) => {
     return {
       success: true,
       imageUrl: response.data[0].url,
-      revisedPrompt: response.data[0].revised_prompt // Opzionale: possiamo usarlo per debug
+      revisedPrompt: response.data[0].revised_prompt // opzionale: per debug
     };
   } catch (error) {
     console.error('Errore dettagliato nella generazione dell\'immagine:', error);
-    
-    // Migliore gestione degli errori
-    if (error.error?.message) {
-      throw new Error(error.error.message);
-    } else if (error.message) {
-      throw new Error(error.message);
-    }
-    throw new Error('Errore nella generazione dell\'immagine');
+    throw error;
   }
 };
 
