@@ -5,6 +5,7 @@ const twilioRoutes = require('./twilioRoutes');
 const templateRoutes = require('./templateRoutes');
 const contactRoutes = require('./contactRoutes');
 const apiRoutes = require('./api');
+const aiRoutes = require('./aiRoutes');
 
 const router = express.Router();
 
@@ -25,5 +26,8 @@ router.use('/contacts', contactRoutes);
 
 // Rotte API generali
 router.use('/', apiRoutes);
+
+// Rotte AI
+router.use('/ai', aiRoutes);
 
 module.exports = router; 
