@@ -1,27 +1,10 @@
 const anthropic = require('../config/anthropic');
 
 const generatePromptForTemplate = (campaignType, objective, language) => {
-  const basePrompt = `You are an expert restaurant marketing specialist.
-You need to create a persuasive WhatsApp message for a marketing campaign.
-
-Campaign details:
-- Type: ${campaignType}
-- Objective: ${objective}
-- Language: ${language}
-
-The message must:
-- Be concise and direct (max 200 characters)
-- Include relevant emojis
-- Have a friendly yet professional tone
-- End with a clear call-to-action
-
-For the call-to-action, decide whether it's more appropriate to use:
-- A link (for online bookings, menu, etc.)
-- A phone number (for direct reservations)
-
-Respond in JSON format with this structure:
+  const basePrompt = `Create a WhatsApp marketing message based on these details.
+IMPORTANT: Your response must be a valid JSON object with this exact structure:
 {
-  "messageText": "the message text",
+  "messageText": "your message here",
   "cta": {
     "text": "button text",
     "type": "url|phone",
@@ -29,7 +12,20 @@ Respond in JSON format with this structure:
   }
 }
 
-Additional specifications based on campaign type:`;
+Campaign details:
+- Type: ${campaignType}
+- Objective: ${objective}
+- Language: ${language}
+
+Requirements:
+1. Message must be concise (max 200 characters)
+2. Include relevant emojis
+3. Use friendly yet professional tone
+4. End with clear call-to-action
+
+CTA options:
+- URL: for online bookings/menu
+- Phone: for direct reservations`;
 
   const campaignSpecifics = {
     promo: `
@@ -75,28 +71,40 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
     
     console.log('Sending prompt to Claude:', prompt);
 
+    // Rimuoviamo response_format e aggiungiamo system message
     const message = await anthropic.messages.create({
       model: 'claude-3-sonnet-20240229',
       max_tokens: 1000,
       temperature: 0.7,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }],
-      response_format: { type: 'json' }
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a restaurant marketing expert. Always respond in valid JSON format.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
     });
 
     console.log('Claude response:', message.content[0].text);
 
-    // Estrai la risposta JSON dal messaggio
-    const response = JSON.parse(message.content[0].text);
+    try {
+      // Estrai la risposta JSON dal messaggio
+      const response = JSON.parse(message.content[0].text);
 
-    // Validazione della risposta
-    if (!response.messageText || !response.cta) {
-      throw new Error('Risposta AI non valida: mancano campi richiesti');
+      // Validazione della risposta
+      if (!response.messageText || !response.cta) {
+        throw new Error('Risposta AI non valida: mancano campi richiesti');
+      }
+
+      return response;
+    } catch (parseError) {
+      console.error('Errore nel parsing della risposta:', parseError);
+      console.log('Risposta raw:', message.content[0].text);
+      throw new Error('Errore nel parsing della risposta AI');
     }
-
-    return response;
   } catch (error) {
     console.error('Errore dettagliato in generateTemplateWithClaude:', error);
     
