@@ -71,16 +71,12 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
     
     console.log('Sending prompt to Claude:', prompt);
 
-    // Rimuoviamo response_format e aggiungiamo system message
     const message = await anthropic.messages.create({
       model: 'claude-3-sonnet-20240229',
       max_tokens: 1000,
       temperature: 0.7,
+      system: 'You are a restaurant marketing expert. Always respond in valid JSON format.',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a restaurant marketing expert. Always respond in valid JSON format.'
-        },
         {
           role: 'user',
           content: prompt
