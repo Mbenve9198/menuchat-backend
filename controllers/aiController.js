@@ -12,6 +12,14 @@ exports.generateTemplate = async (req, res) => {
       });
     }
 
+    // Debug log
+    console.log('Generating template with params:', {
+      campaignType,
+      objective,
+      language,
+      hasApiKey: !!process.env.ANTHROPIC_API_KEY
+    });
+
     // Genera il template
     const template = await generateTemplateWithClaude(campaignType, objective, language);
 
@@ -20,10 +28,10 @@ exports.generateTemplate = async (req, res) => {
       data: template
     });
   } catch (error) {
-    console.error('Errore nella generazione del template:', error);
+    console.error('Errore dettagliato nella generazione del template:', error);
     res.status(500).json({
       success: false,
-      error: 'Errore nella generazione del template'
+      error: error.message || 'Errore nella generazione del template'
     });
   }
 }; 

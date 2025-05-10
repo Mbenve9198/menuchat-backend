@@ -67,8 +67,14 @@ Additional specifications based on campaign type:`;
 
 const generateTemplateWithClaude = async (campaignType, objective, language) => {
   try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY non configurata');
+    }
+
     const prompt = generatePromptForTemplate(campaignType, objective, language);
     
+    console.log('Sending prompt to Claude:', prompt);
+
     const message = await anthropic.messages.create({
       model: 'claude-3-sonnet-20240229',
       max_tokens: 1000,
@@ -80,18 +86,25 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
       response_format: { type: 'json' }
     });
 
+    console.log('Claude response:', message.content[0].text);
+
     // Estrai la risposta JSON dal messaggio
     const response = JSON.parse(message.content[0].text);
 
-    // Valida la risposta
+    // Validazione della risposta
     if (!response.messageText || !response.cta) {
-      throw new Error('Risposta AI non valida');
+      throw new Error('Risposta AI non valida: mancano campi richiesti');
     }
 
     return response;
   } catch (error) {
-    console.error('Errore nella generazione del template con Claude:', error);
-    throw new Error('Errore nella generazione del template');
+    console.error('Errore dettagliato in generateTemplateWithClaude:', error);
+    
+    if (error.name === 'SyntaxError') {
+      throw new Error('Errore nel parsing della risposta AI');
+    }
+    
+    throw error;
   }
 };
 
