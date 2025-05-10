@@ -10,6 +10,19 @@ const axios = require('axios');
 const cron = require('node-cron');
 const googlePlacesService = require('./services/googlePlacesService');
 
+// Import delle rotte
+const authRoutes = require('./routes/authRoutes');
+const restaurantRoutes = require('./routes/restaurantRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const contactRoutes = require('./routes/contactRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
+const templateRoutes = require('./routes/templateRoutes');
+const statsRoutes = require('./routes/statsRoutes');
+const activityRoutes = require('./routes/activityRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
+const aiRoutes = require('./routes/ai');
+
 // Inizializza Express
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -128,6 +141,19 @@ const setupGooglePlacesReviewsJob = () => {
     timezone: 'Europe/Rome'
   });
 };
+
+// Routing API
+app.use('/api/auth', authRoutes);
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/contacts', contactRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/webhook', webhookRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Gestione errori 404
 app.use((req, res) => {
