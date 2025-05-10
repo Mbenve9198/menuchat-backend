@@ -111,7 +111,7 @@ class StatsController {
         return ((current - previous) / previous) * 100;
       };
 
-      res.json({
+      return res.json({
         success: true,
         menusSent: menuTemplates.length,
         reviewRequests: reviewTemplates.length,
@@ -126,7 +126,7 @@ class StatsController {
       });
     } catch (error) {
       console.error('Error getting stats:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Errore nel recupero delle statistiche'
       });
