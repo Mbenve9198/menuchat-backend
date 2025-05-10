@@ -32,6 +32,50 @@ class GooglePlacesService {
   }
 
   /**
+   * Sincronizza le recensioni per un singolo ristorante
+   */
+  async syncRestaurantReviews(restaurant) {
+    try {
+      if (!restaurant.googlePlaceId) {
+        throw new Error('Restaurant has no Google Place ID');
+      }
+
+      // Ottieni i nuovi dati da Google Places
+      const placeDetails = await this.getPlaceDetails(restaurant.googlePlaceId);
+      
+      // Se è la prima volta che sincronizziamo, salva il conteggio iniziale
+      if (typeof restaurant.initialReviewCount === 'undefined') {
+        restaurant.initialReviewCount = placeDetails.user_ratings_total || 0;
+      }
+
+      // Aggiorna i dati del ristorante
+      restaurant.googleRating = {
+        rating: placeDetails.rating || 0,
+        reviewCount: placeDetails.user_ratings_total || 0,
+        lastUpdated: new Date()
+      };
+
+      // Aggiorna le recensioni se disponibili
+      if (placeDetails.reviews) {
+        restaurant.reviews = placeDetails.reviews.map(review => ({
+          authorName: review.author_name,
+          rating: review.rating,
+          text: review.text,
+          time: new Date(review.time * 1000)
+        }));
+      }
+
+      await restaurant.save();
+      console.log(`Updated reviews for ${restaurant.name}`);
+
+      return restaurant;
+    } catch (error) {
+      console.error(`Error syncing reviews for restaurant ${restaurant.name}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Aggiorna le recensioni per tutti i ristoranti
    */
   async updateAllRestaurantsReviews() {
@@ -46,38 +90,7 @@ class GooglePlacesService {
 
       for (const restaurant of restaurants) {
         try {
-          // Se è la prima volta che aggiorniamo le recensioni, salva il conteggio iniziale
-          if (typeof restaurant.initialReviewCount === 'undefined') {
-            const placeDetails = await this.getPlaceDetails(restaurant.googlePlaceId);
-            restaurant.initialReviewCount = placeDetails.user_ratings_total || 0;
-            await restaurant.save();
-            console.log(`Set initial review count for ${restaurant.name}: ${restaurant.initialReviewCount}`);
-            continue;
-          }
-
-          // Ottieni i nuovi dati da Google Places
-          const placeDetails = await this.getPlaceDetails(restaurant.googlePlaceId);
-          
-          // Aggiorna i dati del ristorante
-          restaurant.googleRating = {
-            rating: placeDetails.rating || 0,
-            reviewCount: placeDetails.user_ratings_total || 0,
-            lastUpdated: new Date()
-          };
-
-          // Aggiorna le recensioni se disponibili
-          if (placeDetails.reviews) {
-            restaurant.reviews = placeDetails.reviews.map(review => ({
-              authorName: review.author_name,
-              rating: review.rating,
-              text: review.text,
-              time: new Date(review.time * 1000)
-            }));
-          }
-
-          await restaurant.save();
-          console.log(`Updated reviews for ${restaurant.name}`);
-
+          await this.syncRestaurantReviews(restaurant);
           // Attendi un po' per non superare i limiti di rate dell'API
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {

@@ -5,6 +5,8 @@ const uploadController = require('../controllers/uploadController');
 const statsController = require('../controllers/statsController');
 const { uploadPdf } = require('../config/cloudinary');
 const menuService = require('../services/menuService');
+const googlePlacesService = require('../services/googlePlacesService');
+const Restaurant = require('../models/Restaurant');
 
 // Rotte per il setup del ristorante
 router.post('/restaurants', setupController.setupRestaurant);
@@ -12,6 +14,44 @@ router.get('/restaurants/:id', setupController.getRestaurant);
 router.put('/restaurants/:id', setupController.updateRestaurant);
 router.delete('/restaurants/:id', setupController.deleteRestaurant);
 router.get('/restaurants/:id/profile-image', setupController.getRestaurantProfileImage);
+
+// Rotta per sincronizzare le recensioni di un ristorante
+router.post('/restaurants/:id/sync-reviews', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Trova il ristorante
+    const restaurant = await Restaurant.findById(id);
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Ristorante non trovato'
+      });
+    }
+
+    // Verifica che il ristorante abbia un Google Place ID
+    if (!restaurant.googlePlaceId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ristorante non collegato a Google Places'
+      });
+    }
+
+    // Sincronizza le recensioni
+    const updatedRestaurant = await googlePlacesService.syncRestaurantReviews(restaurant);
+
+    res.json({
+      success: true,
+      restaurant: updatedRestaurant
+    });
+  } catch (error) {
+    console.error('Error syncing reviews:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Errore durante la sincronizzazione delle recensioni'
+    });
+  }
+});
 
 // Rotte per le statistiche e le attività
 router.get('/stats', statsController.getStats);
