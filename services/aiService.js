@@ -76,7 +76,7 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
       model: 'claude-3-7-sonnet-20250219',
       max_tokens: 1000,
       temperature: 0.7,
-      system: 'You are a restaurant marketing expert. Always respond in valid JSON format.',
+      system: 'You are a restaurant marketing expert. Return ONLY the JSON object without any markdown formatting or additional text.',
       messages: [
         {
           role: 'user',
@@ -88,8 +88,18 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
     console.log('Claude response:', message.content[0].text);
 
     try {
+      // Puliamo la risposta da eventuali backticks e markdown
+      let cleanResponse = message.content[0].text;
+      
+      // Rimuovi i backticks e l'indicatore json se presenti
+      cleanResponse = cleanResponse.replace(/```json\s*/, '');
+      cleanResponse = cleanResponse.replace(/```\s*$/, '');
+      cleanResponse = cleanResponse.trim();
+
+      console.log('Cleaned response:', cleanResponse);
+
       // Estrai la risposta JSON dal messaggio
-      const response = JSON.parse(message.content[0].text);
+      const response = JSON.parse(cleanResponse);
 
       // Validazione della risposta
       if (!response.messageText || !response.cta) {
@@ -104,11 +114,6 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
     }
   } catch (error) {
     console.error('Errore dettagliato in generateTemplateWithClaude:', error);
-    
-    if (error.name === 'SyntaxError') {
-      throw new Error('Errore nel parsing della risposta AI');
-    }
-    
     throw error;
   }
 };
