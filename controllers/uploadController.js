@@ -1,10 +1,5 @@
 const { cloudinary } = require('../config/cloudinary');
 const menuService = require('../services/menuService');
-const cloudinaryV2 = require('cloudinary').v2;
-const fs = require('fs');
-const util = require('util');
-const path = require('path');
-const { Restaurant } = require('../models');
 
 /**
  * Controller per gestire gli upload di file
@@ -112,107 +107,6 @@ class UploadController {
         success: false,
         error: 'Errore durante l\'eliminazione del file',
         details: error.message
-      });
-    }
-  }
-
-  /**
-   * Carica un'immagine di campagna su Cloudinary
-   * @param {Object} req - Richiesta Express
-   * @param {Object} res - Risposta Express
-   * @returns {Promise<void>}
-   */
-  async uploadCampaignImage(req, res) {
-    try {
-      // Verifica se è stato caricato un file
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: 'Nessun file caricato'
-        });
-      }
-      
-      const { restaurantId } = req.body;
-      
-      // Verifica che l'utente abbia accesso al ristorante
-      if (req.user.restaurantId !== restaurantId) {
-        // Elimina il file temporaneo
-        fs.unlink(req.file.path, (err) => {
-          if (err) console.error('Errore durante la cancellazione del file temporaneo:', err);
-        });
-        
-        return res.status(403).json({
-          success: false,
-          error: 'Accesso non autorizzato a questo ristorante'
-        });
-      }
-      
-      // Trova il ristorante per ottenere il nome
-      const restaurant = await Restaurant.findById(restaurantId);
-      if (!restaurant) {
-        // Elimina il file temporaneo
-        fs.unlink(req.file.path, (err) => {
-          if (err) console.error('Errore durante la cancellazione del file temporaneo:', err);
-        });
-        
-        return res.status(404).json({
-          success: false,
-          error: 'Ristorante non trovato'
-        });
-      }
-      
-      // Sanitizza il nome del ristorante per il pubblic_id
-      const sanitizedName = restaurant.name
-        .toLowerCase()
-        .replace(/[']/g, '')
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      
-      // Opzioni per il caricamento su Cloudinary
-      const uploadOptions = {
-        folder: `menuchat/campaign-images/${sanitizedName}`,
-        resource_type: 'image',
-        public_id: `campaign-${Date.now()}`,
-        transformation: [
-          { width: 1024, crop: 'limit' },
-          { quality: 'auto' }
-        ]
-      };
-      
-      // Carica il file su Cloudinary
-      const result = await cloudinaryV2.uploader.upload(req.file.path, uploadOptions);
-      
-      // Elimina il file temporaneo
-      fs.unlink(req.file.path, (err) => {
-        if (err) console.error('Errore durante la cancellazione del file temporaneo:', err);
-      });
-      
-      console.log(`Immagine caricata: ${result.secure_url}`);
-      
-      return res.json({
-        success: true,
-        file: {
-          url: result.secure_url,
-          publicId: result.public_id,
-          width: result.width,
-          height: result.height
-        }
-      });
-      
-    } catch (error) {
-      console.error('Errore durante il caricamento dell\'immagine:', error);
-      
-      // Elimina il file temporaneo in caso di errore
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          if (err) console.error('Errore durante la cancellazione del file temporaneo:', err);
-        });
-      }
-      
-      return res.status(500).json({
-        success: false,
-        error: error.message || 'Errore durante il caricamento dell\'immagine'
       });
     }
   }

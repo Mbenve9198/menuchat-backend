@@ -5,11 +5,10 @@ const cors = require('cors');
 // Commentato temporaneamente per il deploy
 // const helmet = require('helmet');
 const connectDB = require('./db');
+const routes = require('./routes');
 const axios = require('axios');
 const cron = require('node-cron');
 const googlePlacesService = require('./services/googlePlacesService');
-const routes = require('./routes');
-const twilioController = require('./controllers/twilioController');
 
 // Inizializza Express
 const app = express();
@@ -62,6 +61,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api', routes);
 
 // Aggiungi una rotta diretta per il webhook di Twilio
+const twilioController = require('./controllers/twilioController');
 app.post('/twilio/webhook', twilioController.webhookHandler);
 
 // Route di debug per verificare che il server sia attivo
