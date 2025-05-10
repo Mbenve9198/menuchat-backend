@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const contactController = require('../controllers/contactController');
-const { authenticateJWT } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // Proteggi tutte le rotte con autenticazione JWT
-router.use(authenticateJWT);
+router.use(protect);
 
 // Rotte per la gestione dei contatti
 router.get('/restaurant/:restaurantId', contactController.getContactsByRestaurant);
