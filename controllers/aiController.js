@@ -1,4 +1,4 @@
-const { generateTemplateWithClaude } = require('../services/aiService');
+const { generateTemplateWithClaude, generateImagePrompt, generateImage } = require('../services/aiService');
 
 exports.generateTemplate = async (req, res) => {
   try {
@@ -32,6 +32,58 @@ exports.generateTemplate = async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Errore nella generazione del template'
+    });
+  }
+};
+
+exports.generateImagePrompt = async (req, res) => {
+  try {
+    const { messageText, campaignType, objective } = req.body;
+
+    if (!messageText || !campaignType || !objective) {
+      return res.status(400).json({
+        success: false,
+        error: 'Parametri mancanti'
+      });
+    }
+
+    const prompt = await generateImagePrompt(messageText, campaignType, objective);
+
+    res.json({
+      success: true,
+      data: { prompt }
+    });
+  } catch (error) {
+    console.error('Errore nella generazione del prompt:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Errore nella generazione del prompt'
+    });
+  }
+};
+
+exports.generateImage = async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Prompt mancante'
+      });
+    }
+
+    const result = await generateImage(prompt);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Errore nella generazione dell\'immagine:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Errore nella generazione dell\'immagine'
     });
   }
 }; 

@@ -1,4 +1,5 @@
 const anthropic = require('../config/anthropic');
+const openai = require('../config/openai');
 
 const generatePromptForTemplate = (campaignType, objective, language) => {
   const basePrompt = `Create a WhatsApp marketing message based on these details.
@@ -72,7 +73,7 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
     console.log('Sending prompt to Claude:', prompt);
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-sonnet-20240229',
+      model: 'claude-3-7-sonnet-20250219',
       max_tokens: 1000,
       temperature: 0.7,
       system: 'You are a restaurant marketing expert. Always respond in valid JSON format.',
@@ -112,6 +113,68 @@ const generateTemplateWithClaude = async (campaignType, objective, language) => 
   }
 };
 
+const generateImagePrompt = async (messageText, campaignType, objective) => {
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-7-sonnet-20250219',
+      max_tokens: 1000,
+      temperature: 0.7,
+      system: 'You are an expert at creating DALL-E prompts. Create detailed, specific prompts that will generate high-quality marketing images.',
+      messages: [
+        {
+          role: 'user',
+          content: `Create a DALL-E prompt for a restaurant marketing image based on this context:
+          
+Campaign Type: ${campaignType}
+Campaign Objective: ${objective}
+Message Text: ${messageText}
+
+The prompt should:
+1. Be detailed and specific
+2. Focus on the key elements of the campaign
+3. Specify the style (e.g. photography, illustration)
+4. Include mood and lighting
+5. Mention any specific colors or branding elements
+6. Be optimized for marketing/advertising use
+
+Respond with just the prompt text, no explanations.`
+        }
+      ]
+    });
+
+    return message.content[0].text;
+  } catch (error) {
+    console.error('Errore nella generazione del prompt per immagine:', error);
+    throw error;
+  }
+};
+
+const generateImage = async (prompt) => {
+  try {
+    console.log('Generating image with DALL-E 3 prompt:', prompt);
+
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: prompt,
+      n: 1,
+      size: "1024x1024",
+      style: "vivid", // Usiamo vivid per immagini più dettagliate e accattivanti per il marketing
+    });
+
+    console.log('DALL-E response:', response);
+
+    return {
+      success: true,
+      imageUrl: response.data[0].url
+    };
+  } catch (error) {
+    console.error('Errore nella generazione dell\'immagine:', error);
+    throw error;
+  }
+};
+
 module.exports = {
-  generateTemplateWithClaude
+  generateTemplateWithClaude,
+  generateImagePrompt,
+  generateImage
 }; 
