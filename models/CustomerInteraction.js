@@ -83,7 +83,19 @@ const CustomerInteractionSchema = new Schema({
   deviceInfo: {
     userAgent: String,
     ipHash: String
-  }
+  },
+  // Campi per la gestione delle recensioni
+  scheduledForReview: {
+    type: Date,
+    index: true
+  },
+  reviewSent: {
+    type: Boolean,
+    default: false
+  },
+  lastReviewSentAt: Date,
+  lastTemplateId: String,
+  // Fine dei campi per la gestione delle recensioni
 }, {
   timestamps: true // Aggiunge automaticamente i campi createdAt e updatedAt
 });
@@ -93,6 +105,7 @@ CustomerInteractionSchema.index({ restaurant: 1, status: 1 });
 CustomerInteractionSchema.index({ restaurant: 1, lastActive: -1 });
 CustomerInteractionSchema.index({ restaurant: 1, 'reviewData.completed': 1 });
 CustomerInteractionSchema.index({ restaurant: 1, 'reviewData.requestedAt': 1 }, { sparse: true });
+CustomerInteractionSchema.index({ scheduledForReview: 1, reviewSent: 1, status: 1 });
 
 // Metodo statico per hashare il numero di telefono (per privacy)
 CustomerInteractionSchema.statics.hashPhoneNumber = function(phoneNumber) {

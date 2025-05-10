@@ -6,6 +6,7 @@ const cors = require('cors');
 // const helmet = require('helmet');
 const connectDB = require('./db');
 const routes = require('./routes');
+const axios = require('axios');
 
 // Inizializza Express
 const app = express();
@@ -82,6 +83,34 @@ app.get('/', (req, res) => {
   res.json({ message: 'MenuChat API' });
 });
 
+// Sistema di scheduling semplice per richiamare l'API delle recensioni programmate
+const setupReviewScheduler = () => {
+  const scheduler_api_key = process.env.SCHEDULER_API_KEY || 'default_key_dev';
+  const schedulerInterval = process.env.REVIEW_SCHEDULER_INTERVAL_MIN || 10; // Default a 10 minuti
+  const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+  
+  console.log(`🕒 Configurazione scheduler recensioni ogni ${schedulerInterval} minuti`);
+  
+  // Esegui lo scheduler ogni X minuti
+  setInterval(async () => {
+    try {
+      console.log('⏰ Esecuzione scheduler recensioni...');
+      
+      // Richiama l'endpoint per l'invio delle recensioni programmate
+      const response = await axios.post(`${baseUrl}/api/twilio/send-scheduled-reviews`, {}, {
+        headers: {
+          'x-api-key': scheduler_api_key,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('✅ Scheduler recensioni completato:', response.data.message);
+    } catch (error) {
+      console.error('❌ Errore nell\'esecuzione dello scheduler recensioni:', error.message);
+    }
+  }, schedulerInterval * 60 * 1000); // Converti minuti in millisecondi
+};
+
 // Gestione errori 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint non trovato' });
@@ -96,4 +125,6 @@ app.use((err, req, res, next) => {
 // Avvio del server
 app.listen(PORT, () => {
   console.log(`Server in esecuzione sulla porta ${PORT} in modalità ${process.env.NODE_ENV || 'development'}`);
+  // Avvia lo scheduler delle recensioni
+  setupReviewScheduler();
 }); 
