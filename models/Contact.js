@@ -1,16 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-const crypto = require('crypto');
 
-// Schema per tracciare le interazioni del cliente
-const InteractionDateSchema = new Schema({
-  date: {
-    type: Date,
-    default: Date.now
-  }
-}, { _id: false });
-
-// Schema principale per i contatti dei clienti
 const ContactSchema = new Schema({
   restaurant: {
     type: Schema.Types.ObjectId,
@@ -18,143 +8,128 @@ const ContactSchema = new Schema({
     required: [true, 'Ristorante è obbligatorio'],
     index: true
   },
-  // Nome del cliente (visibile su WhatsApp)
   name: {
     type: String,
-    required: [true, 'Nome del cliente è obbligatorio'],
-    trim: true,
-    index: true
+    required: [true, 'Nome è obbligatorio'],
+    trim: true
   },
-  // Numero di telefono del cliente
   phoneNumber: {
     type: String,
     required: [true, 'Numero di telefono è obbligatorio'],
     index: true
   },
-  // Hash del numero di telefono per privacy e ricerche
-  phoneHash: {
+  countryCode: {
     type: String,
-    required: [true, 'Hash del numero di telefono è obbligatorio'],
-    index: true
+    default: 'IT' // Default a Italia
   },
-  // Consenso marketing
   optIn: {
     type: Boolean,
-    default: false,
-    index: true
+    default: true // Opt-in di default come richiesto
   },
-  // Data in cui il cliente ha dato il consenso
-  optInDate: {
+  // Metadati sulle interazioni
+  firstContact: {
     type: Date,
-    default: null
+    default: Date.now
   },
-  // Tracciamento per opt-out
-  optOut: {
-    type: Boolean,
-    default: false,
-    index: true
-  },
-  // Data in cui il cliente ha revocato il consenso
-  optOutDate: {
+  lastContact: {
     type: Date,
-    default: null
+    default: Date.now
   },
-  // Se è stata inviata una richiesta di recensione
-  reviewLinkSent: {
-    type: Boolean,
-    default: false
-  },
-  // Data in cui è stata inviata l'ultima richiesta di recensione
-  lastReviewLinkSentAt: {
-    type: Date,
-    default: null
-  },
-  // Conteggio delle interazioni in giorni diversi
-  interactionDates: [InteractionDateSchema],
-  // Conteggio totale delle interazioni
-  interactionCount: {
+  interactionDates: [{
+    type: Date
+  }],
+  totalInteractions: {
     type: Number,
-    default: 0
+    default: 1
   },
-  // Lingua preferita del cliente
-  language: {
-    type: String,
-    enum: ['it', 'en', 'es', 'fr', 'de'],
-    default: 'it'
-  },
-  // Metadati aggiuntivi e note
-  notes: {
-    type: String,
-    default: ''
-  },
-  // Tag per segmentazione
-  tags: [String],
-  // Flag per contatti di test
-  isTest: {
-    type: Boolean,
-    default: false
-  },
-  // Data di creazione del contatto
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-  },
-  // Data dell'ultima interazione
-  lastInteractionAt: {
-    type: Date,
-    default: Date.now,
-    index: true
+  // Contatore delle interazioni per giorno distinto
+  uniqueDayInteractions: {
+    type: Number,
+    default: 1
   }
+}, {
+  timestamps: true
 });
 
-// Indicizzazione composta per query comuni
+// Indici per ottimizzare le query
+ContactSchema.index({ restaurant: 1, phoneNumber: 1 }, { unique: true });
+ContactSchema.index({ restaurant: 1, lastContact: -1 });
+ContactSchema.index({ restaurant: 1, totalInteractions: -1 });
+ContactSchema.index({ restaurant: 1, uniqueDayInteractions: -1 });
 ContactSchema.index({ restaurant: 1, optIn: 1 });
-ContactSchema.index({ restaurant: 1, lastInteractionAt: -1 });
-ContactSchema.index({ restaurant: 1, reviewLinkSent: 1 });
 
-// Metodo statico per hashare il numero di telefono (per privacy)
-ContactSchema.statics.hashPhoneNumber = function(phoneNumber) {
-  // Rimuove caratteri non numerici e normalizza
-  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+// Metodo per registrare una nuova interazione
+ContactSchema.methods.recordInteraction = function() {
+  const now = new Date();
+  this.lastContact = now;
   
-  // Crea un hash SHA-256 del numero di telefono
-  return crypto
-    .createHash('sha256')
-    .update(normalizedPhone)
-    .digest('hex');
-};
-
-// Metodo per aggiungere una nuova interazione
-ContactSchema.methods.addInteraction = function() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalizza alla data odierna senza ora
+  // Aggiungi data alla lista delle interazioni
+  this.interactionDates.push(now);
   
-  // Controlla se esiste già un'interazione per oggi
-  const existingInteractionToday = this.interactionDates.find(interaction => {
-    const interactionDate = new Date(interaction.date);
-    interactionDate.setHours(0, 0, 0, 0);
-    return interactionDate.getTime() === today.getTime();
+  // Incrementa contatore totale interazioni
+  this.totalInteractions += 1;
+  
+  // Calcola il numero di giorni unici di interazione
+  // Converti tutte le date al formato gg/mm/aaaa per contare solo giorni unici
+  const uniqueDays = new Set();
+  this.interactionDates.forEach(date => {
+    const day = date.toISOString().split('T')[0]; // formato YYYY-MM-DD
+    uniqueDays.add(day);
   });
   
-  // Se non c'è un'interazione per oggi, aggiungila
-  if (!existingInteractionToday) {
-    this.interactionDates.push({ date: new Date() });
-  }
-  
-  // Incrementa il contatore di interazioni
-  this.interactionCount += 1;
-  
-  // Aggiorna la data dell'ultima interazione
-  this.lastInteractionAt = new Date();
+  this.uniqueDayInteractions = uniqueDays.size;
   
   return this;
 };
 
-// Metodo per verificare se il cliente è attivo (ha interagito negli ultimi X giorni)
-ContactSchema.methods.isActive = function(days = 90) {
-  const daysInMilliseconds = days * 24 * 60 * 60 * 1000;
-  return (Date.now() - this.lastInteractionAt) <= daysInMilliseconds;
+// Utility per ottenere il codice paese dal prefisso internazionale
+ContactSchema.statics.getCountryCodeFromPhoneNumber = function(phoneNumber) {
+  // Rimuovi eventuali spazi e simboli come + o -
+  const cleanNumber = phoneNumber.replace(/\s+/g, '');
+  
+  // Mappa dei prefissi più comuni con i relativi codici paese
+  const prefixMap = {
+    '39': 'IT',  // Italia
+    '1': 'US',   // Stati Uniti / Canada
+    '44': 'GB',  // Regno Unito
+    '33': 'FR',  // Francia
+    '49': 'DE',  // Germania
+    '34': 'ES',  // Spagna
+    '351': 'PT', // Portogallo
+    '41': 'CH',  // Svizzera
+    '43': 'AT',  // Austria
+    '32': 'BE',  // Belgio
+    '31': 'NL',  // Paesi Bassi
+    '45': 'DK',  // Danimarca
+    '46': 'SE',  // Svezia
+    '47': 'NO',  // Norvegia
+    '358': 'FI', // Finlandia
+    '420': 'CZ', // Repubblica Ceca
+    '48': 'PL',  // Polonia
+    '36': 'HU',  // Ungheria
+    '30': 'GR',  // Grecia
+    '7': 'RU',   // Russia
+    '81': 'JP',  // Giappone
+    '86': 'CN',  // Cina
+    '91': 'IN',  // India
+    '55': 'BR',  // Brasile
+    '52': 'MX',  // Messico
+    '61': 'AU',  // Australia
+    '64': 'NZ'   // Nuova Zelanda
+  };
+  
+  // Se il numero inizia con +, rimuovilo
+  const normalizedNumber = cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber;
+  
+  // Prova a trovare una corrispondenza con i prefissi conosciuti
+  for (const [prefix, code] of Object.entries(prefixMap)) {
+    if (normalizedNumber.startsWith(prefix)) {
+      return code;
+    }
+  }
+  
+  // Default a IT se non viene trovata corrispondenza
+  return 'IT';
 };
 
 module.exports = mongoose.model('Contact', ContactSchema); 

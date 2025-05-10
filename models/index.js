@@ -7,8 +7,6 @@ const BotConfiguration = require('./BotConfiguration');
 const CustomerInteraction = require('./CustomerInteraction');
 const Analytics = require('./Analytics');
 const Contact = require('./Contact');
-const WhatsAppTemplate = require('./WhatsAppTemplate');
-const Campaign = require('./Campaign');
 
 module.exports = {
   User,
@@ -17,7 +15,5 @@ module.exports = {
   BotConfiguration,
   CustomerInteraction,
   Analytics,
-  Contact,
-  WhatsAppTemplate,
-  Campaign
+  Contact
 }; 
