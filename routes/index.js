@@ -3,6 +3,7 @@ const authRoutes = require('./authRoutes');
 const setupRoutes = require('./setupRoutes');
 const twilioRoutes = require('./twilioRoutes');
 const templateRoutes = require('./templateRoutes');
+const apiRoutes = require('./api');
 
 const router = express.Router();
 
@@ -17,5 +18,8 @@ router.use('/twilio', twilioRoutes);
 
 // Rotte dei template
 router.use('/templates', templateRoutes);
+
+// Rotte API generali
+router.use('/', apiRoutes);
 
 module.exports = router; 
