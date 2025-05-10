@@ -6,6 +6,13 @@ const Restaurant = require('../models/Restaurant');
  * Controller per gestire le statistiche e le attività della dashboard
  */
 class StatsController {
+  constructor() {
+    // Binding dei metodi per mantenere il contesto
+    this.getStats = this.getStats.bind(this);
+    this.getActivities = this.getActivities.bind(this);
+    this.getStartDate = this.getStartDate.bind(this);
+  }
+
   /**
    * Calcola la data di inizio in base al periodo selezionato
    */
