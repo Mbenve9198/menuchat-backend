@@ -156,36 +156,39 @@ Respond with just the prompt text, no explanations.`
 
 const generateImage = async (prompt) => {
   try {
-    console.log('Generating image with DALL-E 3 prompt:', prompt);
+    // Validazione del prompt
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('Prompt non valido');
+    }
 
-    // Verifica che il prompt sia una stringa di testo e non un URL
     if (prompt.startsWith('http')) {
       throw new Error('Il prompt non può essere un URL');
     }
 
+    // Configurazione OpenAI per DALL-E
     const response = await openai.images.generate({
       model: "dall-e-3",
       prompt: prompt,
       n: 1,
       size: "1024x1024",
-      style: "vivid",
-      response_format: "url"  // Esplicitiamo il formato di risposta
+      quality: "standard",
+      style: "vivid"
     });
 
-    console.log('DALL-E response:', response);
-
-    if (!response.data?.[0]?.url) {
-      throw new Error('URL immagine non trovato nella risposta');
+    // Verifica della risposta
+    if (!response?.data?.[0]?.url) {
+      throw new Error('Risposta DALL-E non valida');
     }
 
-    // Restituisci solo l'URL dell'immagine generata
     return {
       success: true,
-      imageUrl: response.data[0].url,
-      revisedPrompt: response.data[0].revised_prompt
+      data: {
+        imageUrl: response.data[0].url,
+        revisedPrompt: response.data[0].revised_prompt
+      }
     };
   } catch (error) {
-    console.error('Errore dettagliato nella generazione dell\'immagine:', error);
+    console.error('Errore nella generazione dell\'immagine:', error);
     throw error;
   }
 };

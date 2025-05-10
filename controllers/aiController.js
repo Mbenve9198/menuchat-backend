@@ -100,21 +100,33 @@ exports.generateImage = async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    if (!prompt) {
+    // Validazione
+    if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({
         success: false,
-        error: 'Prompt mancante'
+        error: 'Prompt non valido'
       });
     }
 
+    if (prompt.startsWith('http')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Il prompt non può essere un URL'
+      });
+    }
+
+    // Genera l'immagine
     const result = await generateImage(prompt);
 
     res.json({
       success: true,
-      data: result
+      data: {
+        imageUrl: result.data.imageUrl,
+        revisedPrompt: result.data.revisedPrompt
+      }
     });
   } catch (error) {
-    console.error('Errore nella generazione dell\'immagine:', error);
+    console.error('Errore dettagliato nella generazione dell\'immagine:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Errore nella generazione dell\'immagine'
