@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const setupController = require('../controllers/setupController');
 const uploadController = require('../controllers/uploadController');
+const statsController = require('../controllers/statsController');
 const { uploadPdf } = require('../config/cloudinary');
 const menuService = require('../services/menuService');
 
@@ -11,6 +12,10 @@ router.get('/restaurants/:id', setupController.getRestaurant);
 router.put('/restaurants/:id', setupController.updateRestaurant);
 router.delete('/restaurants/:id', setupController.deleteRestaurant);
 router.get('/restaurants/:id/profile-image', setupController.getRestaurantProfileImage);
+
+// Rotte per le statistiche e le attività
+router.get('/stats', statsController.getStats);
+router.get('/activities', statsController.getActivities);
 
 // Rotte per la generazione di messaggi di benvenuto
 router.post('/welcome', setupController.generateWelcomeMessage);
