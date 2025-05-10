@@ -1,4 +1,5 @@
 const { generateTemplateWithClaude, generateImagePrompt, generateImage } = require('../services/aiService');
+const { anthropic } = require('../services/anthropicService');
 
 exports.generateTemplate = async (req, res) => {
   try {
@@ -47,12 +48,45 @@ exports.generateImagePrompt = async (req, res) => {
       });
     }
 
-    const prompt = await generateImagePrompt(messageText, campaignType, objective);
+    const message = await anthropic.messages.create({
+      model: 'claude-3-7-sonnet-20250219',
+      max_tokens: 1000,
+      temperature: 0.7,
+      system: 'You are an expert at creating DALL-E prompts. Create detailed, specific prompts that will generate high-quality marketing images.',
+      messages: [
+        {
+          role: 'user',
+          content: `Create a DALL-E prompt for a restaurant marketing image based on this context:
+          
+Campaign Type: ${campaignType}
+Campaign Objective: ${objective}
+Message Text: ${messageText}
+
+The prompt should:
+1. Be detailed and specific about what should appear in the image
+2. Focus on the key elements of the campaign
+3. Specify the style (e.g. professional food photography, lifestyle, etc.)
+4. Include mood and lighting details
+5. Mention specific colors or branding elements
+6. Be optimized for marketing/advertising use
+7. Include specific composition details
+
+Example format:
+"Professional food photography of a gourmet burger on a rustic wooden table, warm ambient lighting, shallow depth of field, garnished with fresh herbs, soft bokeh background, high-end restaurant atmosphere, 4K, high detail"
+
+Respond with just the prompt text, no explanations or additional formatting.`
+        }
+      ]
+    });
+
+    // Estrai il prompt dalla risposta
+    const prompt = message.content[0].text.trim();
 
     res.json({
       success: true,
       data: { prompt }
     });
+
   } catch (error) {
     console.error('Errore nella generazione del prompt:', error);
     res.status(500).json({
