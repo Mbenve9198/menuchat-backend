@@ -5,6 +5,7 @@ const twilioService = require('../services/twilioService');
 const Menu = require('../models/Menu');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
+const Contact = require('../models/Contact');
 const twilio = require('twilio');
 
 /**
@@ -71,6 +72,64 @@ const webhookHandler = async (req, res) => {
     
     // Estrai solo il numero senza il prefisso "whatsapp:"
     const rawPhoneNumber = fromNumber.replace('whatsapp:', '');
+    
+    // Identifica la lingua più appropriata in base al prefisso del numero di telefono
+    const getLanguageFromPhoneNumber = (phoneNumber) => {
+      // Rimuovi qualsiasi formato (whatsapp:, +, spazi, ecc.)
+      const cleanNumber = phoneNumber.replace(/\D+/g, '');
+      
+      // Mappa dei principali prefissi telefonici internazionali
+      const prefixMap = {
+        '39': 'it',  // Italia
+        '1': 'en',   // USA/Canada
+        '44': 'en',  // UK
+        '34': 'es',  // Spagna
+        '49': 'de',  // Germania
+        '33': 'fr',  // Francia
+      };
+      
+      // Controlla i prefissi principali
+      for (const [prefix, lang] of Object.entries(prefixMap)) {
+        if (cleanNumber.startsWith(prefix)) {
+          return lang;
+        }
+      }
+      
+      return 'it'; // Default a italiano
+    };
+    
+    language = getLanguageFromPhoneNumber(rawPhoneNumber);
+    console.log(`🌍 Lingua rilevata: ${language}`);
+    
+    // Salva o aggiorna il contatto
+    const phoneHash = Contact.hashPhoneNumber(fromNumber);
+    let contact = await Contact.findOne({
+      restaurant: restaurant._id,
+      phoneHash
+    });
+    
+    if (!contact) {
+      // Crea un nuovo contatto
+      contact = new Contact({
+        restaurant: restaurant._id,
+        name: profileName,
+        phoneNumber: fromNumber,
+        phoneHash,
+        language,
+        // Imposta opt-in a true di default
+        optIn: true,
+        optInDate: new Date(),
+        createdAt: new Date()
+      });
+      console.log(`👤 Nuovo contatto creato: ${profileName} (${fromNumber}) con opt-in attivo`);
+    } else {
+      console.log(`👤 Contatto esistente trovato: ${contact.name} (${contact.phoneNumber})`);
+    }
+    
+    // Aggiorna l'interazione per il contatto
+    contact.addInteraction();
+    await contact.save();
+    console.log(`✅ Contatto aggiornato con nuova interazione`);
     
     // Trova i template attivi per il ristorante
     const templates = await WhatsAppTemplate.find({
@@ -148,34 +207,6 @@ const webhookHandler = async (req, res) => {
       console.log('TwiML generato:', twiml.toString());
       return res.type('text/xml').send(twiml.toString());
     }
-    
-    // Identifica la lingua più appropriata in base al prefisso del numero di telefono
-    const getLanguageFromPhoneNumber = (phoneNumber) => {
-      // Rimuovi qualsiasi formato (whatsapp:, +, spazi, ecc.)
-      const cleanNumber = phoneNumber.replace(/\D+/g, '');
-      
-      // Mappa dei principali prefissi telefonici internazionali
-      const prefixMap = {
-        '39': 'it',  // Italia
-        '1': 'en',   // USA/Canada
-        '44': 'en',  // UK
-        '34': 'es',  // Spagna
-        '49': 'de',  // Germania
-        '33': 'fr',  // Francia
-      };
-      
-      // Controlla i prefissi principali
-      for (const [prefix, lang] of Object.entries(prefixMap)) {
-        if (cleanNumber.startsWith(prefix)) {
-          return lang;
-        }
-      }
-      
-      return 'it'; // Default a italiano
-    };
-    
-    language = getLanguageFromPhoneNumber(rawPhoneNumber);
-    console.log(`🌍 Lingua rilevata: ${language}`);
     
     // Trova il template nella lingua appropriata o usa il default (italiano)
     let template = welcomeTemplates.find(t => t.language === language);
