@@ -7,6 +7,7 @@ const CustomerInteraction = require('../models/CustomerInteraction');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const Contact = require('../models/Contact');
 const twilio = require('twilio');
+const ScheduledMessage = require('../models/ScheduledMessage');
 
 /**
  * @desc    Gestisce i messaggi in arrivo da Twilio
@@ -604,10 +605,144 @@ const sendScheduledReviews = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Programma l'invio di un messaggio WhatsApp
+ * @route   POST /api/twilio/schedule
+ * @access  Private
+ */
+const scheduleTemplateMessage = async (req, res) => {
+  try {
+    const { phoneNumber, templateId, variables, scheduleDate, restaurantId } = req.body;
+
+    if (!phoneNumber || !templateId || !scheduleDate || !restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parametri mancanti'
+      });
+    }
+
+    // Verifica che il template esista
+    const template = await WhatsAppTemplate.findOne({
+      _id: templateId,
+      restaurant: restaurantId
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template non trovato'
+      });
+    }
+
+    // Se il template non è approvato, salviamo comunque la programmazione
+    // ma con uno stato speciale
+    const pendingStatus = template.status !== 'APPROVED' ? 'pending_approval' : 'scheduled';
+
+    // Salva la programmazione nel database
+    const scheduledMessage = new ScheduledMessage({
+      restaurant: restaurantId,
+      template: templateId,
+      phoneNumber,
+      scheduledFor: scheduleDate,
+      status: pendingStatus,
+      // Salviamo il messageId solo se il template è approvato
+      twilioMessageId: template.status === 'APPROVED' ? result.messageId : null
+    });
+    await scheduledMessage.save();
+
+    // Se il template è approvato, programma effettivamente il messaggio con Twilio
+    let twilioResult = null;
+    if (template.status === 'APPROVED') {
+      twilioResult = await twilioService.scheduleMessage(
+        phoneNumber,
+        template.twilioTemplateId,
+        variables,
+        new Date(scheduleDate)
+      );
+      
+      // Aggiorna il messageId se abbiamo programmato con successo
+      if (twilioResult.success) {
+        scheduledMessage.twilioMessageId = twilioResult.messageId;
+        await scheduledMessage.save();
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        messageId: twilioResult?.messageId || null,
+        scheduledFor: scheduleDate,
+        status: pendingStatus,
+        templateStatus: template.status
+      }
+    });
+  } catch (error) {
+    console.error('Errore nella programmazione del messaggio:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la programmazione del messaggio',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Controlla lo stato di approvazione di un template
+ * @route   GET /api/twilio/template/:id/status
+ * @access  Private
+ */
+const checkTemplateStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Trova il template nel database
+    const template = await WhatsAppTemplate.findById(id);
+    
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template non trovato'
+      });
+    }
+
+    // Controlla lo stato su Twilio
+    const status = await twilioService.checkTemplateApprovalStatus(template.twilioTemplateId);
+
+    if (!status.success) {
+      throw new Error(status.error);
+    }
+
+    // Aggiorna lo stato nel database se è cambiato
+    if (status.status !== template.status) {
+      template.status = status.status;
+      template.rejectionReason = status.rejectionReason;
+      await template.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        status: status.status,
+        rejectionReason: status.rejectionReason,
+        whatsappCategory: status.whatsappCategory
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel controllo dello stato del template:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il controllo dello stato',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   webhookHandler,
   connectTwilio,
   getTwilioStatus,
   sendTestMessage,
-  sendScheduledReviews
+  sendScheduledReviews,
+  scheduleTemplateMessage,
+  checkTemplateStatus
 }; 

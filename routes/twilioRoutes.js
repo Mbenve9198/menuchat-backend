@@ -15,4 +15,10 @@ router.post('/test', protect, twilioController.sendTestMessage);
 // Rotta per lo scheduler delle recensioni (protetta da API key tramite middleware nel controller)
 router.post('/send-scheduled-reviews', twilioController.sendScheduledReviews);
 
+// Rotta per programmare messaggi
+router.post('/schedule', protect, twilioController.scheduleTemplateMessage);
+
+// Rotta per controllare lo stato di un template
+router.get('/template/:id/status', protect, twilioController.checkTemplateStatus);
+
 module.exports = router; 
