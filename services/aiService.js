@@ -168,10 +168,16 @@ const generateImage = async (prompt) => {
 
     console.log('DALL-E response:', response);
 
-    // La risposta di OpenAI è cambiata, ora è in questo formato
+    // La risposta ha questa struttura:
+    // { created: timestamp, data: [{ revised_prompt: string, url: string }] }
+    if (!response.data?.[0]?.url) {
+      throw new Error('URL immagine non trovato nella risposta');
+    }
+
     return {
       success: true,
-      imageUrl: response[0].url
+      imageUrl: response.data[0].url,
+      revisedPrompt: response.data[0].revised_prompt // Opzionale: possiamo usarlo per debug
     };
   } catch (error) {
     console.error('Errore dettagliato nella generazione dell\'immagine:', error);
@@ -179,8 +185,10 @@ const generateImage = async (prompt) => {
     // Migliore gestione degli errori
     if (error.error?.message) {
       throw new Error(error.error.message);
+    } else if (error.message) {
+      throw new Error(error.message);
     }
-    throw error;
+    throw new Error('Errore nella generazione dell\'immagine');
   }
 };
 
