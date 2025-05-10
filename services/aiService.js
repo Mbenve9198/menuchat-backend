@@ -163,17 +163,23 @@ const generateImage = async (prompt) => {
       prompt: prompt,
       n: 1,
       size: "1024x1024",
-      style: "vivid", // Usiamo vivid per immagini più dettagliate e accattivanti per il marketing
+      style: "vivid",
     });
 
     console.log('DALL-E response:', response);
 
+    // La risposta di OpenAI è cambiata, ora è in questo formato
     return {
       success: true,
-      imageUrl: response.data[0].url
+      imageUrl: response[0].url
     };
   } catch (error) {
-    console.error('Errore nella generazione dell\'immagine:', error);
+    console.error('Errore dettagliato nella generazione dell\'immagine:', error);
+    
+    // Migliore gestione degli errori
+    if (error.error?.message) {
+      throw new Error(error.error.message);
+    }
     throw error;
   }
 };
