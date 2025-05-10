@@ -383,8 +383,32 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
       }
 
+      // Sanitizza il JSON per rimuovere caratteri di controllo
+      const sanitizedJson = jsonStr
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Rimuove tutti i caratteri di controllo
+        .replace(/\n/g, '\\n') // Gestisce correttamente i newline
+        .replace(/\r/g, '\\r') // Gestisce correttamente i carriage return
+        .replace(/\\"/g, '"') // Ripara eventuali doppi escape di virgolette
+        .replace(/\\\\n/g, '\\n'); // Ripara eventuali doppi escape di newline
+
+      console.log('JSON sanitizzato:', sanitizedJson);
+
       // Parse la risposta JSON
-      const translations = JSON.parse(jsonStr);
+      let translations;
+      try {
+        translations = JSON.parse(sanitizedJson);
+      } catch (parseError) {
+        console.error('Errore nel parsing JSON:', parseError);
+        console.error('JSON problematico:', sanitizedJson);
+        
+        // Tentativo di riparazione ulteriore
+        const fixedJson = sanitizedJson
+          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":') // Assicura che le chiavi siano tra virgolette
+          .replace(/:\s*'([^']*)'/g, ':"$1"'); // Sostituisce gli apici singoli con doppi per i valori
+        
+        console.log('JSON riparato:', fixedJson);
+        translations = JSON.parse(fixedJson);
+      }
 
       // Verifica che tutte le lingue richieste siano presenti
       languages.forEach(lang => {
@@ -448,8 +472,32 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
       }
 
+      // Sanitizza il JSON per rimuovere caratteri di controllo
+      const sanitizedJson = jsonStr
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Rimuove tutti i caratteri di controllo
+        .replace(/\n/g, '\\n') // Gestisce correttamente i newline
+        .replace(/\r/g, '\\r') // Gestisce correttamente i carriage return
+        .replace(/\\"/g, '"') // Ripara eventuali doppi escape di virgolette
+        .replace(/\\\\n/g, '\\n'); // Ripara eventuali doppi escape di newline
+
+      console.log('JSON sanitizzato:', sanitizedJson);
+
       // Parse la risposta JSON
-      const translations = JSON.parse(jsonStr);
+      let translations;
+      try {
+        translations = JSON.parse(sanitizedJson);
+      } catch (parseError) {
+        console.error('Errore nel parsing JSON:', parseError);
+        console.error('JSON problematico:', sanitizedJson);
+        
+        // Tentativo di riparazione ulteriore
+        const fixedJson = sanitizedJson
+          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":') // Assicura che le chiavi siano tra virgolette
+          .replace(/:\s*'([^']*)'/g, ':"$1"'); // Sostituisce gli apici singoli con doppi per i valori
+        
+        console.log('JSON riparato:', fixedJson);
+        translations = JSON.parse(fixedJson);
+      }
 
       // Verifica che tutte le lingue richieste siano presenti
       languages.forEach(lang => {
