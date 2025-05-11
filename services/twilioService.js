@@ -231,6 +231,133 @@ class TwilioService {
       };
     }
   }
+
+  /**
+   * Pianifica un messaggio utilizzando un template Twilio per invio futuro
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {string} templateId - ID del template Twilio (content SID)
+   * @param {Object} variables - Variabili da sostituire nel template
+   * @param {string} restaurantId - ID del ristorante
+   * @param {Date} scheduledTime - Data e ora programmata per l'invio
+   * @returns {Promise<Object>} - Risultato della programmazione
+   */
+  async scheduleTemplateMessage(phoneNumber, templateId, variables, restaurantId, scheduledTime) {
+    try {
+      console.log('===== PROGRAMMAZIONE MESSAGGIO TEMPLATE =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Template ID:', templateId);
+      console.log('Variables:', JSON.stringify(variables));
+      console.log('Scheduled Time:', scheduledTime);
+      
+      if (!phoneNumber || !templateId || !scheduledTime) {
+        throw new Error('Numero di telefono, ID del template e orario programmato sono obbligatori');
+      }
+
+      // Verifica che la data di invio sia nel futuro (almeno 5 minuti dopo)
+      const minScheduleTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minuti nel futuro
+      if (scheduledTime < minScheduleTime) {
+        scheduledTime = minScheduleTime; // Imposta a 5 minuti nel futuro se troppo vicino
+      }
+
+      // Verifica che la data di invio non sia troppo lontana (max 35 giorni)
+      const maxScheduleTime = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000); // 35 giorni nel futuro
+      if (scheduledTime > maxScheduleTime) {
+        throw new Error('La data di invio non può essere oltre 35 giorni nel futuro');
+      }
+
+      // Verifica che le variabili d'ambiente siano configurate
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+      if (!twilioSid || !twilioToken || !messagingServiceSid) {
+        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+      }
+
+      // Inizializza il client Twilio
+      const twilioClient = twilio(twilioSid, twilioToken);
+      
+      // Formatta il numero di destinazione per WhatsApp
+      const toNumber = phoneNumber.startsWith('whatsapp:') ? phoneNumber : `whatsapp:${phoneNumber}`;
+
+      // Prepara i dati del messaggio
+      const messageData = {
+        contentSid: templateId,
+        to: toNumber,
+        messagingServiceSid: messagingServiceSid,
+        scheduleType: "fixed",
+        sendAt: scheduledTime.toISOString()
+      };
+      
+      // Aggiungi le variabili se presenti
+      if (variables && Object.keys(variables).length > 0) {
+        messageData.contentVariables = JSON.stringify(variables);
+      }
+
+      console.log('Dati messaggio programmato:', JSON.stringify(messageData));
+
+      // Pianifica il messaggio
+      const message = await twilioClient.messages.create(messageData);
+
+      console.log(`Template programmato con SID: ${message.sid} per il: ${scheduledTime}`);
+      
+      return {
+        success: true,
+        messageId: message.sid,
+        scheduledTime: scheduledTime,
+        status: message.status
+      };
+    } catch (error) {
+      console.error('Errore nella programmazione del template:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Annulla un messaggio programmato
+   * @param {string} messageSid - SID del messaggio da annullare
+   * @returns {Promise<Object>} - Risultato dell'annullamento
+   */
+  async cancelScheduledMessage(messageSid) {
+    try {
+      if (!messageSid) {
+        throw new Error('SID del messaggio obbligatorio');
+      }
+
+      // Verifica che le variabili d'ambiente siano configurate
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+
+      if (!twilioSid || !twilioToken) {
+        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+      }
+
+      // Inizializza il client Twilio
+      const twilioClient = twilio(twilioSid, twilioToken);
+
+      // Annulla il messaggio pianificato
+      const canceledMessage = await twilioClient.messages(messageSid).update({
+        status: 'canceled'
+      });
+
+      console.log(`Messaggio pianificato annullato: ${messageSid}`);
+
+      return {
+        success: true,
+        messageId: messageSid,
+        status: canceledMessage.status
+      };
+    } catch (error) {
+      console.error('Errore nell\'annullamento del messaggio pianificato:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 }
 
 module.exports = new TwilioService(); 

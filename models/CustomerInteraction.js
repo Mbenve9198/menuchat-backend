@@ -95,6 +95,14 @@ const CustomerInteractionSchema = new Schema({
   },
   lastReviewSentAt: Date,
   lastTemplateId: String,
+  // Nuovi campi per lo scheduling Twilio
+  scheduledReviewMessageId: {
+    type: String,
+    sparse: true, // Permette valori null/undefined ma richiede unicità se presente
+  },
+  reviewScheduledFor: {
+    type: Date
+  },
   // Fine dei campi per la gestione delle recensioni
 }, {
   timestamps: true // Aggiunge automaticamente i campi createdAt e updatedAt

@@ -12,7 +12,4 @@ router.post('/connect', protect, twilioController.connectTwilio);
 router.get('/status', protect, twilioController.getTwilioStatus);
 router.post('/test', protect, twilioController.sendTestMessage);
 
-// Rotta per lo scheduler delle recensioni (protetta da API key tramite middleware nel controller)
-router.post('/send-scheduled-reviews', twilioController.sendScheduledReviews);
-
 module.exports = router; 

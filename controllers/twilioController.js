@@ -192,9 +192,7 @@ const webhookHandler = async (req, res) => {
       lastMessageReceived: messageBody,
       lastMessageSent: null,
       status: 'active',
-      language,
-      // Importante: salva l'interazione per poter inviare la recensione in seguito
-      scheduledForReview: botConfig.reviewTimer ? new Date(Date.now() + botConfig.reviewTimer * 60 * 1000) : null
+      language
     });
     
     await interaction.save();
@@ -214,15 +212,59 @@ const webhookHandler = async (req, res) => {
       // Aggiorna l'interazione con il messaggio inviato
       interaction.lastMessageSent = 'Invio template: ' + template.name;
       interaction.lastTemplateId = template.twilioTemplateId;
+      
+      // Se la configurazione include un timer per le recensioni, programma l'invio tramite Twilio
+      if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
+        try {
+          // Calcola la data pianificata
+          const scheduledTime = new Date(Date.now() + botConfig.reviewTimer * 60 * 1000);
+          console.log(`⏰ Scheduling recensione per ${scheduledTime}`);
+          
+          // Trova il template di recensione nella lingua appropriata
+          const reviewTemplates = await WhatsAppTemplate.find({
+            restaurant: restaurant._id,
+            type: 'REVIEW',
+            isActive: true,
+            status: 'APPROVED',
+          });
+          
+          if (reviewTemplates.length > 0) {
+            // Seleziona il template nella lingua dell'utente o usa il default italiano
+            let reviewTemplate = reviewTemplates.find(t => t.language === language);
+            if (!reviewTemplate) {
+              reviewTemplate = reviewTemplates.find(t => t.language === 'it') || reviewTemplates[0];
+            }
+            
+            // Programma il messaggio di recensione con Twilio
+            const scheduledResult = await twilioService.scheduleTemplateMessage(
+              fromNumber,
+              reviewTemplate.twilioTemplateId,
+              {
+                1: profileName || 'Cliente'
+              },
+              restaurant._id,
+              scheduledTime
+            );
+            
+            if (scheduledResult.success) {
+              // Salva il riferimento al messaggio programmato
+              interaction.scheduledReviewMessageId = scheduledResult.messageId;
+              interaction.reviewScheduledFor = scheduledTime;
+              console.log(`✅ Recensione programmata con Twilio (SID: ${scheduledResult.messageId})`);
+            } else {
+              console.error('❌ Errore nella programmazione del messaggio di recensione:', scheduledResult.error);
+            }
+          } else {
+            console.log('⚠️ Nessun template di recensione disponibile per programmazione');
+          }
+        } catch (scheduleError) {
+          console.error('❌ Errore nella programmazione della recensione:', scheduleError);
+        }
+      }
+      
       await interaction.save();
       
       console.log(`✅ Template inviato a ${fromNumber}`);
-      
-      // Se la configurazione include un timer per le recensioni, programma l'invio
-      if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
-        console.log(`⏰ Recensione programmata tra ${botConfig.reviewTimer} minuti`);
-        // L'effettivo invio sarà gestito dal job scheduler
-      }
       
       // Per webhook response, è sufficiente un 200 OK vuoto
       return res.status(200).send();
@@ -429,148 +471,9 @@ const sendTestMessage = async (req, res) => {
   }
 };
 
-/**
- * @desc    Invia richieste di recensione programmate
- * @route   POST /api/twilio/send-scheduled-reviews
- * @access  Private (solo per cron jobs)
- */
-const sendScheduledReviews = async (req, res) => {
-  try {
-    // Verifica l'autenticazione del cron job (usa un token o chiave API)
-    const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.SCHEDULER_API_KEY) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
-    }
-
-    console.log('===== AVVIO INVIO RECENSIONI PROGRAMMATE =====');
-    const now = new Date();
-    
-    // Non inviare recensioni durante la notte (00:00 - 08:00)
-    const currentHour = now.getHours();
-    if (currentHour >= 0 && currentHour < 8) {
-      console.log('🌙 Orario notturno, invio recensioni posticipato');
-      return res.status(200).json({
-        success: true,
-        message: 'Orario notturno, invio recensioni posticipato',
-        sent: 0
-      });
-    }
-
-    // Trova tutte le interazioni che devono ricevere una recensione ora
-    const interactionsDue = await CustomerInteraction.find({
-      scheduledForReview: { $lte: now },
-      reviewSent: { $ne: true },
-      status: 'active'
-    }).populate('restaurant');
-
-    console.log(`📊 Trovate ${interactionsDue.length} recensioni da inviare`);
-
-    let sentCount = 0;
-    const results = [];
-
-    for (const interaction of interactionsDue) {
-      try {
-        // Trova la configurazione del bot per questo ristorante
-        const botConfig = await BotConfiguration.findOne({ 
-          restaurant: interaction.restaurant._id,
-          active: true
-        });
-
-        if (!botConfig) {
-          console.log(`⚠️ Nessuna configurazione bot attiva per il ristorante ${interaction.restaurant._id}`);
-          continue;
-        }
-
-        // Trova il template di recensione nella lingua appropriata
-        const reviewTemplates = await WhatsAppTemplate.find({
-          restaurant: interaction.restaurant._id,
-          type: 'REVIEW',
-          isActive: true,
-          status: 'APPROVED',
-        });
-
-        if (!reviewTemplates.length) {
-          console.log(`⚠️ Nessun template di recensione trovato per ${interaction.restaurant.name}`);
-          continue;
-        }
-
-        // Seleziona il template nella lingua dell'utente o usa il default italiano
-        let template = reviewTemplates.find(t => t.language === interaction.language);
-        if (!template) {
-          template = reviewTemplates.find(t => t.language === 'it') || reviewTemplates[0];
-        }
-
-        // Invia il template di recensione
-        const result = await twilioService.sendTemplateMessage(
-          interaction.customerPhoneNumber,
-          template.twilioTemplateId,
-          {
-            1: interaction.customerName || 'Cliente'
-          },
-          interaction.restaurant._id
-        );
-
-        if (result.success) {
-          // Aggiorna l'interazione
-          interaction.reviewSent = true;
-          interaction.lastReviewSentAt = now;
-          interaction.lastMessageSent = 'Invio recensione: ' + template.name;
-          await interaction.save();
-          
-          sentCount++;
-          results.push({
-            interactionId: interaction._id,
-            restaurant: interaction.restaurant.name,
-            customerPhone: interaction.customerPhoneNumber,
-            templateId: template.twilioTemplateId,
-            success: true
-          });
-        } else {
-          results.push({
-            interactionId: interaction._id,
-            restaurant: interaction.restaurant.name,
-            customerPhone: interaction.customerPhoneNumber,
-            error: result.error,
-            success: false
-          });
-        }
-      } catch (error) {
-        console.error(`❌ Errore nell'invio della recensione per ${interaction._id}:`, error);
-        results.push({
-          interactionId: interaction._id,
-          restaurant: interaction.restaurant ? interaction.restaurant.name : 'Unknown',
-          error: error.message,
-          success: false
-        });
-      }
-    }
-
-    console.log(`✅ Inviate ${sentCount}/${interactionsDue.length} recensioni programmate`);
-
-    res.status(200).json({
-      success: true,
-      message: `Inviate ${sentCount}/${interactionsDue.length} recensioni programmate`,
-      sent: sentCount,
-      total: interactionsDue.length,
-      results
-    });
-  } catch (error) {
-    console.error('❌ ERRORE NELL\'INVIO DELLE RECENSIONI PROGRAMMATE:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Errore durante l\'invio delle recensioni programmate',
-      error: error.message
-    });
-  }
-};
-
 module.exports = {
   webhookHandler,
   connectTwilio,
   getTwilioStatus,
-  sendTestMessage,
-  sendScheduledReviews
+  sendTestMessage
 }; 
