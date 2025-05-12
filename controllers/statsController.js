@@ -19,15 +19,15 @@ class StatsController {
   getStartDate(period) {
     const now = new Date();
     switch (period) {
-      case '7d':
+      case '7days':
         return new Date(now.setDate(now.getDate() - 7));
-      case '1m':
+      case '30days':
         return new Date(now.setMonth(now.getMonth() - 1));
-      case '1y':
-        return new Date(now.setFullYear(now.getFullYear() - 1));
-      case 'all':
+      case 'custom':
+        // Per custom, dovremmo ricevere startDate e endDate come parametri
+        return null; // Verrà gestito separatamente
       default:
-        return new Date(0); // Unix epoch
+        return new Date(0); // Unix epoch per "all"
     }
   }
 
@@ -36,7 +36,7 @@ class StatsController {
    */
   async getStats(req, res) {
     try {
-      const { restaurantId, period = 'all' } = req.query;
+      const { restaurantId, period = '7days', startDate: startDateStr, endDate: endDateStr } = req.query;
 
       if (!restaurantId) {
         return res.status(400).json({
@@ -45,20 +45,24 @@ class StatsController {
         });
       }
 
-      const startDate = this.getStartDate(period);
+      // Gestisci date personalizzate o utilizza la funzione standard
+      let startDate, endDate;
+      if (period === 'custom' && startDateStr && endDateStr) {
+        startDate = new Date(startDateStr);
+        endDate = new Date(endDateStr);
+        // Assicurati che endDate includa l'intero giorno
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        startDate = this.getStartDate(period);
+        endDate = new Date(); // Ora corrente
+      }
 
-      // Trova tutti i template del ristorante nel periodo selezionato
-      const templates = await WhatsAppTemplate.find({
-        restaurant: restaurantId,
-        isActive: true,
-        createdAt: { $gte: startDate }
-      });
+      // Calcola l'inizio della settimana corrente (per il weekly goal)
+      const startOfWeek = new Date();
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Domenica
 
-      // Calcola il numero di menu e review template inviati
-      const menuTemplates = templates.filter(t => t.type === 'MEDIA' || t.type === 'CALL_TO_ACTION');
-      const reviewTemplates = templates.filter(t => t.type === 'REVIEW');
-
-      // Trova il ristorante per ottenere i dati delle recensioni
+      // Trova il ristorante
       const restaurant = await Restaurant.findById(restaurantId);
       if (!restaurant) {
         return res.status(404).json({
@@ -67,67 +71,133 @@ class StatsController {
         });
       }
 
-      // Calcola le recensioni raccolte
+      // 1. MENU INVIATI: Conta le interazioni con template di menu
+      const menuInteractions = await CustomerInteraction.countDocuments({
+        restaurant: restaurantId,
+        lastTemplateId: { $exists: true, $ne: null },
+        createdAt: { $gte: startDate, $lte: endDate }
+      });
+
+      // 2. RICHIESTE DI RECENSIONE: Conta i messaggi di recensione inviati o programmati
+      const reviewRequests = await CustomerInteraction.countDocuments({
+        restaurant: restaurantId,
+        $or: [
+          { 'reviewData.requested': true },
+          { scheduledReviewMessageId: { $exists: true, $ne: null } }
+        ],
+        $and: [
+          { $or: [
+            { 'reviewData.requestedAt': { $gte: startDate, $lte: endDate } },
+            { reviewScheduledFor: { $gte: startDate, $lte: endDate } }
+          ]}
+        ]
+      });
+
+      // 3. RECENSIONI RACCOLTE: Calcola recensioni nel periodo selezionato
       const initialReviewCount = restaurant.initialReviewCount || 0;
       const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
       const totalReviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
 
-      // Se il periodo non è "all", filtra le recensioni per il periodo selezionato
-      let reviewsCollected = totalReviewsCollected;
-      if (period !== 'all' && restaurant.reviews) {
-        const recentReviews = restaurant.reviews.filter(review => 
-          new Date(review.time) >= startDate
-        );
-        reviewsCollected = recentReviews.length;
+      // Filtra recensioni per il periodo selezionato se abbiamo i dati dettagliati
+      let reviewsCollected = 0;
+      if (restaurant.reviews && restaurant.reviews.length > 0) {
+        reviewsCollected = restaurant.reviews.filter(review => 
+          new Date(review.time) >= startDate && new Date(review.time) <= endDate
+        ).length;
+      } else {
+        // Fallback se non abbiamo i dati dettagliati
+        reviewsCollected = totalReviewsCollected;
       }
 
-      // Calcola il progresso settimanale delle recensioni
-      const startOfWeek = new Date();
-      startOfWeek.setHours(0, 0, 0, 0);
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-
-      const weeklyReviews = restaurant.reviews?.filter(review => 
-        new Date(review.time) >= startOfWeek
-      ).length || 0;
-
-      // Calcola le tendenze rispetto al periodo precedente
-      const previousStartDate = new Date(startDate);
-      const periodDuration = new Date() - startDate;
-      previousStartDate.setTime(previousStartDate.getTime() - periodDuration);
-
-      const previousTemplates = await WhatsAppTemplate.find({
+      // 4. OBIETTIVO SETTIMANALE: 10% dei messaggi di recensione degli ultimi 7 giorni
+      const lastWeekReviewRequests = await CustomerInteraction.countDocuments({
         restaurant: restaurantId,
-        isActive: true,
-        createdAt: { $gte: previousStartDate, $lt: startDate }
+        $or: [
+          { 'reviewData.requested': true },
+          { scheduledReviewMessageId: { $exists: true, $ne: null } }
+        ],
+        $and: [
+          { $or: [
+            { 'reviewData.requestedAt': { $gte: startOfWeek, $lte: endDate } },
+            { reviewScheduledFor: { $gte: startOfWeek, $lte: endDate } }
+          ]}
+        ]
       });
 
-      const previousMenuTemplates = previousTemplates.filter(t => t.type === 'MEDIA' || t.type === 'CALL_TO_ACTION');
-      const previousReviewTemplates = previousTemplates.filter(t => t.type === 'REVIEW');
+      // Calcola l'obiettivo settimanale (10% dei messaggi di recensione)
+      const weeklyGoal = Math.max(Math.ceil(lastWeekReviewRequests * 0.1), 1); // Almeno 1
 
-      // Per le recensioni, confronta con il periodo precedente
+      // Recensioni effettivamente raccolte questa settimana
+      const weeklyReviewsCollected = restaurant.reviews
+        ? restaurant.reviews.filter(review => new Date(review.time) >= startOfWeek).length
+        : 0;
+
+      // Calcola la percentuale di progresso
+      const weeklyGoalProgress = weeklyGoal > 0 
+        ? Math.min(Math.round((weeklyReviewsCollected / weeklyGoal) * 100), 100) 
+        : 0;
+
+      // Calcola i giorni rimanenti nella settimana
+      const now = new Date();
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+      const daysLeft = Math.ceil((endOfWeek - now) / (1000 * 60 * 60 * 24));
+
+      // Calcola le tendenze rispetto al periodo precedente (per indicatori di crescita)
+      const previousPeriodDuration = endDate.getTime() - startDate.getTime();
+      const previousPeriodStart = new Date(startDate.getTime() - previousPeriodDuration);
+
+      // Tendenza per menu inviati
+      const previousMenuInteractions = await CustomerInteraction.countDocuments({
+        restaurant: restaurantId,
+        lastTemplateId: { $exists: true, $ne: null },
+        createdAt: { $gte: previousPeriodStart, $lt: startDate }
+      });
+
+      // Tendenza per recensioni richieste
+      const previousReviewRequests = await CustomerInteraction.countDocuments({
+        restaurant: restaurantId,
+        $or: [
+          { 'reviewData.requested': true },
+          { scheduledReviewMessageId: { $exists: true, $ne: null } }
+        ],
+        $and: [
+          { $or: [
+            { 'reviewData.requestedAt': { $gte: previousPeriodStart, $lt: startDate } },
+            { reviewScheduledFor: { $gte: previousPeriodStart, $lt: startDate } }
+          ]}
+        ]
+      });
+
+      // Tendenza per recensioni raccolte
       let previousReviewsCollected = 0;
-      if (period !== 'all' && restaurant.reviews) {
+      if (restaurant.reviews && restaurant.reviews.length > 0) {
         previousReviewsCollected = restaurant.reviews.filter(review => 
-          new Date(review.time) >= previousStartDate && new Date(review.time) < startDate
+          new Date(review.time) >= previousPeriodStart && new Date(review.time) < startDate
         ).length;
       }
 
-      // Calcola le variazioni percentuali
+      // Funzione per calcolare la variazione percentuale
       const calculateTrend = (current, previous) => {
         if (previous === 0) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
+        return Math.round(((current - previous) / previous) * 100);
       };
 
       return res.json({
         success: true,
-        menusSent: menuTemplates.length,
-        reviewRequests: reviewTemplates.length,
-        reviewsCollected,
-        totalReviewsCollected,
-        weeklyGoalProgress: weeklyReviews,
+        menusSent: menuInteractions,
+        reviewRequests: reviewRequests,
+        reviewsCollected: reviewsCollected,
+        totalReviewsCollected: totalReviewsCollected,
+        weeklyGoal: {
+          target: weeklyGoal,
+          progress: weeklyGoalProgress,
+          current: weeklyReviewsCollected,
+          daysLeft: daysLeft
+        },
         trends: {
-          menusSent: calculateTrend(menuTemplates.length, previousMenuTemplates.length),
-          reviewRequests: calculateTrend(reviewTemplates.length, previousReviewTemplates.length),
+          menusSent: calculateTrend(menuInteractions, previousMenuInteractions),
+          reviewRequests: calculateTrend(reviewRequests, previousReviewRequests),
           reviewsCollected: calculateTrend(reviewsCollected, previousReviewsCollected)
         }
       });
@@ -145,7 +215,7 @@ class StatsController {
    */
   async getActivities(req, res) {
     try {
-      const { restaurantId, period = 'all' } = req.query;
+      const { restaurantId, period = '7days' } = req.query;
 
       if (!restaurantId) {
         return res.status(400).json({
@@ -154,58 +224,71 @@ class StatsController {
         });
       }
 
+      // Determina la data di inizio in base al periodo
       const startDate = this.getStartDate(period);
 
       // Trova le interazioni recenti nel periodo selezionato
       const interactions = await CustomerInteraction.find({
         restaurant: restaurantId,
-        'events.timestamp': { $gte: startDate }
+        createdAt: { $gte: startDate }
       })
-      .sort('-lastActive')
+      .sort('-createdAt')
       .limit(10);
 
       // Trasforma le interazioni in attività
       const activities = interactions.map(interaction => {
-        // Prendi l'ultimo evento
-        const lastEvent = interaction.events[interaction.events.length - 1];
-        if (!lastEvent) return null;
-
-        let activity = {
-          _id: interaction._id,
-          type: lastEvent.type,
-          createdAt: lastEvent.timestamp,
-          expanded: false
-        };
-
-        switch (lastEvent.type) {
-          case 'menu_viewed':
-            activity.emoji = '📋';
-            activity.message = 'Menu visualizzato da un cliente';
-            activity.details = `Il cliente ha visualizzato il menu per ${lastEvent.details?.duration || 0} secondi`;
-            break;
-          case 'review_requested':
-            activity.emoji = '⭐';
-            activity.message = 'Richiesta recensione inviata';
-            activity.details = 'Richiesta di recensione inviata al cliente dopo l\'ordine';
-            break;
-          case 'review_completed':
-            activity.emoji = '🏆';
-            activity.message = 'Nuova recensione ricevuta!';
-            activity.details = lastEvent.details?.reviewText || 'Recensione senza testo';
-            break;
-          case 'info_requested':
-            activity.emoji = '✏️';
-            activity.message = 'Informazioni richieste';
-            activity.details = 'Un cliente ha richiesto informazioni';
-            break;
-          default:
-            activity.emoji = '📝';
-            activity.message = 'Nuova interazione';
-            activity.details = 'Dettagli non disponibili';
+        const customerName = interaction.customerName || 'Cliente';
+        
+        // Determina il tipo di attività
+        let type, emoji, message, details, time;
+        
+        // Se è un invio menu
+        if (interaction.lastTemplateId && !interaction.lastTemplateId.includes('review')) {
+          type = 'menu_view';
+          emoji = '📋';
+          message = `Menu inviato a ${customerName}`;
+          details = `Il cliente ha ricevuto il menu.`;
+          time = interaction.createdAt;
+        } 
+        // Se è una recensione programmata
+        else if (interaction.scheduledReviewMessageId) {
+          type = 'review_request';
+          emoji = '⭐';
+          message = `Richiesta recensione a ${customerName}`;
+          details = `Programmata per ${new Date(interaction.reviewScheduledFor).toLocaleString()}`;
+          time = interaction.reviewScheduledFor;
+        }
+        // Se è una recensione già inviata
+        else if (interaction.reviewData && interaction.reviewData.requested) {
+          type = 'review_request';
+          emoji = '⭐';
+          message = `Richiesta recensione inviata a ${customerName}`;
+          details = 'Richiesta di recensione inviata al cliente';
+          time = interaction.reviewData.requestedAt;
+        }
+        // Altrimenti è una generica interazione
+        else {
+          type = 'interaction';
+          emoji = '📝';
+          message = `Interazione con ${customerName}`;
+          details = 'Dettagli non disponibili';
+          time = interaction.createdAt;
         }
 
-        return activity;
-      }).filter(Boolean); // Rimuovi eventuali null
+        // Formatta il timestamp relativo
+        const relativeTime = this.getRelativeTime(time);
+
+        return {
+          id: interaction._id,
+          type,
+          emoji,
+          message,
+          details,
+          time: relativeTime,
+          expanded: false,
+          customerName
+        };
+      });
 
       res.json({
         success: true,
@@ -216,6 +299,36 @@ class StatsController {
       res.status(500).json({
         success: false,
         error: 'Errore nel recupero delle attività'
+      });
+    }
+  }
+
+  /**
+   * Formatta un timestamp in formato relativo
+   */
+  getRelativeTime(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffSec = Math.round(diffMs / 1000);
+    const diffMin = Math.round(diffSec / 60);
+    const diffHour = Math.round(diffMin / 60);
+    const diffDay = Math.round(diffHour / 24);
+
+    if (diffSec < 60) {
+      return 'just now';
+    } else if (diffMin < 60) {
+      return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+    } else if (diffHour < 24) {
+      return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+    } else if (diffDay < 7) {
+      return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+    } else {
+      // Formatta data come "MMM DD, YYYY"
+      return time.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: time.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
       });
     }
   }
