@@ -3,6 +3,7 @@ const router = express.Router();
 const setupController = require('../controllers/setupController');
 const uploadController = require('../controllers/uploadController');
 const statsController = require('../controllers/statsController');
+const restaurantController = require('../controllers/restaurantController');
 const { uploadPdf } = require('../config/cloudinary');
 const menuService = require('../services/menuService');
 const googlePlacesService = require('../services/googlePlacesService');
@@ -10,7 +11,7 @@ const Restaurant = require('../models/Restaurant');
 
 // Rotte per il setup del ristorante
 router.post('/restaurants', setupController.setupRestaurant);
-router.get('/restaurants/:id', setupController.getRestaurant);
+router.get('/restaurants/:id', restaurantController.getRestaurantById);
 router.put('/restaurants/:id', setupController.updateRestaurant);
 router.delete('/restaurants/:id', setupController.deleteRestaurant);
 router.get('/restaurants/:id/profile-image', setupController.getRestaurantProfileImage);
