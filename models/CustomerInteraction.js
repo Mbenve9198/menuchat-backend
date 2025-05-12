@@ -103,6 +103,18 @@ const CustomerInteractionSchema = new Schema({
   reviewScheduledFor: {
     type: Date
   },
+  // Aggiungi questi campi mancanti
+  customerName: {
+    type: String,
+    default: 'Cliente'
+  },
+  customerPhoneNumber: String, // Per riferimento diretto (protetto da hashing)
+  lastMessageReceived: String,
+  lastMessageSent: String,
+  language: {
+    type: String,
+    default: 'it'
+  },
   // Fine dei campi per la gestione delle recensioni
 }, {
   timestamps: true // Aggiunge automaticamente i campi createdAt e updatedAt
