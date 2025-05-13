@@ -33,6 +33,7 @@ class RestaurantService {
         googleRating: {
           rating: formData.googleRating?.rating || 0,
           reviewCount: formData.googleRating?.reviewCount || 0,
+          initialReviewCount: formData.googleRating?.initialReviewCount || formData.googleRating?.reviewCount || 0,
           lastUpdated: new Date()
         },
         

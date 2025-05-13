@@ -54,6 +54,14 @@ class SetupController {
       // Crea il nuovo ristorante
       const restaurant = await restaurantService.createRestaurant(formData, user._id);
 
+      // Se sono disponibili i dati delle recensioni da Google, salviamo il numero iniziale
+      if (formData.googleRating && formData.googleRating.reviewCount) {
+        // Aggiorniamo l'initialReviewCount con lo stesso valore di reviewCount
+        await Restaurant.findByIdAndUpdate(restaurant._id, {
+          'googleRating.initialReviewCount': formData.googleRating.reviewCount
+        });
+      }
+
       // Aggiorna l'utente con il riferimento al ristorante
       await userService.updateUser(user._id, { restaurant: restaurant._id });
 

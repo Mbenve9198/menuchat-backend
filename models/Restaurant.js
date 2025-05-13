@@ -89,6 +89,7 @@ const RestaurantSchema = new Schema({
   googleRating: {
     rating: Number,
     reviewCount: Number,
+    initialReviewCount: Number,
     lastUpdated: {
       type: Date,
       default: Date.now
