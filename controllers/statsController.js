@@ -94,7 +94,7 @@ class StatsController {
       });
 
       // 3. RECENSIONI RACCOLTE: Calcola recensioni nel periodo selezionato
-      const initialReviewCount = restaurant.initialReviewCount || 0;
+      const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
       const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
       const totalReviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
 
@@ -189,6 +189,7 @@ class StatsController {
         reviewRequests: reviewRequests,
         reviewsCollected: reviewsCollected,
         totalReviewsCollected: totalReviewsCollected,
+        initialReviewCount: initialReviewCount,
         weeklyGoal: {
           target: weeklyGoal,
           progress: weeklyGoalProgress,
