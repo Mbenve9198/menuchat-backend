@@ -43,15 +43,14 @@ class GooglePlacesService {
       // Ottieni i nuovi dati da Google Places
       const placeDetails = await this.getPlaceDetails(restaurant.googlePlaceId);
       
-      // Se è la prima volta che sincronizziamo, salva il conteggio iniziale
-      if (typeof restaurant.initialReviewCount === 'undefined') {
-        restaurant.initialReviewCount = placeDetails.user_ratings_total || 0;
-      }
-
-      // Aggiorna i dati del ristorante
+      // Memorizza l'initialReviewCount esistente se presente
+      const existingInitialReviewCount = restaurant.googleRating?.initialReviewCount;
+      
+      // Aggiorna i dati del ristorante ma preserva l'initialReviewCount
       restaurant.googleRating = {
         rating: placeDetails.rating || 0,
         reviewCount: placeDetails.user_ratings_total || 0,
+        initialReviewCount: existingInitialReviewCount || placeDetails.user_ratings_total || 0,
         lastUpdated: new Date()
       };
 
