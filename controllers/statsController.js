@@ -190,6 +190,7 @@ class StatsController {
         reviewsCollected: reviewsCollected,
         totalReviewsCollected: totalReviewsCollected,
         initialReviewCount: initialReviewCount,
+        currentReviewCount: currentReviewCount,
         weeklyGoal: {
           target: weeklyGoal,
           progress: weeklyGoalProgress,
