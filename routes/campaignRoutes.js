@@ -21,4 +21,7 @@ router.put('/:id/cancel', campaignController.cancelCampaign);
 // Rotta per la generazione di contenuti con AI
 router.post('/generate-content', campaignController.generateCampaignContent);
 
+// Rotta per la generazione di prompt per immagini
+router.post('/generate-image-prompt', campaignController.generateImagePrompt);
+
 module.exports = router; 

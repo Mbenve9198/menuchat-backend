@@ -812,6 +812,165 @@ DO NOT provide explanations or additional text. Return only the JSON object.`;
   }
 };
 
+/**
+ * @desc    Genera un prompt per immagini DALL-E basato sul tipo di campagna
+ * @route   POST /api/campaign/generate-image-prompt
+ * @access  Private
+ */
+const generateImagePrompt = async (req, res) => {
+  try {
+    const {
+      campaignType,
+      messageText,
+      restaurantName = 'Restaurant',
+      language = "en",
+      modelId = "claude-3-7-sonnet-20250219",
+      restaurantId
+    } = req.body;
+
+    // Validazione degli input
+    if (!campaignType || !messageText) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo di campagna e testo del messaggio sono obbligatori'
+      });
+    }
+
+    // Trova il ristorante (opzionale)
+    let cuisineTypes = [];
+    if (restaurantId) {
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (restaurant) {
+        cuisineTypes = restaurant.cuisineTypes || [];
+      }
+    }
+
+    // Mappa i tipi di campagna per il prompt
+    const campaignTypeMap = {
+      promo: {
+        en: "promotional offer or discount for a restaurant",
+        it: "offerta promozionale o sconto per un ristorante"
+      },
+      event: {
+        en: "restaurant event or special occasion",
+        it: "evento o occasione speciale del ristorante"
+      },
+      update: {
+        en: "menu update or new dishes announcement",
+        it: "aggiornamento del menu o annuncio di nuovi piatti"
+      },
+      feedback: {
+        en: "customer feedback or review request",
+        it: "richiesta di feedback o recensione dai clienti"
+      }
+    };
+
+    // Ottieni descrizione del tipo di campagna nella lingua appropriata
+    const campaignDesc = campaignTypeMap[campaignType]?.[language] || campaignTypeMap[campaignType]?.en;
+    if (!campaignDesc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo di campagna non valido'
+      });
+    }
+
+    // Crea prompt per Claude in base alla lingua
+    let promptContent;
+    if (language === 'it') {
+      promptContent = `Crea un prompt dettagliato per generare un'immagine con DALL-E da utilizzare in una campagna WhatsApp per un ristorante.
+
+CONTESTO:
+- Nome ristorante: ${restaurantName}
+- Tipo di cucina: ${cuisineTypes.join(', ') || 'Varia'}
+- Tipo di campagna: ${campaignDesc}
+- Testo del messaggio: "${messageText}"
+
+ISTRUZIONI:
+1. Crea un prompt di 2-3 frasi (massimo 300 caratteri) che descriva una SINGOLA immagine chiara e accattivante che accompagni il messaggio
+2. L'immagine deve essere coerente con il tipo di campagna e il testo del messaggio
+3. Descrivi una scena con cibo/ristorante realistica, evitando testo o persone in primo piano
+4. Includi dettagli su illuminazione, composizione e stile per un risultato professionale
+5. NON includere testo nell'immagine
+6. NON includere tratti stilistici specifici come "digital art", "photo-realistic", "hyperrealistic", ecc.
+7. Usa un linguaggio diretto, senza introduzioni come "un'immagine di" o "una foto di"
+
+Fornisci SOLO il prompt, senza spiegazioni o commenti addizionali.`;
+    } else {
+      promptContent = `Create a detailed prompt for generating an image with DALL-E to be used in a WhatsApp campaign for a restaurant.
+
+CONTEXT:
+- Restaurant name: ${restaurantName}
+- Cuisine type: ${cuisineTypes.join(', ') || 'Various'}
+- Campaign type: ${campaignDesc}
+- Message text: "${messageText}"
+
+INSTRUCTIONS:
+1. Create a 2-3 sentence prompt (maximum 300 characters) describing a SINGLE clear and engaging image to accompany the message
+2. The image should align with the campaign type and message text
+3. Describe a realistic food/restaurant scene, avoiding text or close-up people
+4. Include details on lighting, composition, and style for a professional result
+5. DO NOT include text in the image
+6. DO NOT include specific style traits like "digital art", "photo-realistic", "hyperrealistic", etc.
+7. Use direct language, without introductions like "an image of" or "a photo of"
+
+Provide ONLY the prompt, with no additional explanations or comments.`;
+    }
+
+    console.log(`Generating image prompt for ${campaignType} campaign`);
+    console.log(`Using Claude model: ${modelId}`);
+
+    // Genera il prompt usando Claude
+    const response = await anthropic.messages.create({
+      model: modelId,
+      max_tokens: 500,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: promptContent
+        }
+      ]
+    });
+
+    // Estrai il prompt dalla risposta
+    const rawResponse = response.content[0].text;
+    console.log("Claude raw response for image prompt:", rawResponse);
+    
+    // Elimina eventuali virgolette o spazi in eccesso
+    const prompt = rawResponse.trim().replace(/^["']|["']$/g, "");
+    
+    // Verifica la lunghezza del prompt
+    if (prompt.length > 1000) {
+      console.warn(`Prompt generato troppo lungo: ${prompt.length} caratteri. Troncato a 1000.`);
+      const truncatedPrompt = prompt.substring(0, 997) + "...";
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          prompt: truncatedPrompt,
+          originalPrompt: prompt,
+          truncated: true
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        prompt: prompt
+      }
+    });
+
+  } catch (error) {
+    console.error('Errore nella generazione del prompt per immagine:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la generazione del prompt',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getContacts,
   createCampaign,
@@ -820,5 +979,6 @@ module.exports = {
   updateCampaign,
   deleteCampaign,
   cancelCampaign,
-  generateCampaignContent
+  generateCampaignContent,
+  generateImagePrompt
 }; 
