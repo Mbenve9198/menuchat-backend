@@ -18,4 +18,7 @@ router.put('/:id', campaignController.updateCampaign);
 router.delete('/:id', campaignController.deleteCampaign);
 router.put('/:id/cancel', campaignController.cancelCampaign);
 
+// Rotta per la generazione di contenuti con AI
+router.post('/generate-content', campaignController.generateCampaignContent);
+
 module.exports = router; 

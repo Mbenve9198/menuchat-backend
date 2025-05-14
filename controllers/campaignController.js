@@ -3,6 +3,11 @@ const WhatsAppContact = require('../models/WhatsAppContact');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const Restaurant = require('../models/Restaurant');
 const twilioService = require('../services/twilioService');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 /**
  * @desc    Ottiene tutti i contatti WhatsApp per un ristorante
@@ -555,6 +560,258 @@ const cancelCampaign = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Genera il contenuto di una campagna WhatsApp con AI
+ * @route   POST /api/campaign/generate-content
+ * @access  Private
+ */
+const generateCampaignContent = async (req, res) => {
+  try {
+    const {
+      campaignType,
+      language = "en",
+      campaignObjective,
+      modelId = "claude-3-7-sonnet-20250219",
+      restaurantId
+    } = req.body;
+
+    // Validazione degli input
+    if (!campaignType || !campaignObjective) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo di campagna e obiettivo sono obbligatori'
+      });
+    }
+
+    // Trova il ristorante
+    const restaurant = await Restaurant.findById(restaurantId || req.user.restaurantId);
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Ottieni dati del ristorante per migliorare il messaggio
+    const restaurantName = restaurant.name;
+    const cuisineTypes = restaurant.cuisineTypes || [];
+    
+    // Mappa i tipi di campagna per il prompt
+    const campaignTypeMap = {
+      promo: {
+        en: {
+          description: "Promotional offer or discount",
+          ctaExamples: [
+            { text: "Order Now", type: "url" },
+            { text: "Get Discount", type: "url" },
+            { text: "Call Now", type: "phone" }
+          ]
+        },
+        it: {
+          description: "Offerta promozionale o sconto",
+          ctaExamples: [
+            { text: "Ordina Ora", type: "url" },
+            { text: "Ottieni Sconto", type: "url" },
+            { text: "Chiama Ora", type: "phone" }
+          ]
+        }
+      },
+      event: {
+        en: {
+          description: "Event invitation",
+          ctaExamples: [
+            { text: "RSVP", type: "url" },
+            { text: "Reserve a Spot", type: "url" },
+            { text: "Call to Book", type: "phone" }
+          ]
+        },
+        it: {
+          description: "Invito a un evento",
+          ctaExamples: [
+            { text: "Conferma Partecipazione", type: "url" },
+            { text: "Prenota un Posto", type: "url" },
+            { text: "Chiama per Prenotare", type: "phone" }
+          ]
+        }
+      },
+      update: {
+        en: {
+          description: "Menu update or restaurant news",
+          ctaExamples: [
+            { text: "View Menu", type: "url" },
+            { text: "Learn More", type: "url" },
+            { text: "Call for Info", type: "phone" }
+          ]
+        },
+        it: {
+          description: "Aggiornamento menu o novità del ristorante",
+          ctaExamples: [
+            { text: "Vedi Menu", type: "url" },
+            { text: "Scopri di Più", type: "url" },
+            { text: "Chiama per Informazioni", type: "phone" }
+          ]
+        }
+      },
+      feedback: {
+        en: {
+          description: "Request for customer feedback or reviews",
+          ctaExamples: [
+            { text: "Leave a Review", type: "url" },
+            { text: "Take Survey", type: "url" },
+            { text: "Call Us", type: "phone" }
+          ]
+        },
+        it: {
+          description: "Richiesta di feedback o recensioni dai clienti",
+          ctaExamples: [
+            { text: "Lascia una Recensione", type: "url" },
+            { text: "Partecipa al Sondaggio", type: "url" },
+            { text: "Chiamaci", type: "phone" }
+          ]
+        }
+      }
+    };
+
+    // Ottieni i dettagli del tipo di campagna in base alla lingua
+    const campaignDetails = campaignTypeMap[campaignType]?.[language] || campaignTypeMap[campaignType]?.en;
+    if (!campaignDetails) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo di campagna non valido'
+      });
+    }
+
+    // Crea prompt per Claude in base alla lingua
+    let promptContent;
+    if (language === 'it') {
+      promptContent = `Genera il contenuto per una campagna marketing WhatsApp per un ristorante:
+
+Ristorante: ${restaurantName}
+Tipo di cucina: ${cuisineTypes.join(', ')}
+Tipo di campagna: ${campaignDetails.description}
+Obiettivo della campagna: ${campaignObjective}
+
+Requisiti:
+1. Crea un messaggio WhatsApp breve e accattivante (80-120 caratteri)
+2. Includi {{1}} come segnaposto per il nome del cliente (utilizza ESATTAMENTE {{1}}, non altre varianti)
+3. Aggiungi 1-2 emoji appropriate per il tipo di campagna
+4. Il messaggio deve essere personalizzato in base all'obiettivo specificato
+5. Scrivi in lingua italiana
+6. NON includere URL diretti nel messaggio
+
+Inoltre, suggerisci un'appropriata Call-to-Action (CTA) per un pulsante sotto il messaggio.
+Il testo della CTA deve essere breve (2-3 parole) e convincente.
+Specifica anche se la CTA dovrebbe collegarsi a un URL o a un numero di telefono.
+
+Restituisci la risposta in formato JSON esattamente così:
+{
+  "messageText": "Il testo del messaggio con {{1}} per il nome",
+  "cta": {
+    "text": "Testo della CTA",
+    "type": "url" o "phone"
+  }
+}
+
+NON fornire spiegazioni o testo aggiuntivo. Restituisci solo l'oggetto JSON.`;
+    } else {
+      promptContent = `Generate content for a WhatsApp marketing campaign for a restaurant:
+
+Restaurant: ${restaurantName}
+Cuisine: ${cuisineTypes.join(', ')}
+Campaign type: ${campaignDetails.description} 
+Campaign objective: ${campaignObjective}
+
+Requirements:
+1. Create a short, engaging WhatsApp message (80-120 characters)
+2. Include {{1}} as a placeholder for customer name (use EXACTLY {{1}}, not other variations)
+3. Add 1-2 appropriate emojis for the campaign type
+4. Tailor the message to the specified objective
+5. Write in ${language === 'en' ? 'English' : language} language
+6. DO NOT include direct URLs in the message
+
+Also, suggest an appropriate Call-to-Action (CTA) for a button below the message.
+The CTA text should be short (2-3 words) and compelling.
+Also specify if the CTA should link to a URL or a phone number.
+
+Return the response in JSON format exactly like this:
+{
+  "messageText": "The message text with {{1}} for name",
+  "cta": {
+    "text": "CTA text",
+    "type": "url" or "phone"
+  }
+}
+
+DO NOT provide explanations or additional text. Return only the JSON object.`;
+    }
+
+    console.log(`Generating campaign content for ${campaignType} in ${language}`);
+    console.log(`Using Claude model: ${modelId}`);
+
+    // Genera il contenuto usando Claude
+    const response = await anthropic.messages.create({
+      model: modelId,
+      max_tokens: 500,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: promptContent
+        }
+      ]
+    });
+
+    // Estrai il messaggio dalla risposta
+    const rawResponse = response.content[0].text;
+    console.log("Claude raw response:", rawResponse);
+    
+    // Estrai oggetto JSON dalla risposta
+    let contentData;
+    try {
+      // Trova l'oggetto JSON nella risposta utilizzando una regex
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        contentData = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Formato JSON non trovato nella risposta');
+      }
+    } catch (error) {
+      console.error('Errore nel parsing della risposta JSON:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Errore nel processing della risposta AI',
+        error: error.message
+      });
+    }
+
+    // Verifica che contentData abbia la struttura corretta
+    if (!contentData.messageText || !contentData.cta || !contentData.cta.text || !contentData.cta.type) {
+      return res.status(500).json({
+        success: false,
+        message: 'Risposta AI mancante di campi necessari'
+      });
+    }
+
+    // Verifica che contentData.cta.type sia "url" o "phone"
+    if (contentData.cta.type !== 'url' && contentData.cta.type !== 'phone') {
+      contentData.cta.type = 'url'; // Default a URL se non valido
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: contentData
+    });
+
+  } catch (error) {
+    console.error('Errore nella generazione del contenuto della campagna:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la generazione del contenuto',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getContacts,
   createCampaign,
@@ -562,5 +819,6 @@ module.exports = {
   getCampaignById,
   updateCampaign,
   deleteCampaign,
-  cancelCampaign
+  cancelCampaign,
+  generateCampaignContent
 }; 
