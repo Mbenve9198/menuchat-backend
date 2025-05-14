@@ -391,6 +391,8 @@ const getTwilioStatus = async (req, res) => {
           data: {
             configured: true,
             phoneNumber: twilioConfig.phoneNumber,
+            whatsappNumberType: 'custom',
+            messagingServiceSid: botConfig.messagingServiceSid,
             status: twilioConfig.status,
             message: 'Configurazione Twilio completata automaticamente'
           }
@@ -401,6 +403,7 @@ const getTwilioStatus = async (req, res) => {
           success: true,
           data: {
             configured: false,
+            whatsappNumberType: botConfig.whatsappNumberType || 'default',
             error: 'Configurazione automatica fallita'
           }
         });
@@ -415,7 +418,13 @@ const getTwilioStatus = async (req, res) => {
       data: {
         configured: status.active,
         phoneNumber: botConfig.whatsappNumber,
-        status
+        whatsappNumberType: botConfig.whatsappNumberType,
+        messagingServiceSid: botConfig.messagingServiceSid,
+        status: {
+          ...status,
+          whatsappNumberType: botConfig.whatsappNumberType,
+          messagingServiceSid: botConfig.messagingServiceSid
+        }
       }
     });
   } catch (error) {
