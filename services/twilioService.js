@@ -39,13 +39,18 @@ class TwilioService {
       // Inizializza il client Twilio
       const twilioClient = twilio(accountSid, authToken);
 
-      // Verifica che il messaging service esista
-      try {
-        const messagingService = await twilioClient.messaging.v1.services(messagingServiceSid).fetch();
-        console.log('Messaging Service verificato:', messagingService.friendlyName);
-      } catch (error) {
-        console.error('Errore nel recupero del Messaging Service:', error);
-        throw new Error('Impossibile verificare il Messaging Service Twilio');
+      // Verifica che il messaging service esista solo se è quello di default
+      if (!customMessagingServiceSid) {
+        try {
+          const messagingService = await twilioClient.messaging.v1.services(messagingServiceSid).fetch();
+          console.log('Messaging Service predefinito verificato:', messagingService.friendlyName);
+        } catch (error) {
+          console.error('Errore nel recupero del Messaging Service predefinito:', error);
+          throw new Error('Impossibile verificare il Messaging Service Twilio predefinito');
+        }
+      } else {
+        // Se è un Messaging Service personalizzato, assumiamo che sia valido
+        console.log('Utilizzo Messaging Service personalizzato (senza verifica):', customMessagingServiceSid);
       }
 
       // Aggiorna la configurazione del bot con i nuovi valori
