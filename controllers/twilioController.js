@@ -391,8 +391,6 @@ const getTwilioStatus = async (req, res) => {
           data: {
             configured: true,
             phoneNumber: twilioConfig.phoneNumber,
-            whatsappNumberType: 'custom',
-            messagingServiceSid: botConfig.messagingServiceSid,
             status: twilioConfig.status,
             message: 'Configurazione Twilio completata automaticamente'
           }
@@ -587,11 +585,31 @@ const resetToDefaultSettings = async (req, res) => {
     botConfig.twilioAuthToken = null;
     
     await botConfig.save();
+    
+    // Ricarica la configurazione per assicurarsi che i dati siano aggiornati
+    botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+    
+    // Log per debug
+    console.log('Configurazione dopo reset:', {
+      whatsappNumberType: botConfig.whatsappNumberType,
+      whatsappNumber: botConfig.whatsappNumber,
+      messagingServiceSid: botConfig.messagingServiceSid
+    });
 
+    // Restituisci una risposta completa simile a quella di getTwilioStatus
     res.status(200).json({
       success: true,
       data: {
-        message: 'Impostazioni Twilio ripristinate alle predefinite'
+        configured: false,
+        phoneNumber: null,
+        whatsappNumberType: 'default',
+        messagingServiceSid: null,
+        message: 'Impostazioni Twilio ripristinate alle predefinite',
+        status: {
+          active: false, 
+          whatsappNumberType: 'default',
+          messagingServiceSid: null
+        }
       }
     });
   } catch (error) {
