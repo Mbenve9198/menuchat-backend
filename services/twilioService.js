@@ -13,25 +13,31 @@ class TwilioService {
    */
   async configureTwilio(config) {
     try {
-      const { restaurantId, botConfigId } = config;
+      const { restaurantId, botConfigId, customWhatsappNumber, customMessagingServiceSid, twilioAccountSid, twilioAuthToken } = config;
 
       // Verifica che i parametri siano validi
       if (!restaurantId || !botConfigId) {
         throw new Error('Parametri mancanti nella configurazione Twilio');
       }
-
-      // Utilizza le credenziali dalle variabili d'ambiente
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-      const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
       
-      if (!twilioSid || !twilioToken || !messagingServiceSid || !whatsappNumber) {
-        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+      // Trova la configurazione del bot
+      const botConfig = await BotConfiguration.findById(botConfigId);
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
+      
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const accountSid = twilioAccountSid || botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const authToken = twilioAuthToken || botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = customMessagingServiceSid || botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const whatsappNumber = customWhatsappNumber || botConfig.whatsappNumber || process.env.TWILIO_WHATSAPP_NUMBER;
+      
+      if (!accountSid || !authToken || !messagingServiceSid || !whatsappNumber) {
+        throw new Error('Credenziali Twilio non configurate correttamente');
       }
 
       // Inizializza il client Twilio
-      const twilioClient = twilio(twilioSid, twilioToken);
+      const twilioClient = twilio(accountSid, authToken);
 
       // Verifica che il messaging service esista
       try {
@@ -42,9 +48,16 @@ class TwilioService {
         throw new Error('Impossibile verificare il Messaging Service Twilio');
       }
 
-      // Associa il ristorante e la configurazione del bot all'integrazione Twilio
-      // In un ambiente di produzione, le credenziali dovrebbero essere crittografate
-      // e memorizzate in un sistema di gestione delle credenziali sicuro
+      // Aggiorna la configurazione del bot con i nuovi valori
+      if (customWhatsappNumber || customMessagingServiceSid || twilioAccountSid || twilioAuthToken) {
+        botConfig.whatsappNumberType = 'custom';
+        if (customWhatsappNumber) botConfig.whatsappNumber = customWhatsappNumber;
+        if (customMessagingServiceSid) botConfig.messagingServiceSid = customMessagingServiceSid;
+        if (twilioAccountSid) botConfig.twilioAccountSid = twilioAccountSid;
+        if (twilioAuthToken) botConfig.twilioAuthToken = twilioAuthToken;
+        await botConfig.save();
+      }
+
       console.log('Configurazione Twilio completata per il ristorante:', restaurantId);
 
       return {
@@ -64,15 +77,25 @@ class TwilioService {
    */
   async checkTwilioStatus(restaurantId) {
     try {
-      // Verifica che le variabili d'ambiente siano configurate
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        return {
+          active: false,
+          error: 'Configurazione bot non trovata'
+        };
+      }
+      
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
 
       if (!twilioSid || !twilioToken || !messagingServiceSid) {
         return {
           active: false,
-          error: 'Variabili d\'ambiente Twilio non configurate'
+          error: 'Credenziali Twilio non configurate'
         };
       }
 
@@ -126,14 +149,14 @@ class TwilioService {
         throw new Error('Configurazione bot non trovata');
       }
 
-      // Verifica che le variabili d'ambiente siano configurate
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-      const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const whatsappNumber = botConfig.whatsappNumber || process.env.TWILIO_WHATSAPP_NUMBER;
 
       if (!twilioSid || !twilioToken || !messagingServiceSid || !whatsappNumber) {
-        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+        throw new Error('Credenziali Twilio non configurate correttamente');
       }
 
       // Inizializza il client Twilio
@@ -182,14 +205,21 @@ class TwilioService {
       if (!phoneNumber || !templateId) {
         throw new Error('Numero di telefono e ID del template obbligatori');
       }
+      
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
 
-      // Verifica che le variabili d'ambiente siano configurate
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const whatsappNumber = botConfig.whatsappNumber || process.env.TWILIO_WHATSAPP_NUMBER;
 
       if (!twilioSid || !twilioToken || !whatsappNumber) {
-        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+        throw new Error('Credenziali Twilio non configurate correttamente');
       }
 
       // Inizializza il client Twilio
@@ -265,13 +295,20 @@ class TwilioService {
         throw new Error('La data di invio non può essere oltre 35 giorni nel futuro');
       }
 
-      // Verifica che le variabili d'ambiente siano configurate
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
+
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
 
       if (!twilioSid || !twilioToken || !messagingServiceSid) {
-        throw new Error('Variabili d\'ambiente Twilio non configurate correttamente');
+        throw new Error('Credenziali Twilio non configurate correttamente');
       }
 
       // Inizializza il client Twilio

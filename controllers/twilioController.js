@@ -471,9 +471,84 @@ const sendTestMessage = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Aggiorna le impostazioni Twilio personalizzate
+ * @route   POST /api/twilio/custom-settings
+ * @access  Private
+ */
+const updateCustomTwilioSettings = async (req, res) => {
+  try {
+    const { whatsappNumber, messagingServiceSid, twilioAccountSid, twilioAuthToken } = req.body;
+
+    // Valida i dati obbligatori
+    if (!whatsappNumber || !messagingServiceSid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Numero WhatsApp e Messaging Service ID sono obbligatori'
+      });
+    }
+
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova la configurazione del bot
+    let botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+    if (!botConfig) {
+      return res.status(404).json({
+        success: false,
+        message: 'Configurazione bot non trovata'
+      });
+    }
+
+    // Configura Twilio con le impostazioni personalizzate
+    try {
+      const twilioConfig = await twilioService.configureTwilio({
+        restaurantId: restaurant._id,
+        botConfigId: botConfig._id,
+        customWhatsappNumber: whatsappNumber,
+        customMessagingServiceSid: messagingServiceSid,
+        twilioAccountSid,
+        twilioAuthToken
+      });
+
+      // La configurazione è stata completata con successo
+      res.status(200).json({
+        success: true,
+        data: {
+          phoneNumber: botConfig.whatsappNumber,
+          messagingServiceSid: botConfig.messagingServiceSid,
+          status: 'active',
+          message: 'Impostazioni Twilio personalizzate aggiornate con successo'
+        }
+      });
+    } catch (configError) {
+      console.error('Errore nella configurazione personalizzata:', configError);
+      res.status(400).json({
+        success: false,
+        message: 'Errore durante la configurazione di Twilio',
+        error: configError.message
+      });
+    }
+  } catch (error) {
+    console.error('Errore nell\'aggiornamento delle impostazioni Twilio:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante l\'aggiornamento delle impostazioni Twilio',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   webhookHandler,
   connectTwilio,
   getTwilioStatus,
-  sendTestMessage
+  sendTestMessage,
+  updateCustomTwilioSettings
 }; 

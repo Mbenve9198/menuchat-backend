@@ -73,6 +73,32 @@ const BotConfigurationSchema = new Schema({
   active: {
     type: Boolean,
     default: true
+  },
+  // Tipo di numero WhatsApp (default o personalizzato)
+  whatsappNumberType: {
+    type: String,
+    enum: ['default', 'custom'],
+    default: 'default'
+  },
+  // Numero WhatsApp personalizzato
+  whatsappNumber: {
+    type: String,
+    trim: true
+  },
+  // Messaging Service ID personalizzato
+  messagingServiceSid: {
+    type: String,
+    trim: true
+  },
+  // Twilio Account SID personalizzato (opzionale)
+  twilioAccountSid: {
+    type: String,
+    trim: true
+  },
+  // Twilio Auth Token personalizzato (opzionale)
+  twilioAuthToken: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true

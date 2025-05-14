@@ -11,5 +11,6 @@ router.post('/webhook', twilioController.webhookHandler);
 router.post('/connect', protect, twilioController.connectTwilio);
 router.get('/status', protect, twilioController.getTwilioStatus);
 router.post('/test', protect, twilioController.sendTestMessage);
+router.post('/custom-settings', protect, twilioController.updateCustomTwilioSettings);
 
 module.exports = router; 
