@@ -545,10 +545,61 @@ const updateCustomTwilioSettings = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Ripristina le impostazioni Twilio predefinite
+ * @route   POST /api/twilio/reset-to-default
+ * @access  Private
+ */
+const resetToDefaultSettings = async (req, res) => {
+  try {
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova la configurazione del bot
+    let botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+    if (!botConfig) {
+      return res.status(404).json({
+        success: false,
+        message: 'Configurazione bot non trovata'
+      });
+    }
+
+    // Resetta a impostazioni predefinite
+    botConfig.whatsappNumberType = 'default';
+    botConfig.whatsappNumber = null;
+    botConfig.messagingServiceSid = null;
+    botConfig.twilioAccountSid = null;
+    botConfig.twilioAuthToken = null;
+    
+    await botConfig.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        message: 'Impostazioni Twilio ripristinate alle predefinite'
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel ripristino delle impostazioni Twilio:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il ripristino delle impostazioni Twilio',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   webhookHandler,
   connectTwilio,
   getTwilioStatus,
   sendTestMessage,
-  updateCustomTwilioSettings
+  updateCustomTwilioSettings,
+  resetToDefaultSettings
 }; 
