@@ -577,15 +577,20 @@ const resetToDefaultSettings = async (req, res) => {
       });
     }
 
-    // Resetta a impostazioni predefinite
-    botConfig.whatsappNumberType = 'default';
-    botConfig.whatsappNumber = null;
-    botConfig.messagingServiceSid = null;
-    botConfig.twilioAccountSid = null;
-    botConfig.twilioAuthToken = null;
-    
-    await botConfig.save();
-    
+    // Resetta a impostazioni predefinite utilizzando updateOne per assicurarsi che le modifiche vengano applicate
+    await BotConfiguration.updateOne(
+      { _id: botConfig._id },
+      { 
+        $set: {
+          whatsappNumberType: 'default',
+          whatsappNumber: null,
+          messagingServiceSid: null,
+          twilioAccountSid: null,
+          twilioAuthToken: null
+        }
+      }
+    );
+
     // Ricarica la configurazione per assicurarsi che i dati siano aggiornati
     botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
     
