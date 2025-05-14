@@ -480,16 +480,30 @@ ${langInstructions.example}`;
       const fullText = response.content[0].text;
       console.log("✅ Claude raw response:", fullText);
       
-      // Estrae solo il messaggio di benvenuto, escludendo eventuali spiegazioni
-      // Prende il primo paragrafo che contiene il testo del messaggio di benvenuto
-      // e rimuove eventuali virgolette
+      // Il problema: Claude sta restituendo il messaggio con più righe, ma stiamo perdendo
+      // la parte dopo l'a capo perché la consideriamo erroneamente una spiegazione.
       let generatedMessage = fullText;
       
-      // Se il messaggio contiene una spiegazione dopo il messaggio vero e proprio
+      // Se il messaggio contiene una doppia riga vuota, potrebbe essere una spiegazione aggiuntiva
       if (fullText.includes("\n\n")) {
-        // Prendi solo la prima parte del testo, che dovrebbe essere il messaggio
-        generatedMessage = fullText.split("\n\n")[0];
-        console.log("🔍 Found explanation text after message, removing it");
+        // Analizziamo il contenuto prima di decidere cosa scartare
+        const parts = fullText.split("\n\n");
+        console.log(`🔎 Message has ${parts.length} parts separated by double newlines`);
+        
+        // Se ci sono 2 paragrafi e il secondo inizia con una frase tipica di spiegazione
+        // allora scartiamo il secondo paragrafo
+        if (parts.length === 2 && 
+            (parts[1].startsWith("This welcome message") || 
+             parts[1].startsWith("I've created") || 
+             parts[1].startsWith("This message"))) {
+          console.log("🔍 Found explanation text after message, removing it");
+          generatedMessage = parts[0];
+        } else {
+          // Altrimenti, probabilmente il \n\n fa parte del formato del messaggio
+          // e dobbiamo mantenerlo, sostituendolo con un singolo \n per la formattazione
+          console.log("✨ Preserving multiline message format");
+          generatedMessage = fullText.replace(/\n\n/g, "\n");
+        }
       }
       
       // Rimuovi eventuali virgolette attorno al messaggio
@@ -694,7 +708,41 @@ ${langInstructions.example}`;
       // Estrai il messaggio dalla risposta
       const rawResponse = response.content[0].text;
       console.log("✅ Claude raw review response:", rawResponse);
-      const message = rawResponse.trim();
+      
+      // Verifica se c'è del testo esplicativo che dovrebbe essere rimosso
+      let message = rawResponse;
+      
+      if (rawResponse.includes("\n\n")) {
+        const parts = rawResponse.split("\n\n");
+        console.log(`🔎 Review message has ${parts.length} parts separated by double newlines`);
+        
+        // Se ci sono 2 paragrafi e il secondo inizia con una frase tipica di spiegazione
+        if (parts.length >= 2 && 
+            (parts[1].startsWith("This message") || 
+             parts[1].startsWith("This review") || 
+             parts[1].startsWith("I've created"))) {
+          console.log("🔍 Found explanation text after review message, removing it");
+          message = parts[0];
+        }
+      }
+      
+      // Rimuovi eventuali virgolette e spazi iniziali/finali
+      message = message.trim().replace(/^["']|["']$/g, "");
+      
+      // Verifica della lunghezza del messaggio
+      console.log(`📊 Review message length: ${message.length} characters`);
+      if (message.length < 50 || message.length > 200) {
+        console.log("⚠️ Warning: Review message length outside recommended range (50-200 chars)");
+      }
+      
+      // Verifica che il messaggio contenga {{1}} per il nome del cliente
+      if (!message.includes("{{1}}")) {
+        console.log("⚠️ Warning: Review message does not contain the placeholder {{1}} for customer name");
+      }
+      
+      // Conta gli emoji nel messaggio
+      const emojiCount = (message.match(/[\p{Emoji}]/gu) || []).length;
+      console.log(`🔢 Emoji count in review message: ${emojiCount}`);
       
       console.log("📱 Final review template:", message);
 
