@@ -1015,14 +1015,13 @@ const generateImage = async (req, res) => {
       });
 
       // Genera l'immagine usando GPT Image API
-      // Nota: gpt-image-1 non supporta il parametro 'style'
+      // Nota: gpt-image-1 supporta solo quality: 'low', 'medium', 'high', o 'auto'
       const response = await openai.images.generate({
         model: modelType,
         prompt: prompt,
         n: 1,
         size: '1024x1024',
-        quality: 'standard'
-        // Rimuoviamo il parametro 'style: vivid' che non è supportato
+        quality: 'high' // Valori supportati: 'low', 'medium', 'high', 'auto'
       });
 
       // Estrai l'URL dell'immagine
