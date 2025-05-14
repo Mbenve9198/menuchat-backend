@@ -296,6 +296,15 @@ class SetupController {
         modelId = "claude-3-7-sonnet-20250219"
       } = req.body;
       
+      console.log("🔍 Welcome Message Request Payload:", JSON.stringify({
+        restaurantId,
+        restaurantName,
+        menuType,
+        language,
+        modelId,
+        restaurantDetailsKeys: restaurantDetails ? Object.keys(restaurantDetails) : 'null'
+      }, null, 2));
+      
       if (!restaurantDetails) {
         return res.status(400).json({
           success: false,
@@ -303,8 +312,16 @@ class SetupController {
         });
       }
 
+      console.log("🍽️ Restaurant Info:", JSON.stringify({
+        name: restaurantDetails.name,
+        rating: restaurantDetails.rating,
+        ratingsTotal: restaurantDetails.ratingsTotal,
+        cuisineTypes: restaurantDetails.cuisineTypes,
+        reviewsCount: restaurantDetails.reviews?.length || 0
+      }, null, 2));
+
       // Determina la lingua per il prompt
-      console.log(`Generating welcome message in language: ${language}, forceLanguage: ${forceLanguage}`);
+      console.log(`🌐 Generating welcome message in language: ${language}, forceLanguage: ${forceLanguage}`);
       
       // Mappatura delle lingue con le istruzioni corrispondenti
       const languageInstructions = {
@@ -409,6 +426,15 @@ class SetupController {
       const langInstructions = languageInstructions[language] || languageInstructions.en;
       const menuPromptSuffix = langInstructions.context;
 
+      // Estrai le prime 5 recensioni per il log
+      const top5Reviews = restaurantDetails.reviews?.slice(0, 5).map(review => ({
+        author: review.author_name || review.authorName,
+        rating: review.rating,
+        text: review.text?.slice(0, 100) + (review.text?.length > 100 ? '...' : '')
+      })) || [];
+      
+      console.log("📝 Top 5 Reviews:", JSON.stringify(top5Reviews, null, 2));
+
       const promptContent = `${langInstructions.welcomeText}
 
 Restaurant Name: ${restaurantDetails.name}
@@ -417,7 +443,7 @@ Cuisine: ${restaurantDetails.cuisineTypes?.join(', ')}
 
 Top 5 Reviews:
 ${restaurantDetails.reviews?.slice(0, 5).map(review => 
-  `- "${review.text.slice(0, 100)}..."`
+  `- "${review.text?.slice(0, 100)}..."`
 ).join('\n') || ''}
 
 Context: ${menuPromptSuffix}
@@ -430,10 +456,14 @@ ${language !== 'en' ? `IMPORTANT: The message MUST be in ${language} language.` 
 Example:
 ${langInstructions.example}`;
 
+      console.log("📋 Claude Prompt:", promptContent);
+
       // Determina il modello da utilizzare
       const model = modelId || "claude-3-7-sonnet-20250219";
+      console.log(`🤖 Using Claude model: ${model}`);
 
       // Genera il messaggio usando Claude
+      console.log("🔄 Sending request to Claude...");
       const response = await anthropic.messages.create({
         model: model,
         max_tokens: 500,
@@ -448,6 +478,7 @@ ${langInstructions.example}`;
 
       // Estrai il messaggio dalla risposta
       const fullText = response.content[0].text;
+      console.log("✅ Claude raw response:", fullText);
       
       // Estrae solo il messaggio di benvenuto, escludendo eventuali spiegazioni
       // Prende il primo paragrafo che contiene il testo del messaggio di benvenuto
@@ -458,17 +489,25 @@ ${langInstructions.example}`;
       if (fullText.includes("\n\n")) {
         // Prendi solo la prima parte del testo, che dovrebbe essere il messaggio
         generatedMessage = fullText.split("\n\n")[0];
+        console.log("🔍 Found explanation text after message, removing it");
       }
       
       // Rimuovi eventuali virgolette attorno al messaggio
+      const beforeCleaning = generatedMessage;
       generatedMessage = generatedMessage.replace(/^["']|["']$/g, "");
+      
+      if (beforeCleaning !== generatedMessage) {
+        console.log("🧹 Removed quotes from message");
+      }
+      
+      console.log("📱 Final message:", generatedMessage);
 
       res.json({ 
         success: true, 
         message: generatedMessage
       });
     } catch (error) {
-      console.error('Error generating welcome message:', error);
+      console.error('❌ Error generating welcome message:', error);
       res.status(500).json({ 
         success: false, 
         error: 'Error generating welcome message',
@@ -488,6 +527,15 @@ ${langInstructions.example}`;
         modelId = "claude-3-7-sonnet-20250219"
       } = req.body;
       
+      console.log("🔍 Review Template Request Payload:", JSON.stringify({
+        restaurantName,
+        reviewLink,
+        language,
+        modelId,
+        forceLanguage,
+        restaurantDetailsKeys: restaurantDetails ? Object.keys(restaurantDetails) : 'null'
+      }, null, 2));
+      
       if (!restaurantDetails) {
         return res.status(400).json({
           success: false,
@@ -495,8 +543,16 @@ ${langInstructions.example}`;
         });
       }
 
+      console.log("🍽️ Restaurant Info for Review:", JSON.stringify({
+        name: restaurantDetails.name,
+        rating: restaurantDetails.rating,
+        ratingsTotal: restaurantDetails.ratingsTotal,
+        cuisineTypes: restaurantDetails.cuisineTypes,
+        reviewsCount: restaurantDetails.reviews?.length || 0
+      }, null, 2));
+
       // Debug info
-      console.log(`Generating review template in language: ${language}, forceLanguage: ${forceLanguage}`);
+      console.log(`🌐 Generating review template in language: ${language}, forceLanguage: ${forceLanguage}`);
       
       // Mappatura delle lingue con le istruzioni corrispondenti
       const languageInstructions = {
@@ -590,6 +646,15 @@ ${langInstructions.example}`;
       // Usa le istruzioni della lingua richiesta o inglese di default se non supportata
       const langInstructions = languageInstructions[language] || languageInstructions.en;
 
+      // Estrai le prime 5 recensioni per il log
+      const top5Reviews = restaurantDetails.reviews?.slice(0, 5).map(review => ({
+        author: review.author_name || review.authorName,
+        rating: review.rating,
+        text: review.text?.slice(0, 100) + (review.text?.length > 100 ? '...' : '')
+      })) || [];
+      
+      console.log("📝 Top 5 Reviews for Review Template:", JSON.stringify(top5Reviews, null, 2));
+
       const promptContent = `${langInstructions.welcomeText}
 
 Restaurant Name: ${restaurantDetails.name}
@@ -607,7 +672,13 @@ Return ONLY the message text, without quotes or any additional explanation.
 Example:
 ${langInstructions.example}`;
 
+      console.log("📋 Claude Review Prompt:", promptContent);
+
+      // Determina il modello da utilizzare
+      console.log(`🤖 Using Claude model for review: ${modelId}`);
+
       // Genera il messaggio usando Claude
+      console.log("🔄 Sending review template request to Claude...");
       const response = await anthropic.messages.create({
         model: modelId,
         max_tokens: 500,
@@ -621,14 +692,18 @@ ${langInstructions.example}`;
       });
 
       // Estrai il messaggio dalla risposta
-      const message = response.content[0].text.trim();
+      const rawResponse = response.content[0].text;
+      console.log("✅ Claude raw review response:", rawResponse);
+      const message = rawResponse.trim();
+      
+      console.log("📱 Final review template:", message);
 
       res.json({ 
         success: true, 
         templates: [message]
       });
     } catch (error) {
-      console.error('Error generating review message:', error);
+      console.error('❌ Error generating review message:', error);
       res.status(500).json({ 
         success: false, 
         error: 'Error generating review message',
