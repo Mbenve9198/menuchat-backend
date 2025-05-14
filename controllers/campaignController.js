@@ -972,7 +972,7 @@ Provide ONLY the prompt, with no additional explanations or comments.`;
 };
 
 /**
- * @desc    Genera un'immagine usando OpenAI DALL-E
+ * @desc    Genera un'immagine usando OpenAI GPT Image
  * @route   POST /api/campaign/generate-image
  * @access  Private
  */
@@ -1014,14 +1014,15 @@ const generateImage = async (req, res) => {
         apiKey: process.env.OPENAI_API_KEY
       });
 
-      // Genera l'immagine usando OpenAI API
+      // Genera l'immagine usando GPT Image API
+      // Nota: gpt-image-1 non supporta il parametro 'style'
       const response = await openai.images.generate({
         model: modelType,
         prompt: prompt,
         n: 1,
         size: '1024x1024',
-        quality: 'standard',
-        style: 'vivid',
+        quality: 'standard'
+        // Rimuoviamo il parametro 'style: vivid' che non è supportato
       });
 
       // Estrai l'URL dell'immagine
