@@ -971,6 +971,91 @@ Provide ONLY the prompt, with no additional explanations or comments.`;
   }
 };
 
+/**
+ * @desc    Genera un'immagine usando OpenAI DALL-E
+ * @route   POST /api/campaign/generate-image
+ * @access  Private
+ */
+const generateImage = async (req, res) => {
+  try {
+    const {
+      prompt,
+      messageText,
+      campaignType,
+      restaurantName = 'Restaurant',
+      modelType = 'gpt-image-1'
+    } = req.body;
+
+    // Validazione degli input
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prompt richiesto per la generazione dell\'immagine'
+      });
+    }
+
+    // Verifica che l'API key di OpenAI sia configurata
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: 'OpenAI API key non configurata'
+      });
+    }
+
+    console.log(`Generating image with prompt: ${prompt.substring(0, 100)}...`);
+    console.log(`Using model: ${modelType}`);
+
+    try {
+      // Importa la libreria OpenAI
+      const { OpenAI } = require('openai');
+      
+      // Inizializza il client OpenAI
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY
+      });
+
+      // Genera l'immagine usando OpenAI API
+      const response = await openai.images.generate({
+        model: modelType,
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard',
+        style: 'vivid',
+      });
+
+      // Estrai l'URL dell'immagine
+      const imageUrl = response.data && response.data[0] ? response.data[0].url : null;
+      
+      if (!imageUrl) {
+        throw new Error('Nessuna immagine generata');
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          imageUrl,
+          prompt
+        }
+      });
+    } catch (openaiError) {
+      console.error('OpenAI error:', openaiError);
+      return res.status(500).json({
+        success: false,
+        message: 'Errore durante la generazione dell\'immagine con OpenAI',
+        error: openaiError.message || String(openaiError)
+      });
+    }
+  } catch (error) {
+    console.error('Errore nella generazione dell\'immagine:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la generazione dell\'immagine',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getContacts,
   createCampaign,
@@ -980,5 +1065,6 @@ module.exports = {
   deleteCampaign,
   cancelCampaign,
   generateCampaignContent,
-  generateImagePrompt
+  generateImagePrompt,
+  generateImage
 }; 

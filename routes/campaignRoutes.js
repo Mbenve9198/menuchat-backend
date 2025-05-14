@@ -24,4 +24,7 @@ router.post('/generate-content', campaignController.generateCampaignContent);
 // Rotta per la generazione di prompt per immagini
 router.post('/generate-image-prompt', campaignController.generateImagePrompt);
 
+// Rotta per la generazione di immagini
+router.post('/generate-image', campaignController.generateImage);
+
 module.exports = router; 
