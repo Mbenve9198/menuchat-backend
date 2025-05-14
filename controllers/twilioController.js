@@ -374,7 +374,25 @@ const getTwilioStatus = async (req, res) => {
     const isConfigured = botConfig.whatsappNumberType === 'custom' && botConfig.whatsappNumber;
 
     if (!isConfigured) {
-      // Prova a configurare Twilio automaticamente
+      // Se è impostato esplicitamente come 'default', restituisci una risposta positiva senza verificare
+      if (botConfig.whatsappNumberType === 'default') {
+        return res.status(200).json({
+          success: true,
+          data: {
+            configured: false,
+            phoneNumber: null,
+            whatsappNumberType: 'default',
+            messagingServiceSid: null,
+            status: {
+              active: true,  // Impostiamo active a true per indicare che il default è attivo e funzionante
+              whatsappNumberType: 'default',
+              messagingServiceSid: null
+            }
+          }
+        });
+      }
+      
+      // Prova a configurare Twilio automaticamente solo se non è impostato esplicitamente come 'default'
       try {
         const twilioConfig = await twilioService.configureTwilio({
           restaurantId: restaurant._id,
