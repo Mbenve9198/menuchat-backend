@@ -32,4 +32,7 @@ router.post('/generate-image-prompt', campaignController.generateImagePrompt);
 // Rotta per la generazione di immagini
 router.post('/generate-image', campaignController.generateImage);
 
+// Nuovo endpoint per gestire le unsubscribe
+router.get('/unsubscribe/:contactId/:token', campaignController.handleUnsubscribe);
+
 module.exports = router; 

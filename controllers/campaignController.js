@@ -6,6 +6,8 @@ const Restaurant = require('../models/Restaurant');
 const twilioService = require('../services/twilioService');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
+const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -1109,6 +1111,186 @@ const generateImage = async (req, res) => {
 };
 
 /**
+ * Genera un token sicuro per l'unsubscribe
+ * @param {String} contactId - ID del contatto
+ * @param {String} phoneNumber - Numero di telefono del contatto
+ * @returns {String} - Token crittografato
+ */
+const generateUnsubscribeToken = (contactId, phoneNumber) => {
+  // Crea una stringa segreta basata sull'ID del contatto e sul numero di telefono
+  const secret = `${contactId}-${phoneNumber}-${process.env.JWT_SECRET || 'menuchat-secret-key'}`;
+  
+  // Genera un hash SHA-256 come token
+  return crypto
+    .createHash('sha256')
+    .update(secret)
+    .digest('hex');
+};
+
+/**
+ * Verifica la validità di un token unsubscribe
+ * @param {String} contactId - ID del contatto
+ * @param {String} phoneNumber - Numero di telefono del contatto
+ * @param {String} token - Token da verificare
+ * @returns {Boolean} - True se il token è valido
+ */
+const verifyUnsubscribeToken = (contactId, phoneNumber, token) => {
+  const expectedToken = generateUnsubscribeToken(contactId, phoneNumber);
+  return expectedToken === token;
+};
+
+/**
+ * @desc    Cambia un contatto in opt-out tramite URL di unsubscribe
+ * @route   GET /api/campaign/unsubscribe/:contactId/:token
+ * @access  Public
+ */
+const handleUnsubscribe = async (req, res) => {
+  try {
+    const { contactId, token } = req.params;
+    
+    // Verifica che contactId sia un ObjectId valido
+    if (!mongoose.Types.ObjectId.isValid(contactId)) {
+      return res.status(400).send(`
+        <html>
+          <head><title>Errore</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Link non valido</h1>
+            <p>Il link che hai seguito non è valido.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Trova il contatto
+    const contact = await WhatsAppContact.findById(contactId);
+    
+    if (!contact) {
+      return res.status(404).send(`
+        <html>
+          <head><title>Errore</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Contatto non trovato</h1>
+            <p>Non è stato possibile trovare il tuo contatto.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Verifica il token
+    if (!verifyUnsubscribeToken(contactId, contact.phoneNumber, token)) {
+      return res.status(403).send(`
+        <html>
+          <head><title>Errore</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1>Link non valido</h1>
+            <p>Il link di disiscrizione non è valido o è scaduto.</p>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Aggiorna il contatto in opt-out
+    await contact.optOut('unsubscribe_link');
+    
+    // Determina la lingua del contatto per la risposta
+    const lang = contact.language || 'it';
+    
+    // Prepara messaggi in varie lingue
+    const messages = {
+      it: {
+        title: 'Disiscrizione completata',
+        message: 'Non riceverai più messaggi promozionali da questa attività.',
+        thanks: 'Grazie per la tua preferenza.'
+      },
+      en: {
+        title: 'Unsubscribe Successful',
+        message: 'You will no longer receive promotional messages from this business.',
+        thanks: 'Thank you for your preference.'
+      },
+      es: {
+        title: 'Cancelación de suscripción completada',
+        message: 'Ya no recibirás mensajes promocionales de este negocio.',
+        thanks: 'Gracias por tu preferencia.'
+      },
+      fr: {
+        title: 'Désinscription terminée',
+        message: 'Vous ne recevrez plus de messages promotionnels de cette entreprise.',
+        thanks: 'Merci pour votre préférence.'
+      },
+      de: {
+        title: 'Abmeldung abgeschlossen',
+        message: 'Sie erhalten keine Werbenachrichten mehr von diesem Unternehmen.',
+        thanks: 'Danke für Ihre Präferenz.'
+      }
+    };
+    
+    // Usa lingua italiana come fallback
+    const responseText = messages[lang] || messages.it;
+    
+    // Restituisci una pagina di conferma nella lingua appropriata
+    res.status(200).send(`
+      <html>
+        <head>
+          <title>${responseText.title}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              text-align: center;
+              padding: 50px;
+              background-color: #f7f7f7;
+              color: #333;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: white;
+              padding: 30px;
+              border-radius: 10px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 {
+              color: #4CAF50;
+              margin-bottom: 20px;
+            }
+            p {
+              font-size: 18px;
+              line-height: 1.6;
+              margin-bottom: 15px;
+            }
+            .emoji {
+              font-size: 50px;
+              margin: 20px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="emoji">✅</div>
+            <h1>${responseText.title}</h1>
+            <p>${responseText.message}</p>
+            <p>${responseText.thanks}</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Errore nella gestione dell\'unsubscribe:', error);
+    
+    // Pagina di errore generica
+    res.status(500).send(`
+      <html>
+        <head><title>Errore</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+          <h1>Si è verificato un errore</h1>
+          <p>Non è stato possibile completare la tua richiesta. Riprova più tardi.</p>
+        </body>
+      </html>
+    `);
+  }
+};
+
+/**
  * @desc    Invia un template di campagna a Twilio per approvazione
  * @route   POST /api/campaign/:id/submit-template
  * @access  Private
@@ -1237,12 +1419,30 @@ const submitCampaignTemplate = async (req, res) => {
           }
         }
         
-        // Aggiungi sempre il bottone di unsubscribe come QUICK_REPLY
+        // Aggiungi sempre il bottone di unsubscribe come URL
         if (campaign.templateParameters.unsubscribe !== false) {
+          // Prepara l'URL base per unsubscribe
+          const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+          const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
+          
+          // Crea titoli per pulsante unsubscribe in varie lingue
+          const unsubscribeText = {
+            it: "Disiscriviti",
+            en: "Unsubscribe",
+            es: "Cancelar suscripción",
+            fr: "Se désinscrire",
+            de: "Abmelden"
+          };
+          
+          // Seleziona testo in base alla lingua del template
+          const buttonText = unsubscribeText[campaign.templateParameters.language || campaign.template.language || 'it'] || "Unsubscribe";
+          
+          // Qui utilizziamo un segnaposto generico che verrà sostituito con l'URL reale per ogni contatto
+          // durante l'invio effettivo della campagna
           actions.push({
-            type: "QUICK_REPLY",
-            title: "Unsubscribe",
-            id: "unsubscribe_action"
+            type: "URL",
+            title: buttonText,
+            url: `${unsubscribeBaseUrl}/{{contactId}}/{{unsubscribeToken}}`
           });
         }
         
@@ -1251,7 +1451,6 @@ const submitCampaignTemplate = async (req, res) => {
           // Per template con immagine, usiamo twilio/card che supporta media e bottoni
           twilioTemplateData.types['twilio/card'] = {
             title: campaign.templateParameters.message || campaign.template.components.body.text,
-            subtitle: "To unsubscribe, reply Stop", // Aggiungiamo un subtitle per WhatsApp
             media: [campaign.templateParameters.imageUrl],
             actions: actions
           };
@@ -1692,5 +1891,6 @@ module.exports = {
   generateImage,
   submitCampaignTemplate,
   scheduleCampaignSending,
-  checkTemplateStatus
+  checkTemplateStatus,
+  handleUnsubscribe
 }; 

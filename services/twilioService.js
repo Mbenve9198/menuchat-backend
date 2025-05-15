@@ -1,6 +1,25 @@
 const twilio = require('twilio');
 const Restaurant = require('../models/Restaurant');
 const BotConfiguration = require('../models/BotConfiguration');
+const WhatsAppContact = require('../models/WhatsAppContact');
+const crypto = require('crypto');
+
+/**
+ * Genera un token sicuro per l'unsubscribe
+ * @param {String} contactId - ID del contatto
+ * @param {String} phoneNumber - Numero di telefono del contatto
+ * @returns {String} - Token crittografato
+ */
+const generateUnsubscribeToken = (contactId, phoneNumber) => {
+  // Crea una stringa segreta basata sull'ID del contatto e sul numero di telefono
+  const secret = `${contactId}-${phoneNumber}-${process.env.JWT_SECRET || 'menuchat-secret-key'}`;
+  
+  // Genera un hash SHA-256 come token
+  return crypto
+    .createHash('sha256')
+    .update(secret)
+    .digest('hex');
+};
 
 /**
  * Service per la gestione dell'integrazione con Twilio
@@ -306,6 +325,37 @@ class TwilioService {
       if (!botConfig) {
         throw new Error('Configurazione bot non trovata');
       }
+      
+      // Ottieni o crea il contatto WhatsApp
+      let contact;
+      try {
+        const normalizedPhone = phoneNumber.replace('whatsapp:', '');
+        // Cerca il contatto nel database
+        const phoneHash = crypto
+          .createHash('sha256')
+          .update(normalizedPhone.replace(/\D/g, ''))
+          .digest('hex');
+        
+        contact = await WhatsAppContact.findOne({
+          restaurant: restaurantId,
+          phoneHash: phoneHash
+        });
+        
+        if (!contact) {
+          console.log(`Contatto non trovato per ${phoneNumber}, creando nuovo contatto...`);
+          contact = new WhatsAppContact({
+            restaurant: restaurantId,
+            phoneNumber: normalizedPhone,
+            phoneHash: phoneHash,
+            name: "Cliente",
+            language: variables.language || 'it'
+          });
+          await contact.save();
+        }
+      } catch (error) {
+        console.error('Errore nel recupero/creazione del contatto:', error);
+        // Continuiamo comunque, anche se non abbiamo trovato il contatto
+      }
 
       // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
       const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
@@ -331,26 +381,61 @@ class TwilioService {
         sendAt: scheduledTime.toISOString()
       };
       
-      // Semplifica la gestione delle contentVariables
+      // Gestisci le variabili del template
       if (variables && Object.keys(variables).length > 0) {
         // Per il formato richiesto da Twilio, utilizziamo solo le variabili essenziali
         // Twilio si aspetta un formato semplice: {"1": "valore", "2": "valore"}
         
-        // Creiamo un nuovo oggetto con solo le variabili necessarie
+        // Creiamo un nuovo oggetto con le variabili necessarie
         const simplifiedVariables = {};
         
-        // Se abbiamo il messaggio personalizzato dal wizard, lo utilizziamo per il nome del cliente
-        if (variables.message) {
-          // Manteniamo la prima variabile per il nome del cliente
-          simplifiedVariables["1"] = variables.customerName || "Cliente";
-        } else {
-          // Default se non ci sono dati specifici
-          simplifiedVariables["1"] = "Cliente";
-        }
+        // La prima variabile è sempre il nome del cliente
+        simplifiedVariables["1"] = variables.customerName || "Cliente";
         
-        // Aggiungiamo la seconda variabile se presente
-        if (variables["2"]) {
-          simplifiedVariables["2"] = variables["2"];
+        // Se il template contiene un URL con segnaposti per unsubscribe
+        // e abbiamo il contatto nel database, creiamo un URL reale per l'unsubscribe
+        if (contact) {
+          // Generiamo il token per l'unsubscribe
+          const contactId = contact._id.toString();
+          const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
+          
+          // Se il template contiene un URL con segnaposti per l'unsubscribe
+          if (JSON.stringify(variables).includes('{{contactId}}') || JSON.stringify(variables).includes('{{unsubscribeToken}}')) {
+            console.log('Template richiede URL unsubscribe, generando URL personalizzato...');
+            
+            // Prepara l'URL base per unsubscribe
+            const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+            const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
+            
+            // URL completo di unsubscribe
+            const unsubscribeUrl = `${unsubscribeBaseUrl}/${contactId}/${unsubscribeToken}`;
+            
+            // Aggiorna il corpo del messaggio con l'URL generato (se presente nel template)
+            if (variables.message) {
+              variables.message = variables.message
+                .replace('{{contactId}}', contactId)
+                .replace('{{unsubscribeToken}}', unsubscribeToken);
+            }
+            
+            // Aggiorna l'URL della CTA se presente
+            if (variables.ctaValue && typeof variables.ctaValue === 'string') {
+              variables.ctaValue = variables.ctaValue
+                .replace('{{contactId}}', contactId)
+                .replace('{{unsubscribeToken}}', unsubscribeToken);
+            }
+            
+            // Registra il contatto come target della campagna se abbiamo l'ID della campagna
+            if (variables.campaignId && contact) {
+              contact.receivedCampaigns.push({
+                campaignId: variables.campaignId,
+                sentAt: scheduledTime,
+                status: 'scheduled'
+              });
+              await contact.save();
+            }
+          }
+        } else {
+          console.log('Contatto non trovato, impossibile generare URL unsubscribe personalizzato');
         }
         
         messageData.contentVariables = JSON.stringify(simplifiedVariables);
