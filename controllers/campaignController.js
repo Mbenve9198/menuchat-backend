@@ -1211,39 +1211,98 @@ const submitCampaignTemplate = async (req, res) => {
         twilioTemplateData.variables = { "1": "customerName" };
       }
       
-      // Costruisci il template in base al tipo
-      if (campaign.template.type === 'MEDIA' && campaign.template.components.header?.example) {
-        twilioTemplateData.types['twilio/media'] = {
-          body: campaign.template.components.body.text,
-          media: [campaign.template.components.header.example]
-        };
-      } else if (campaign.template.type === 'CALL_TO_ACTION' && campaign.template.components.buttons?.length > 0) {
-        const actions = campaign.template.components.buttons.map(button => {
-          if (button.type === 'URL') {
-            return {
-              type: "URL",
-              title: button.text,
-              url: button.url
-            };
-          } else if (button.type === 'PHONE') {
-            return {
-              type: "PHONE_NUMBER",
-              title: button.text,
-              phone_number: button.phone_number
-            };
-          }
-          return null;
-        }).filter(Boolean);
+      // Utilizza i dati effettivi della campagna se disponibili
+      if (campaign.templateParameters && Object.keys(campaign.templateParameters).length > 0) {
+        console.log('Utilizzando parametri template personalizzati:', JSON.stringify(campaign.templateParameters));
         
-        twilioTemplateData.types['twilio/call-to-action'] = {
-          body: campaign.template.components.body.text,
-          actions
-        };
+        // Costruisci il template in base al tipo e ai parametri della campagna
+        if (campaign.template.type === 'MEDIA' || (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl)) {
+          twilioTemplateData.types['twilio/media'] = {
+            body: campaign.templateParameters.message || campaign.template.components.body.text,
+            media: [campaign.templateParameters.imageUrl || campaign.template.components.header?.example]
+          };
+        } else if (campaign.template.type === 'CALL_TO_ACTION' || (campaign.templateParameters.cta && campaign.templateParameters.ctaValue)) {
+          // Crea un'azione basata sui parametri della campagna
+          const actions = [];
+          
+          if (campaign.templateParameters.cta && campaign.templateParameters.ctaValue) {
+            if (campaign.templateParameters.ctaType === 'phone') {
+              actions.push({
+                type: "PHONE_NUMBER",
+                title: campaign.templateParameters.cta,
+                phone_number: campaign.templateParameters.ctaValue
+              });
+            } else {
+              actions.push({
+                type: "URL",
+                title: campaign.templateParameters.cta,
+                url: campaign.templateParameters.ctaValue
+              });
+            }
+          } else if (campaign.template.components.buttons && campaign.template.components.buttons.length > 0) {
+            // Fallback ai bottoni originali del template
+            campaign.template.components.buttons.forEach(button => {
+              if (button.type === 'URL') {
+                actions.push({
+                  type: "URL",
+                  title: button.text,
+                  url: button.url
+                });
+              } else if (button.type === 'PHONE') {
+                actions.push({
+                  type: "PHONE_NUMBER",
+                  title: button.text,
+                  phone_number: button.phone_number
+                });
+              }
+            });
+          }
+          
+          twilioTemplateData.types['twilio/call-to-action'] = {
+            body: campaign.templateParameters.message || campaign.template.components.body.text,
+            actions: actions.filter(Boolean)
+          };
+        } else {
+          // Fallback a text template
+          twilioTemplateData.types['twilio/text'] = {
+            body: campaign.templateParameters.message || campaign.template.components.body.text
+          };
+        }
       } else {
-        // Fallback a text template
-        twilioTemplateData.types['twilio/text'] = {
-          body: campaign.template.components.body.text
-        };
+        // Fallback al comportamento originale se non ci sono parametri personalizzati
+        if (campaign.template.type === 'MEDIA' && campaign.template.components.header?.example) {
+          twilioTemplateData.types['twilio/media'] = {
+            body: campaign.template.components.body.text,
+            media: [campaign.template.components.header.example]
+          };
+        } else if (campaign.template.type === 'CALL_TO_ACTION' && campaign.template.components.buttons?.length > 0) {
+          const actions = campaign.template.components.buttons.map(button => {
+            if (button.type === 'URL') {
+              return {
+                type: "URL",
+                title: button.text,
+                url: button.url
+              };
+            } else if (button.type === 'PHONE') {
+              return {
+                type: "PHONE_NUMBER",
+                title: button.text,
+                phone_number: button.phone_number
+              };
+            }
+            return null;
+          }).filter(Boolean);
+          
+          twilioTemplateData.types['twilio/call-to-action'] = {
+            body: campaign.template.components.body.text,
+            actions
+          };
+        } else {
+          // Fallback a text template
+          twilioTemplateData.types['twilio/text'] = {
+            body: campaign.template.components.body.text
+          };
+        }
       }
       
       console.log('Dati template Twilio:', JSON.stringify(twilioTemplateData, null, 2));
