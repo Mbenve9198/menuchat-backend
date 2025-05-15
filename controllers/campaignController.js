@@ -4,6 +4,7 @@ const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const Restaurant = require('../models/Restaurant');
 const twilioService = require('../services/twilioService');
 const Anthropic = require('@anthropic-ai/sdk');
+const BotConfiguration = require('../models/BotConfiguration');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -1106,6 +1107,418 @@ const generateImage = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Invia un template di campagna a Twilio per approvazione
+ * @route   POST /api/campaign/:id/submit-template
+ * @access  Private
+ */
+const submitCampaignTemplate = async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova la campagna
+    const campaign = await WhatsAppCampaign.findOne({
+      _id: campaignId,
+      restaurant: restaurant._id
+    }).populate('template');
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message: 'Campagna non trovata'
+      });
+    }
+
+    // Verifica che il template sia valido
+    if (!campaign.template) {
+      return res.status(400).json({
+        success: false,
+        message: 'La campagna non ha un template associato'
+      });
+    }
+
+    // Categoria del template (richiesta da WhatsApp)
+    const { category } = req.body;
+    
+    if (!category || !['UTILITY', 'MARKETING', 'AUTHENTICATION'].includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Categoria non valida. Utilizzare UTILITY, MARKETING o AUTHENTICATION'
+      });
+    }
+
+    // Genera un nome univoco per il template di WhatsApp
+    // Questo è un sottoinsieme di caratteri validi per WhatsApp (solo alfanumerici e underscore, lowercase)
+    const templateName = `${restaurant.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')}_${
+      campaign.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+    }_${Date.now()}`.substring(0, 64);
+
+    try {
+      // Ottieni le credenziali Twilio dal BotConfiguration o dalle variabili d'ambiente
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+      
+      if (!botConfig) {
+        return res.status(404).json({
+          success: false,
+          message: 'Configurazione bot non trovata'
+        });
+      }
+
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const accountSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const authToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+
+      if (!accountSid || !authToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Credenziali Twilio non configurate'
+        });
+      }
+
+      // Crea la richiesta di approvazione per WhatsApp
+      const axios = require('axios');
+      const contentApiBaseUrl = 'https://content.twilio.com/v1/Content';
+      
+      // Invia la richiesta di approvazione
+      const approvalResponse = await axios({
+        method: 'post',
+        url: `${contentApiBaseUrl}/${campaign.template.twilioTemplateId}/ApprovalRequests/whatsapp`,
+        auth: {
+          username: accountSid,
+          password: authToken
+        },
+        data: {
+          name: templateName,
+          category: category
+        }
+      });
+
+      // Aggiorna lo stato del template nel database
+      campaign.template.status = 'PENDING';
+      campaign.template.lastSubmissionDate = new Date();
+      await campaign.template.save();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          templateId: campaign.template._id,
+          twilioTemplateId: campaign.template.twilioTemplateId,
+          name: templateName,
+          status: 'PENDING',
+          approvalResponse: approvalResponse.data
+        }
+      });
+    } catch (error) {
+      console.error('Errore nella sottomissione del template a Twilio:', error.response?.data || error);
+      
+      return res.status(500).json({
+        success: false,
+        message: 'Errore durante la sottomissione del template a Twilio',
+        error: error.response?.data?.message || error.message
+      });
+    }
+  } catch (error) {
+    console.error('Errore generale nella sottomissione del template:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la sottomissione del template',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Schedula l'invio di una campagna per una data futura
+ * @route   POST /api/campaign/:id/schedule
+ * @access  Private
+ */
+const scheduleCampaignSending = async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    const { scheduledDate } = req.body;
+
+    // Valida la data programmata
+    if (!scheduledDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data di invio programmata non fornita'
+      });
+    }
+
+    // Converti in oggetto Date
+    const scheduledTime = new Date(scheduledDate);
+    
+    // Verifica che la data sia valida
+    if (isNaN(scheduledTime.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Formato data non valido'
+      });
+    }
+
+    // Verifica che la data sia nel futuro (almeno 5 minuti dopo)
+    const minScheduleTime = new Date(Date.now() + 5 * 60 * 1000);
+    if (scheduledTime < minScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'La data di invio deve essere almeno 5 minuti nel futuro'
+      });
+    }
+
+    // Verifica che la data non sia troppo lontana (max 35 giorni)
+    const maxScheduleTime = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000);
+    if (scheduledTime > maxScheduleTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'La data di invio non può essere oltre 35 giorni nel futuro'
+      });
+    }
+
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova la campagna
+    const campaign = await WhatsAppCampaign.findOne({
+      _id: campaignId,
+      restaurant: restaurant._id
+    }).populate('template').populate('targetAudience.manualContacts');
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message: 'Campagna non trovata'
+      });
+    }
+
+    // Verifica che il template sia valido e approvato
+    if (!campaign.template) {
+      return res.status(400).json({
+        success: false,
+        message: 'La campagna non ha un template associato'
+      });
+    }
+
+    if (campaign.template.status !== 'APPROVED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Il template deve essere approvato da WhatsApp prima dell\'invio',
+        templateStatus: campaign.template.status
+      });
+    }
+
+    // Verifica che ci siano contatti target
+    if (!campaign.targetAudience.manualContacts || campaign.targetAudience.manualContacts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Non ci sono contatti selezionati per questa campagna'
+      });
+    }
+
+    // Ottieni le credenziali Twilio
+    const botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+    
+    if (!botConfig) {
+      return res.status(404).json({
+        success: false,
+        message: 'Configurazione bot non trovata'
+      });
+    }
+
+    // Aggiorna la data programmata della campagna
+    campaign.scheduledDate = scheduledTime;
+    campaign.status = 'scheduled';
+    await campaign.save();
+
+    // Programma l'invio a Twilio per il primo contatto (come esempio)
+    // In un'applicazione reale, potresti voler utilizzare un job queue per programmare tutti i contatti
+    const firstContact = campaign.targetAudience.manualContacts[0];
+    
+    if (firstContact) {
+      const result = await twilioService.scheduleTemplateMessage(
+        firstContact.phoneNumber,
+        campaign.template.twilioTemplateId,
+        campaign.templateParameters || {}, // Variabili del template
+        restaurant._id,
+        scheduledTime
+      );
+      
+      if (result.success) {
+        // Salva l'ID del messaggio programmato
+        campaign.twilioScheduledMessageId = result.messageId;
+        await campaign.save();
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            campaignId: campaign._id,
+            scheduledDate: scheduledTime,
+            targetContacts: campaign.targetAudience.totalContacts,
+            twilioMessageId: result.messageId,
+            status: 'scheduled'
+          }
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          message: 'Errore durante la programmazione del messaggio con Twilio',
+          error: result.error
+        });
+      }
+    } else {
+      return res.status(200).json({
+        success: true,
+        data: {
+          campaignId: campaign._id,
+          scheduledDate: scheduledTime,
+          targetContacts: 0,
+          warning: 'Nessun contatto trovato per l\'invio programmato'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Errore nella programmazione della campagna:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante la programmazione della campagna',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Controllo dello stato di approvazione di un template
+ * @route   GET /api/campaign/:id/template-status
+ * @access  Private
+ */
+const checkTemplateStatus = async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova la campagna
+    const campaign = await WhatsAppCampaign.findOne({
+      _id: campaignId,
+      restaurant: restaurant._id
+    }).populate('template');
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message: 'Campagna non trovata'
+      });
+    }
+
+    // Verifica che il template sia valido
+    if (!campaign.template || !campaign.template.twilioTemplateId) {
+      return res.status(400).json({
+        success: false,
+        message: 'La campagna non ha un template Twilio associato'
+      });
+    }
+
+    // Ottieni le credenziali Twilio dal BotConfiguration o dalle variabili d'ambiente
+    const botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
+    
+    if (!botConfig) {
+      return res.status(404).json({
+        success: false,
+        message: 'Configurazione bot non trovata'
+      });
+    }
+
+    // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+    const accountSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+    const authToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+
+    if (!accountSid || !authToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Credenziali Twilio non configurate'
+      });
+    }
+
+    // Controlla lo stato del template in Twilio
+    const axios = require('axios');
+    const contentApiBaseUrl = 'https://content.twilio.com/v1/Content';
+    
+    try {
+      const response = await axios({
+        method: 'get',
+        url: `${contentApiBaseUrl}/${campaign.template.twilioTemplateId}/ApprovalRequests`,
+        auth: {
+          username: accountSid,
+          password: authToken
+        }
+      });
+
+      const approvalStatus = response.data.whatsapp?.status || 'unknown';
+      const rejectionReason = response.data.whatsapp?.rejection_reason || '';
+      
+      // Aggiorna lo stato del template nel database
+      if (approvalStatus === 'approved' && campaign.template.status !== 'APPROVED') {
+        campaign.template.status = 'APPROVED';
+        await campaign.template.save();
+      } else if (approvalStatus === 'rejected' && campaign.template.status !== 'REJECTED') {
+        campaign.template.status = 'REJECTED';
+        campaign.template.rejectionReason = rejectionReason;
+        await campaign.template.save();
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          templateId: campaign.template._id,
+          twilioTemplateId: campaign.template.twilioTemplateId,
+          status: approvalStatus,
+          rejectionReason: rejectionReason,
+          lastChecked: new Date()
+        }
+      });
+    } catch (error) {
+      console.error('Errore nel controllo dello stato del template:', error.response?.data || error);
+      
+      return res.status(500).json({
+        success: false,
+        message: 'Errore durante il controllo dello stato del template',
+        error: error.response?.data?.message || error.message
+      });
+    }
+  } catch (error) {
+    console.error('Errore generale nel controllo dello stato del template:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il controllo dello stato del template',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getContacts,
   createCampaign,
@@ -1116,5 +1529,8 @@ module.exports = {
   cancelCampaign,
   generateCampaignContent,
   generateImagePrompt,
-  generateImage
+  generateImage,
+  submitCampaignTemplate,
+  scheduleCampaignSending,
+  checkTemplateStatus
 }; 

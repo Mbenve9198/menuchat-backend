@@ -5,6 +5,7 @@ const twilioRoutes = require('./twilioRoutes');
 const templateRoutes = require('./templateRoutes');
 const apiRoutes = require('./api');
 const campaignRoutes = require('./campaignRoutes');
+const campaignTemplateRoutes = require('./campaignTemplateRoutes');
 
 const router = express.Router();
 
@@ -22,6 +23,9 @@ router.use('/templates', templateRoutes);
 
 // Rotte delle campagne
 router.use('/campaign', campaignRoutes);
+
+// Rotte dei template delle campagne
+router.use('/campaign-templates', campaignTemplateRoutes);
 
 // Rotte API generali
 router.use('/', apiRoutes);

@@ -18,6 +18,11 @@ router.put('/:id', campaignController.updateCampaign);
 router.delete('/:id', campaignController.deleteCampaign);
 router.put('/:id/cancel', campaignController.cancelCampaign);
 
+// Rotte per l'approvazione e scheduling dei template
+router.post('/:id/submit-template', campaignController.submitCampaignTemplate);
+router.post('/:id/schedule', campaignController.scheduleCampaignSending);
+router.get('/:id/template-status', campaignController.checkTemplateStatus);
+
 // Rotta per la generazione di contenuti con AI
 router.post('/generate-content', campaignController.generateCampaignContent);
 
