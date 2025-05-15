@@ -1,6 +1,7 @@
 const WhatsAppCampaign = require('../models/WhatsAppCampaign');
 const WhatsAppContact = require('../models/WhatsAppContact');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
+const CampaignTemplate = require('../models/CampaignTemplate');
 const Restaurant = require('../models/Restaurant');
 const twilioService = require('../services/twilioService');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -137,8 +138,8 @@ const createCampaign = async (req, res) => {
       });
     }
 
-    // Verifica che il template esista
-    const template = await WhatsAppTemplate.findById(templateId);
+    // Verifica che il template esista (ora usando CampaignTemplate)
+    const template = await CampaignTemplate.findById(templateId);
     
     if (!template) {
       return res.status(404).json({

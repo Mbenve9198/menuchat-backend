@@ -28,7 +28,7 @@ const WhatsAppCampaignSchema = new Schema({
   // Template WhatsApp utilizzato per la campagna
   template: {
     type: Schema.Types.ObjectId,
-    ref: 'WhatsAppTemplate',
+    ref: 'CampaignTemplate',
     required: [true, 'Template della campagna è obbligatorio']
   },
   // Orario programmato per l'invio
