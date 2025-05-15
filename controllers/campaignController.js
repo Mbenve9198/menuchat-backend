@@ -1196,10 +1196,12 @@ const submitCampaignTemplate = async (req, res) => {
       // Prepara i dati per creare un template Twilio
       const twilioTemplateData = {
         friendly_name: templateName,
-        language: campaign.template.language || 'it',
+        language: campaign.templateParameters?.language || campaign.template.language || 'it',
         variables: {},
         types: {}
       };
+      
+      console.log('Lingua del template:', twilioTemplateData.language);
       
       // Aggiungi variabili al template
       if (campaign.template.variables && campaign.template.variables.length > 0) {
@@ -1215,58 +1217,66 @@ const submitCampaignTemplate = async (req, res) => {
       if (campaign.templateParameters && Object.keys(campaign.templateParameters).length > 0) {
         console.log('Utilizzando parametri template personalizzati:', JSON.stringify(campaign.templateParameters));
         
-        // Costruisci il template in base al tipo e ai parametri della campagna
-        if (campaign.template.type === 'MEDIA' || (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl)) {
-          twilioTemplateData.types['twilio/media'] = {
-            body: campaign.templateParameters.message || campaign.template.components.body.text,
-            media: [campaign.templateParameters.imageUrl || campaign.template.components.header?.example]
-          };
-        } else if (campaign.template.type === 'CALL_TO_ACTION' || (campaign.templateParameters.cta && campaign.templateParameters.ctaValue)) {
-          // Crea un'azione basata sui parametri della campagna
-          const actions = [];
-          
-          if (campaign.templateParameters.cta && campaign.templateParameters.ctaValue) {
-            if (campaign.templateParameters.ctaType === 'phone') {
-              actions.push({
-                type: "PHONE_NUMBER",
-                title: campaign.templateParameters.cta,
-                phone_number: campaign.templateParameters.ctaValue
-              });
-            } else {
-              actions.push({
-                type: "URL",
-                title: campaign.templateParameters.cta,
-                url: campaign.templateParameters.ctaValue
-              });
-            }
-          } else if (campaign.template.components.buttons && campaign.template.components.buttons.length > 0) {
-            // Fallback ai bottoni originali del template
-            campaign.template.components.buttons.forEach(button => {
-              if (button.type === 'URL') {
-                actions.push({
-                  type: "URL",
-                  title: button.text,
-                  url: button.url
-                });
-              } else if (button.type === 'PHONE') {
-                actions.push({
-                  type: "PHONE_NUMBER",
-                  title: button.text,
-                  phone_number: button.phone_number
-                });
-              }
+        // Prepara gli eventuali bottoni di azione
+        const actions = [];
+        
+        // Aggiungi il bottone primario se specificato nei parametri
+        if (campaign.templateParameters.cta && campaign.templateParameters.ctaValue) {
+          if (campaign.templateParameters.ctaType === 'phone') {
+            actions.push({
+              type: "PHONE_NUMBER",
+              title: campaign.templateParameters.cta,
+              phone: campaign.templateParameters.ctaValue
+            });
+          } else {
+            actions.push({
+              type: "URL",
+              title: campaign.templateParameters.cta,
+              url: campaign.templateParameters.ctaValue
             });
           }
-          
+        }
+        
+        // Aggiungi sempre il bottone di unsubscribe come QUICK_REPLY
+        if (campaign.templateParameters.unsubscribe !== false) {
+          actions.push({
+            type: "QUICK_REPLY",
+            title: "Unsubscribe",
+            id: "unsubscribe_action"
+          });
+        }
+        
+        // Costruisci il template in base al tipo e ai parametri della campagna
+        if (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl) {
+          // Per template con immagine, usiamo twilio/card che supporta media e bottoni
+          twilioTemplateData.types['twilio/card'] = {
+            title: campaign.templateParameters.message || campaign.template.components.body.text,
+            subtitle: "To unsubscribe, reply Stop", // Aggiungiamo un subtitle per WhatsApp
+            media: [campaign.templateParameters.imageUrl],
+            actions: actions
+          };
+        } else if (actions.length > 0) {
+          // Per template con CTA ma senza immagine, usiamo twilio/call-to-action
           twilioTemplateData.types['twilio/call-to-action'] = {
             body: campaign.templateParameters.message || campaign.template.components.body.text,
-            actions: actions.filter(Boolean)
+            actions: actions
+          };
+        } else if (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl) {
+          // Per template di tipo MEDIA senza CTA
+          twilioTemplateData.types['twilio/media'] = {
+            body: campaign.templateParameters.message || campaign.template.components.body.text,
+            media: [campaign.templateParameters.imageUrl]
           };
         } else {
           // Fallback a text template
           twilioTemplateData.types['twilio/text'] = {
             body: campaign.templateParameters.message || campaign.template.components.body.text
           };
+        }
+        
+        // Tipo sempre impostato come marketing, come richiesto
+        if (campaign.templateParameters.type === 'marketing' || true) {
+          twilioTemplateData.marketingType = "marketing";
         }
       } else {
         // Fallback al comportamento originale se non ci sono parametri personalizzati
@@ -1287,7 +1297,7 @@ const submitCampaignTemplate = async (req, res) => {
               return {
                 type: "PHONE_NUMBER",
                 title: button.text,
-                phone_number: button.phone_number
+                phone: button.phone_number
               };
             }
             return null;
