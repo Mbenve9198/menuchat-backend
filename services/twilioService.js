@@ -331,46 +331,29 @@ class TwilioService {
         sendAt: scheduledTime.toISOString()
       };
       
-      // Prepara le variabili del template per Twilio
-      const contentVariables = {};
-      
-      // Converti i dati del wizard nei parametri richiesti da Twilio
+      // Semplifica la gestione delle contentVariables
       if (variables && Object.keys(variables).length > 0) {
-        // Imposta la prima variabile al nome del cliente (o un valore predefinito)
-        contentVariables["1"] = "Cliente"; // Valore predefinito se non fornito
+        // Per il formato richiesto da Twilio, utilizziamo solo le variabili essenziali
+        // Twilio si aspetta un formato semplice: {"1": "valore", "2": "valore"}
         
-        // Controlla se ci sono variabili specifiche
+        // Creiamo un nuovo oggetto con solo le variabili necessarie
+        const simplifiedVariables = {};
+        
+        // Se abbiamo il messaggio personalizzato dal wizard, lo utilizziamo per il nome del cliente
         if (variables.message) {
-          // Il body del messaggio proviene dal wizard
-          contentVariables["body"] = variables.message;
+          // Manteniamo la prima variabile per il nome del cliente
+          simplifiedVariables["1"] = variables.customerName || "Cliente";
+        } else {
+          // Default se non ci sono dati specifici
+          simplifiedVariables["1"] = "Cliente";
         }
         
-        // Imposta la lingua dal wizard se disponibile
-        if (variables.language) {
-          contentVariables["language"] = variables.language;
+        // Aggiungiamo la seconda variabile se presente
+        if (variables["2"]) {
+          simplifiedVariables["2"] = variables["2"];
         }
         
-        // Tipo sempre marketing
-        contentVariables["type"] = "marketing";
-        
-        // Aggiungi URL media se presente
-        if (variables.useImage && variables.imageUrl) {
-          contentVariables["media"] = variables.imageUrl;
-        }
-        
-        // Call-to-actions
-        if (variables.cta && variables.ctaValue) {
-          contentVariables["cta"] = {
-            type: variables.ctaType || "url",
-            value: variables.ctaValue,
-            text: variables.cta
-          };
-        }
-        
-        // Aggiungi CTA unsubscribe standard
-        contentVariables["unsubscribe"] = "true";
-        
-        messageData.contentVariables = JSON.stringify(contentVariables);
+        messageData.contentVariables = JSON.stringify(simplifiedVariables);
       }
 
       console.log('Dati messaggio programmato:', JSON.stringify(messageData));
