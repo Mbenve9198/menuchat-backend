@@ -972,7 +972,7 @@ Provide ONLY the prompt, with no additional explanations or comments.`;
 };
 
 /**
- * @desc    Genera un'immagine usando OpenAI GPT Image
+ * @desc    Genera un'immagine usando OpenAI DALL-E 3
  * @route   POST /api/campaign/generate-image
  * @access  Private
  */
@@ -983,7 +983,7 @@ const generateImage = async (req, res) => {
       messageText,
       campaignType,
       restaurantName = 'Restaurant',
-      modelType = 'gpt-image-1'
+      modelType = 'dall-e-3' // Cambio default a dall-e-3
     } = req.body;
 
     // Validazione degli input
@@ -1014,14 +1014,18 @@ const generateImage = async (req, res) => {
         apiKey: process.env.OPENAI_API_KEY
       });
 
-      // Genera l'immagine usando GPT Image API
-      // Nota: gpt-image-1 supporta solo quality: 'low', 'medium', 'high', o 'auto'
+      // Aggiungo prefisso per evitare riscritture del prompt
+      const enhancedPrompt = `I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS: ${prompt}`;
+
+      // Genera l'immagine usando DALL-E 3
+      // Parametri supportati per dall-e-3: model, prompt, n, size, quality (standard/hd)
       const response = await openai.images.generate({
-        model: modelType,
-        prompt: prompt,
+        model: 'dall-e-3',
+        prompt: enhancedPrompt,
         n: 1,
         size: '1024x1024',
-        quality: 'high' // Valori supportati: 'low', 'medium', 'high', 'auto'
+        quality: 'standard', // DALL-E 3 supporta 'standard' o 'hd'
+        style: 'vivid' // DALL-E 3 supporta 'vivid' o 'natural'
       });
 
       // Estrai l'URL dell'immagine
