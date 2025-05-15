@@ -400,19 +400,14 @@ class TwilioService {
           const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
           
           // Se il template contiene un URL con segnaposti per l'unsubscribe
-          if (JSON.stringify(variables).includes('{{2}}') || JSON.stringify(variables).includes('{{3}}')) {
+          if (JSON.stringify(variables).includes('{{2}}')) {
             console.log('Template richiede URL unsubscribe, generando URL personalizzato...');
             
-            // Prepara l'URL base per unsubscribe
-            const backendUrl = 'https://menuchat-backend.onrender.com';
-            const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
+            // Generiamo il path completo per unsubscribe
+            const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
             
-            // URL completo di unsubscribe
-            const unsubscribeUrl = `${unsubscribeBaseUrl}/${contactId}/${unsubscribeToken}`;
-            
-            // Aggiungiamo i valori reali alle variabili di Twilio
-            simplifiedVariables["2"] = contactId;
-            simplifiedVariables["3"] = unsubscribeToken;
+            // Impostiamo la variabile completa per l'URL
+            simplifiedVariables["2"] = unsubscribePath;
             
             // Registra il contatto come target della campagna se abbiamo l'ID della campagna
             if (variables.campaignId && contact) {

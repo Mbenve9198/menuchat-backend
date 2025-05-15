@@ -1437,17 +1437,15 @@ const submitCampaignTemplate = async (req, res) => {
           // Seleziona testo in base alla lingua del template
           const buttonText = unsubscribeText[campaign.templateParameters.language || campaign.template.language || 'it'] || "Unsubscribe";
           
-          // Qui utilizziamo variabili numerate compatibili con Twilio
-          // Variabile {{2}} = contactId, Variabile {{3}} = unsubscribeToken
+          // Utilizziamo una singola variabile {{2}} per l'intero URL di unsubscribe
           actions.push({
             type: "URL",
             title: buttonText,
-            url: `${unsubscribeBaseUrl}/{{2}}/{{3}}`
+            url: `${backendUrl}/{{2}}`
           });
           
-          // Aggiungiamo le variabili al template
-          twilioTemplateData.variables["2"] = "contactId";
-          twilioTemplateData.variables["3"] = "unsubscribeToken";
+          // Definiamo la variabile come il path relativo di unsubscribe che verrà completato in fase di invio
+          twilioTemplateData.variables["2"] = "api/campaign/unsubscribe/[contactId]/[token]";
         }
         
         // Costruisci il template in base al tipo e ai parametri della campagna
