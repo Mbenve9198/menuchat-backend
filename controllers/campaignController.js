@@ -1116,6 +1116,7 @@ const generateImage = async (req, res) => {
 const submitCampaignTemplate = async (req, res) => {
   try {
     const campaignId = req.params.id;
+    console.log(`Sottomissione template per campagna ${campaignId}`);
 
     // Trova il ristorante dell'utente
     const restaurant = await Restaurant.findOne({ user: req.user.id });
@@ -1158,12 +1159,6 @@ const submitCampaignTemplate = async (req, res) => {
       });
     }
 
-    // Genera un nome univoco per il template di WhatsApp
-    // Questo è un sottoinsieme di caratteri validi per WhatsApp (solo alfanumerici e underscore, lowercase)
-    const templateName = `${restaurant.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')}_${
-      campaign.name.toLowerCase().replace(/[^a-z0-9_]/g, '_')
-    }_${Date.now()}`.substring(0, 64);
-
     try {
       // Ottieni le credenziali Twilio dal BotConfiguration o dalle variabili d'ambiente
       const botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
@@ -1186,14 +1181,97 @@ const submitCampaignTemplate = async (req, res) => {
         });
       }
 
-      // Crea la richiesta di approvazione per WhatsApp
       const axios = require('axios');
       const contentApiBaseUrl = 'https://content.twilio.com/v1/Content';
       
-      // Invia la richiesta di approvazione
+      // Primo passo: creare un template su Twilio se non esiste già
+      console.log('Creazione/verifica template su Twilio...');
+      
+      // Genera un nome univoco per il template (per quando lo creeremo su Twilio)
+      const sanitizedRestaurantName = restaurant.name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 20);
+      const sanitizedCampaignName = campaign.name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 20);
+      const templateName = `${sanitizedRestaurantName}_${sanitizedCampaignName}_${Date.now()}`.substring(0, 64);
+      console.log(`Nome template: ${templateName}`);
+      
+      // Prepara i dati per creare un template Twilio
+      const twilioTemplateData = {
+        friendly_name: templateName,
+        language: campaign.template.language || 'it',
+        variables: {},
+        types: {}
+      };
+      
+      // Aggiungi variabili al template
+      if (campaign.template.variables && campaign.template.variables.length > 0) {
+        campaign.template.variables.forEach(variable => {
+          twilioTemplateData.variables[variable.index] = variable.name || 'customerName';
+        });
+      } else {
+        // Default variable
+        twilioTemplateData.variables = { "1": "customerName" };
+      }
+      
+      // Costruisci il template in base al tipo
+      if (campaign.template.type === 'MEDIA' && campaign.template.components.header?.example) {
+        twilioTemplateData.types['twilio/media'] = {
+          body: campaign.template.components.body.text,
+          media: [campaign.template.components.header.example]
+        };
+      } else if (campaign.template.type === 'CALL_TO_ACTION' && campaign.template.components.buttons?.length > 0) {
+        const actions = campaign.template.components.buttons.map(button => {
+          if (button.type === 'URL') {
+            return {
+              type: "URL",
+              title: button.text,
+              url: button.url
+            };
+          } else if (button.type === 'PHONE') {
+            return {
+              type: "PHONE_NUMBER",
+              title: button.text,
+              phone_number: button.phone_number
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        twilioTemplateData.types['twilio/call-to-action'] = {
+          body: campaign.template.components.body.text,
+          actions
+        };
+      } else {
+        // Fallback a text template
+        twilioTemplateData.types['twilio/text'] = {
+          body: campaign.template.components.body.text
+        };
+      }
+      
+      console.log('Dati template Twilio:', JSON.stringify(twilioTemplateData, null, 2));
+      
+      // Crea il template su Twilio
+      const contentResponse = await axios({
+        method: 'post',
+        url: contentApiBaseUrl,
+        auth: {
+          username: accountSid,
+          password: authToken
+        },
+        data: twilioTemplateData
+      });
+      
+      // Salva l'ID Twilio nel template
+      const twilioTemplateId = contentResponse.data.sid;
+      campaign.template.twilioTemplateId = twilioTemplateId;
+      await campaign.template.save();
+      
+      console.log(`Template creato su Twilio con ID: ${twilioTemplateId}`);
+      
+      // Secondo passo: richiedi l'approvazione per WhatsApp
+      console.log(`Richiedo approvazione WhatsApp per il template ${twilioTemplateId}...`);
+      
       const approvalResponse = await axios({
         method: 'post',
-        url: `${contentApiBaseUrl}/${campaign.template.twilioTemplateId}/ApprovalRequests/whatsapp`,
+        url: `${contentApiBaseUrl}/${twilioTemplateId}/ApprovalRequests/whatsapp`,
         auth: {
           username: accountSid,
           password: authToken
@@ -1203,17 +1281,20 @@ const submitCampaignTemplate = async (req, res) => {
           category: category
         }
       });
-
-      // Aggiorna lo stato del template nel database
+      
+      // Aggiorna lo stato del template
       campaign.template.status = 'PENDING';
       campaign.template.lastSubmissionDate = new Date();
+      campaign.template.whatsappCategory = category;
       await campaign.template.save();
+      
+      console.log(`Richiesta di approvazione inviata con successo per ${templateName}`);
 
       return res.status(200).json({
         success: true,
         data: {
           templateId: campaign.template._id,
-          twilioTemplateId: campaign.template.twilioTemplateId,
+          twilioTemplateId,
           name: templateName,
           status: 'PENDING',
           approvalResponse: approvalResponse.data
@@ -1221,7 +1302,6 @@ const submitCampaignTemplate = async (req, res) => {
       });
     } catch (error) {
       console.error('Errore nella sottomissione del template a Twilio:', error.response?.data || error);
-      
       return res.status(500).json({
         success: false,
         message: 'Errore durante la sottomissione del template a Twilio',
@@ -1247,6 +1327,7 @@ const scheduleCampaignSending = async (req, res) => {
   try {
     const campaignId = req.params.id;
     const { scheduledDate } = req.body;
+    console.log(`Schedulazione invio campagna ${campaignId} per ${scheduledDate}`);
 
     // Valida la data programmata
     if (!scheduledDate) {
@@ -1308,19 +1389,11 @@ const scheduleCampaignSending = async (req, res) => {
       });
     }
 
-    // Verifica che il template sia valido e approvato
+    // Verifica che il template sia valido e che abbia un ID Twilio
     if (!campaign.template) {
       return res.status(400).json({
         success: false,
         message: 'La campagna non ha un template associato'
-      });
-    }
-
-    if (campaign.template.status !== 'APPROVED') {
-      return res.status(400).json({
-        success: false,
-        message: 'Il template deve essere approvato da WhatsApp prima dell\'invio',
-        templateStatus: campaign.template.status
       });
     }
 
@@ -1329,6 +1402,41 @@ const scheduleCampaignSending = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Non ci sono contatti selezionati per questa campagna'
+      });
+    }
+
+    // Aggiorna la data programmata della campagna
+    campaign.scheduledDate = scheduledTime;
+    campaign.status = 'scheduled';
+    await campaign.save();
+
+    // Verifico se il template ha un ID Twilio, altrimenti non posso programmare l'invio
+    if (!campaign.template.twilioTemplateId) {
+      console.warn(`Template senza ID Twilio. La campagna è stata schedulata nel database ma non su Twilio.`);
+      return res.status(200).json({
+        success: true,
+        data: {
+          campaignId: campaign._id,
+          scheduledDate: scheduledTime,
+          targetContacts: campaign.targetAudience.totalContacts,
+          status: 'scheduled',
+          warning: 'Template senza ID Twilio. Sottomettere il template a Twilio prima dell\'invio.'
+        }
+      });
+    }
+
+    // Se il template non è approvato, avvisiamo che la campagna è programmata ma non sarà inviata finché il template non è approvato
+    if (campaign.template.status !== 'APPROVED') {
+      console.log(`Template in stato ${campaign.template.status}. La campagna è stata schedulata nel database ma non su Twilio.`);
+      return res.status(200).json({
+        success: true,
+        data: {
+          campaignId: campaign._id,
+          scheduledDate: scheduledTime,
+          targetContacts: campaign.targetAudience.totalContacts,
+          status: 'scheduled',
+          warning: `Il template è in stato ${campaign.template.status}. La campagna non sarà inviata finché il template non sarà approvato.`
+        }
       });
     }
 
@@ -1342,16 +1450,12 @@ const scheduleCampaignSending = async (req, res) => {
       });
     }
 
-    // Aggiorna la data programmata della campagna
-    campaign.scheduledDate = scheduledTime;
-    campaign.status = 'scheduled';
-    await campaign.save();
-
-    // Programma l'invio a Twilio per il primo contatto (come esempio)
-    // In un'applicazione reale, potresti voler utilizzare un job queue per programmare tutti i contatti
+    // Programma l'invio per il primo contatto (esempio)
+    // In un'applicazione reale, dovremmo usare un job queue per programmare tutti i contatti
     const firstContact = campaign.targetAudience.manualContacts[0];
     
     if (firstContact) {
+      console.log(`Programmazione invio a ${firstContact.phoneNumber} tramite template ${campaign.template.twilioTemplateId}`);
       const result = await twilioService.scheduleTemplateMessage(
         firstContact.phoneNumber,
         campaign.template.twilioTemplateId,
@@ -1376,6 +1480,7 @@ const scheduleCampaignSending = async (req, res) => {
           }
         });
       } else {
+        console.error('Errore nella programmazione del messaggio:', result.error);
         return res.status(500).json({
           success: false,
           message: 'Errore durante la programmazione del messaggio con Twilio',
