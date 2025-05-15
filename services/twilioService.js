@@ -400,29 +400,19 @@ class TwilioService {
           const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
           
           // Se il template contiene un URL con segnaposti per l'unsubscribe
-          if (JSON.stringify(variables).includes('{{contactId}}') || JSON.stringify(variables).includes('{{unsubscribeToken}}')) {
+          if (JSON.stringify(variables).includes('{{2}}') || JSON.stringify(variables).includes('{{3}}')) {
             console.log('Template richiede URL unsubscribe, generando URL personalizzato...');
             
             // Prepara l'URL base per unsubscribe
-            const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+            const backendUrl = 'https://menuchat-backend.onrender.com';
             const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
             
             // URL completo di unsubscribe
             const unsubscribeUrl = `${unsubscribeBaseUrl}/${contactId}/${unsubscribeToken}`;
             
-            // Aggiorna il corpo del messaggio con l'URL generato (se presente nel template)
-            if (variables.message) {
-              variables.message = variables.message
-                .replace('{{contactId}}', contactId)
-                .replace('{{unsubscribeToken}}', unsubscribeToken);
-            }
-            
-            // Aggiorna l'URL della CTA se presente
-            if (variables.ctaValue && typeof variables.ctaValue === 'string') {
-              variables.ctaValue = variables.ctaValue
-                .replace('{{contactId}}', contactId)
-                .replace('{{unsubscribeToken}}', unsubscribeToken);
-            }
+            // Aggiungiamo i valori reali alle variabili di Twilio
+            simplifiedVariables["2"] = contactId;
+            simplifiedVariables["3"] = unsubscribeToken;
             
             // Registra il contatto come target della campagna se abbiamo l'ID della campagna
             if (variables.campaignId && contact) {

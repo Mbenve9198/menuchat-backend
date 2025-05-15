@@ -1422,7 +1422,7 @@ const submitCampaignTemplate = async (req, res) => {
         // Aggiungi sempre il bottone di unsubscribe come URL
         if (campaign.templateParameters.unsubscribe !== false) {
           // Prepara l'URL base per unsubscribe
-          const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+          const backendUrl = 'https://menuchat-backend.onrender.com';
           const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
           
           // Crea titoli per pulsante unsubscribe in varie lingue
@@ -1437,13 +1437,17 @@ const submitCampaignTemplate = async (req, res) => {
           // Seleziona testo in base alla lingua del template
           const buttonText = unsubscribeText[campaign.templateParameters.language || campaign.template.language || 'it'] || "Unsubscribe";
           
-          // Qui utilizziamo un segnaposto generico che verrà sostituito con l'URL reale per ogni contatto
-          // durante l'invio effettivo della campagna
+          // Qui utilizziamo variabili numerate compatibili con Twilio
+          // Variabile {{2}} = contactId, Variabile {{3}} = unsubscribeToken
           actions.push({
             type: "URL",
             title: buttonText,
-            url: `${unsubscribeBaseUrl}/{{contactId}}/{{unsubscribeToken}}`
+            url: `${unsubscribeBaseUrl}/{{2}}/{{3}}`
           });
+          
+          // Aggiungiamo le variabili al template
+          twilioTemplateData.variables["2"] = "contactId";
+          twilioTemplateData.variables["3"] = "unsubscribeToken";
         }
         
         // Costruisci il template in base al tipo e ai parametri della campagna
