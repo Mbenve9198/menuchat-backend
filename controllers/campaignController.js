@@ -1425,21 +1425,6 @@ const scheduleCampaignSending = async (req, res) => {
       });
     }
 
-    // Se il template non è approvato, avvisiamo che la campagna è programmata ma non sarà inviata finché il template non è approvato
-    if (campaign.template.status !== 'APPROVED') {
-      console.log(`Template in stato ${campaign.template.status}. La campagna è stata schedulata nel database ma non su Twilio.`);
-      return res.status(200).json({
-        success: true,
-        data: {
-          campaignId: campaign._id,
-          scheduledDate: scheduledTime,
-          targetContacts: campaign.targetAudience.totalContacts,
-          status: 'scheduled',
-          warning: `Il template è in stato ${campaign.template.status}. La campagna non sarà inviata finché il template non sarà approvato.`
-        }
-      });
-    }
-
     // Ottieni le credenziali Twilio
     const botConfig = await BotConfiguration.findOne({ restaurant: restaurant._id });
     
