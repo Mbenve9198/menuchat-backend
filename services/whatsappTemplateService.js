@@ -5,11 +5,21 @@ const crypto = require('crypto');
 const axios = require('axios');
 const anthropic = require('../services/anthropic');
 
+// Inizializza il client Twilio solo se le credenziali sono presenti
+let twilioClient = null;
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_ACCOUNT_SID.startsWith('AC') && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    console.log('Servizio Twilio inizializzato correttamente');
+  } else {
+    console.warn('Credenziali Twilio mancanti o non valide. Alcune funzionalità di WhatsApp potrebbero non essere disponibili.');
+  }
+} catch (error) {
+  console.error('Errore nell\'inizializzazione del client Twilio:', error);
+}
+
 class WhatsAppTemplateService {
   constructor() {
-    this.accountSid = process.env.TWILIO_ACCOUNT_SID;
-    this.authToken = process.env.TWILIO_AUTH_TOKEN;
-    this.client = twilio(this.accountSid, this.authToken);
     this.whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
     
     // Base URL per le API Content di Twilio
@@ -526,8 +536,8 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         method: 'post',
         url: this.contentApiBaseUrl,
         auth: {
-          username: this.accountSid,
-          password: this.authToken
+          username: process.env.TWILIO_ACCOUNT_SID,
+          password: process.env.TWILIO_AUTH_TOKEN
         },
         data: twilioTemplate
       });
@@ -539,8 +549,8 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         method: 'post',
         url: `${this.contentApiBaseUrl}/${contentSid}/ApprovalRequests/whatsapp`,
         auth: {
-          username: this.accountSid,
-          password: this.authToken
+          username: process.env.TWILIO_ACCOUNT_SID,
+          password: process.env.TWILIO_AUTH_TOKEN
         },
         data: {
           name: template.name.toLowerCase(),
@@ -583,8 +593,8 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         method: 'get',
         url: `${this.contentApiBaseUrl}/${template.twilioTemplateId}/ApprovalRequests`,
         auth: {
-          username: this.accountSid,
-          password: this.authToken
+          username: process.env.TWILIO_ACCOUNT_SID,
+          password: process.env.TWILIO_AUTH_TOKEN
         }
       });
 

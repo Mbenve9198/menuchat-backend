@@ -977,6 +977,7 @@ Provide ONLY the prompt, with no additional explanations or comments.`;
  * @access  Private
  */
 const generateImage = async (req, res) => {
+  console.log('📷 generateImage: Inizio funzione');
   try {
     const {
       prompt,
@@ -986,8 +987,16 @@ const generateImage = async (req, res) => {
       modelType = 'dall-e-3' // Cambio default a dall-e-3
     } = req.body;
 
+    console.log('📷 generateImage: Parametri ricevuti:', JSON.stringify({
+      promptLength: prompt?.length,
+      campaignType,
+      restaurantName,
+      modelType
+    }));
+
     // Validazione degli input
     if (!prompt) {
+      console.log('📷 generateImage: Errore - Prompt mancante');
       return res.status(400).json({
         success: false,
         message: 'Prompt richiesto per la generazione dell\'immagine'
@@ -996,44 +1005,63 @@ const generateImage = async (req, res) => {
 
     // Verifica che l'API key di OpenAI sia configurata
     if (!process.env.OPENAI_API_KEY) {
+      console.log('📷 generateImage: Errore - OpenAI API key non configurata');
       return res.status(500).json({
         success: false,
         message: 'OpenAI API key non configurata'
       });
     }
 
-    console.log(`Generating image with prompt: ${prompt.substring(0, 100)}...`);
-    console.log(`Using model: ${modelType}`);
+    console.log(`📷 generateImage: Prompt da utilizzare: ${prompt.substring(0, 100)}...`);
+    console.log(`📷 generateImage: Modello: ${modelType}`);
 
     try {
       // Importa la libreria OpenAI
+      console.log('📷 generateImage: Inizializzazione OpenAI client');
       const { OpenAI } = require('openai');
       
       // Inizializza il client OpenAI
       const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY
       });
+      console.log('📷 generateImage: Client OpenAI inizializzato correttamente');
 
       // Aggiungo prefisso per evitare riscritture del prompt
       const enhancedPrompt = `I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS: ${prompt}`;
+      console.log(`📷 generateImage: Prompt migliorato creato (${enhancedPrompt.length} caratteri)`);
 
-      // Genera l'immagine usando DALL-E 3
-      // Parametri supportati per dall-e-3: model, prompt, n, size, quality (standard/hd)
-      const response = await openai.images.generate({
+      // Prepara i parametri per la richiesta
+      const requestParams = {
         model: 'dall-e-3',
         prompt: enhancedPrompt,
         n: 1,
         size: '1024x1024',
         quality: 'standard', // DALL-E 3 supporta 'standard' o 'hd'
         style: 'vivid' // DALL-E 3 supporta 'vivid' o 'natural'
-      });
+      };
+      console.log('📷 generateImage: Parametri richiesta:', JSON.stringify(requestParams, null, 2));
+
+      // Genera l'immagine usando DALL-E 3
+      console.log('📷 generateImage: Invio richiesta a OpenAI per generazione immagine...');
+      console.time('openai_request_time');
+      const response = await openai.images.generate(requestParams);
+      console.timeEnd('openai_request_time');
+      
+      console.log('📷 generateImage: Risposta OpenAI ricevuta:', JSON.stringify({
+        responseKeys: Object.keys(response),
+        dataLength: response.data?.length,
+        dataTypes: response.data ? response.data.map(item => Object.keys(item)) : []
+      }));
 
       // Estrai l'URL dell'immagine
       const imageUrl = response.data && response.data[0] ? response.data[0].url : null;
       
       if (!imageUrl) {
+        console.log('📷 generateImage: Errore - Nessuna URL immagine nella risposta');
         throw new Error('Nessuna immagine generata');
       }
+      
+      console.log('📷 generateImage: URL immagine generata con successo:', imageUrl.substring(0, 50) + '...');
 
       return res.status(200).json({
         success: true,
@@ -1043,7 +1071,17 @@ const generateImage = async (req, res) => {
         }
       });
     } catch (openaiError) {
-      console.error('OpenAI error:', openaiError);
+      console.error('📷 generateImage: OpenAI error:', openaiError);
+      console.log('📷 generateImage: Dettagli errore OpenAI:', {
+        name: openaiError.name,
+        message: openaiError.message,
+        stack: openaiError.stack?.split('\n').slice(0, 3),
+        status: openaiError.status,
+        headers: openaiError.headers,
+        type: openaiError.type,
+        code: openaiError.code
+      });
+      
       return res.status(500).json({
         success: false,
         message: 'Errore durante la generazione dell\'immagine con OpenAI',
@@ -1051,12 +1089,20 @@ const generateImage = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Errore nella generazione dell\'immagine:', error);
+    console.error('📷 generateImage: Errore generale:', error);
+    console.log('📷 generateImage: Dettagli errore generale:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 3)
+    });
+    
     res.status(500).json({
       success: false,
       message: 'Errore durante la generazione dell\'immagine',
-      error: error.message
+      error: error.message || String(error)
     });
+  } finally {
+    console.log('📷 generateImage: Fine funzione');
   }
 };
 
