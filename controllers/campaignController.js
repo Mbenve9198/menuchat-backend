@@ -1488,7 +1488,7 @@ const submitCampaignTemplate = async (req, res) => {
           // Per template con immagine, usiamo twilio/card che supporta media e bottoni
           twilioTemplateData.types['twilio/card'] = {
             title: campaign.templateParameters.message || campaign.template.components.body.text,
-            media: [campaign.templateParameters.imageUrl],
+            media: [ensureMediaCompatibility(campaign.templateParameters.imageUrl)],
             actions: actions
           };
         } else if (actions.length > 0) {
@@ -1498,10 +1498,10 @@ const submitCampaignTemplate = async (req, res) => {
             actions: actions
           };
         } else if (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl) {
-          // Per template di tipo MEDIA senza CTA
+          // Se è un template di tipo MEDIA senza CTA
           twilioTemplateData.types['twilio/media'] = {
             body: campaign.templateParameters.message || campaign.template.components.body.text,
-            media: [campaign.templateParameters.imageUrl]
+            media: [ensureMediaCompatibility(campaign.templateParameters.imageUrl)]
           };
         } else {
           // Fallback a text template
@@ -1979,6 +1979,71 @@ const testUnsubscribe = async (req, res) => {
       error: error.message
     });
   }
+};
+
+/**
+ * Verifica e modifica un URL di media per garantire la compatibilità con Twilio/WhatsApp
+ * @param {string} mediaUrl - URL originale del media
+ * @returns {string} - URL compatibile con Twilio/WhatsApp
+ */
+const ensureMediaCompatibility = (mediaUrl) => {
+  if (!mediaUrl) return mediaUrl;
+  
+  // Verifica se è un URL Cloudinary
+  const isCloudinaryUrl = mediaUrl.includes('cloudinary.com');
+  
+  // Verifica se è un video
+  const isVideo = mediaUrl.includes('/video/') || 
+                  mediaUrl.includes('.mp4') || 
+                  mediaUrl.includes('.mov') || 
+                  mediaUrl.includes('.avi') ||
+                  mediaUrl.includes('.webm');
+  
+  // Se non è Cloudinary o non è un video, restituisci l'URL originale
+  if (!isCloudinaryUrl || !isVideo) {
+    return mediaUrl;
+  }
+  
+  // Per i video Cloudinary, assicurati che sia utilizzato il codec h264:baseline:3.1
+  // che è ampiamente supportato da WhatsApp
+  let optimizedUrl = mediaUrl;
+  
+  // Aggiungi trasformazione del codec se non presente
+  if (!optimizedUrl.includes('vc_h264:baseline:3.1')) {
+    if (optimizedUrl.includes('/upload/')) {
+      // Sostituisci trasformazioni esistenti o aggiungi nuove trasformazioni
+      if (optimizedUrl.includes('/upload/f_')) {
+        // Ci sono già delle trasformazioni, sostituisci il codec
+        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_mp4,');
+        
+        // Assicurati che ci sia il parametro del codec
+        if (!optimizedUrl.includes('vc_')) {
+          optimizedUrl = optimizedUrl.replace('/upload/f_mp4', '/upload/f_mp4,vc_h264:baseline:3.1');
+        } else {
+          // Sostituisci il codec esistente
+          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_h264:baseline:3.1');
+        }
+      } else {
+        // Non ci sono trasformazioni, aggiungi quelle necessarie
+        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_mp4,vc_h264:baseline:3.1/');
+      }
+    }
+  }
+  
+  // Assicurati che il file abbia estensione .mp4
+  if (!optimizedUrl.endsWith('.mp4')) {
+    const extensionPattern = /\.[a-zA-Z0-9]+$/;
+    if (extensionPattern.test(optimizedUrl)) {
+      // Sostituisci l'estensione esistente
+      optimizedUrl = optimizedUrl.replace(extensionPattern, '.mp4');
+    } else {
+      // Aggiungi l'estensione
+      optimizedUrl += '.mp4';
+    }
+  }
+  
+  console.log(`Media URL ottimizzato per WhatsApp: ${optimizedUrl}`);
+  return optimizedUrl;
 };
 
 module.exports = {

@@ -104,8 +104,8 @@ class UploadController {
             
             // Costruisci il nuovo URL con le trasformazioni per la conversione
             // f_mp4: formato MP4
-            // vc_auto: codec video ottimizzato automaticamente
-            const transformations = `f_${targetFormat},vc_auto`;
+            // vc_h264:baseline:3.1: codec video h264 con profilo baseline e livello 3.1 compatibile con WhatsApp
+            const transformations = `f_${targetFormat},vc_h264:baseline:3.1`;
             
             // Costruisce l'URL con trasformazioni
             path = originalUrl.replace(/\/upload\//, `/upload/${transformations}/`);
