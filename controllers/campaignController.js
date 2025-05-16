@@ -2004,41 +2004,46 @@ const ensureMediaCompatibility = (mediaUrl) => {
     return mediaUrl;
   }
   
-  // Per i video Cloudinary, assicurati che sia utilizzato il formato WebM con codec VP9
-  // che è ampiamente supportato da WhatsApp
+  // Per i video Cloudinary, assicurati che sia utilizzato il formato MP4 con codec H.264 e audio AAC
+  // come specificamente richiesto dalla documentazione di WhatsApp
   let optimizedUrl = mediaUrl;
   
   // Aggiungi trasformazione del codec se non presente
-  if (!optimizedUrl.includes('f_webm') || !optimizedUrl.includes('vc_vp9')) {
+  if (!optimizedUrl.includes('vc_h264') || !optimizedUrl.includes('ac_aac')) {
     if (optimizedUrl.includes('/upload/')) {
       // Sostituisci trasformazioni esistenti o aggiungi nuove trasformazioni
       if (optimizedUrl.includes('/upload/f_')) {
         // Ci sono già delle trasformazioni, sostituisci il formato e il codec
-        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_webm,');
+        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_mp4,');
         
-        // Assicurati che ci sia il parametro del codec
+        // Assicurati che ci siano i parametri dei codec video e audio
         if (!optimizedUrl.includes('vc_')) {
-          optimizedUrl = optimizedUrl.replace('/upload/f_webm', '/upload/f_webm,vc_vp9');
+          optimizedUrl = optimizedUrl.replace('/upload/f_mp4', '/upload/f_mp4,vc_h264');
         } else {
-          // Sostituisci il codec esistente
-          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_vp9');
+          // Sostituisci il codec video esistente
+          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_h264');
+        }
+        
+        // Aggiungi il codec audio se non presente
+        if (!optimizedUrl.includes('ac_')) {
+          optimizedUrl = optimizedUrl.replace('/vc_h264', '/vc_h264,ac_aac');
         }
       } else {
         // Non ci sono trasformazioni, aggiungi quelle necessarie
-        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_webm,vc_vp9/');
+        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_mp4,vc_h264,ac_aac/');
       }
     }
   }
   
-  // Assicurati che il file abbia estensione .webm
-  if (!optimizedUrl.endsWith('.webm')) {
+  // Assicurati che il file abbia estensione .mp4
+  if (!optimizedUrl.endsWith('.mp4')) {
     const extensionPattern = /\.[a-zA-Z0-9]+$/;
     if (extensionPattern.test(optimizedUrl)) {
       // Sostituisci l'estensione esistente
-      optimizedUrl = optimizedUrl.replace(extensionPattern, '.webm');
+      optimizedUrl = optimizedUrl.replace(extensionPattern, '.mp4');
     } else {
       // Aggiungi l'estensione
-      optimizedUrl += '.webm';
+      optimizedUrl += '.mp4';
     }
   }
   
