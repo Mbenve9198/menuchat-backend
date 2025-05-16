@@ -4,7 +4,7 @@ const setupController = require('../controllers/setupController');
 const uploadController = require('../controllers/uploadController');
 const statsController = require('../controllers/statsController');
 const restaurantController = require('../controllers/restaurantController');
-const { uploadPdf } = require('../config/cloudinary');
+const { uploadPdf, uploadMedia } = require('../config/cloudinary');
 const menuService = require('../services/menuService');
 const googlePlacesService = require('../services/googlePlacesService');
 const Restaurant = require('../models/Restaurant');
@@ -127,5 +127,8 @@ router.delete('/menu/:id', async (req, res) => {
 // Rotte per l'upload di file
 router.post('/upload/menu-pdf', uploadPdf.single('file'), uploadController.uploadMenuPdf);
 router.delete('/upload/menu-pdf/:publicId/:menuId?', uploadController.deleteMenuPdf);
+
+// Rotta per l'upload di media per campagne (immagini, video, PDF)
+router.post('/upload/campaign-media', uploadMedia.single('file'), uploadController.uploadCampaignMedia);
 
 module.exports = router; 

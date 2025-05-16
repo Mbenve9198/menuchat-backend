@@ -8,7 +8,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const storage = new CloudinaryStorage({
+// Storage per i PDF dei menu
+const pdfStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'menu-pdf',
@@ -25,8 +26,64 @@ const storage = new CloudinaryStorage({
   }
 });
 
+// Storage per i media delle campagne (immagini, video, PDF)
+const mediaStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'campaign-media',
+    resource_type: (req, file) => {
+      // Determina il tipo di risorsa basato sul mimetype
+      if (file.mimetype.startsWith('image/')) {
+        return 'image';
+      } else if (file.mimetype.startsWith('video/')) {
+        return 'video';
+      } else if (file.mimetype === 'application/pdf') {
+        return 'raw';
+      }
+      return 'auto'; // Fallback
+    },
+    format: (req, file) => {
+      // Estrae il formato dall'estensione originale o dal mimetype
+      if (file.mimetype === 'application/pdf') {
+        return 'pdf';
+      }
+      
+      // Per estensioni video e immagini, estrai dal nome file
+      const originalExt = file.originalname.split('.').pop().toLowerCase();
+      
+      // Se è un video che richiede conversione, usa mp4
+      if (file.mimetype.startsWith('video/') && req.body.needsConversion === 'true') {
+        return req.body.targetFormat || 'mp4';
+      }
+      
+      // Altrimenti mantieni il formato originale
+      return originalExt;
+    },
+    public_id: (req, file) => {
+      // Generiamo un ID unico basato sul tipo di campagna e timestamp
+      const campaignType = req.body.campaignType || 'campaign';
+      const sanitizedType = campaignType
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-');
+        
+      // Identificatore per il tipo di risorsa
+      let prefix = '';
+      if (file.mimetype.startsWith('image/')) {
+        prefix = 'img';
+      } else if (file.mimetype.startsWith('video/')) {
+        prefix = 'video';
+      } else if (file.mimetype === 'application/pdf') {
+        prefix = 'pdf';
+      }
+      
+      return `${prefix}-${sanitizedType}-${Date.now()}`;
+    }
+  }
+});
+
+// Configurazione multer per upload PDF
 const uploadPdf = multer({ 
-  storage: storage,
+  storage: pdfStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
@@ -40,7 +97,28 @@ const uploadPdf = multer({
   }
 });
 
+// Configurazione multer per upload media
+const uploadMedia = multer({
+  storage: mediaStorage,
+  limits: {
+    fileSize: 30 * 1024 * 1024 // 30MB limit per supportare video
+  },
+  fileFilter: (req, file, cb) => {
+    // Accettiamo immagini, video e PDF
+    if (
+      file.mimetype.startsWith('image/') || 
+      file.mimetype.startsWith('video/') || 
+      file.mimetype === 'application/pdf'
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo immagini, video e PDF sono accettati'), false);
+    }
+  }
+});
+
 module.exports = {
   cloudinary,
-  uploadPdf
+  uploadPdf,
+  uploadMedia
 }; 
