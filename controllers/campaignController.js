@@ -1428,45 +1428,6 @@ const submitCampaignTemplate = async (req, res) => {
       if (campaign.templateParameters && Object.keys(campaign.templateParameters).length > 0) {
         console.log('Utilizzando parametri template personalizzati:', JSON.stringify(campaign.templateParameters));
         
-        // Verifica se l'URL del media è un video e controlla la compatibilità
-        if (campaign.templateParameters.useImage && campaign.templateParameters.imageUrl) {
-          const mediaUrl = campaign.templateParameters.imageUrl;
-          
-          // Verifica se si tratta di un video
-          const isVideo = mediaUrl.includes('/video/') || 
-                         mediaUrl.toLowerCase().endsWith('.mp4') || 
-                         mediaUrl.toLowerCase().endsWith('.mov') ||
-                         mediaUrl.toLowerCase().endsWith('.avi');
-                         
-          if (isVideo) {
-            console.log('Rilevato video nella campagna:', mediaUrl);
-            
-            // Verifica se l'URL contiene già trasformazioni di Cloudinary
-            const hasTransformations = mediaUrl.includes('/upload/') && 
-                                      (mediaUrl.includes('/vc_h264') || 
-                                       mediaUrl.includes('/video_codec_h264'));
-            
-            if (!hasTransformations) {
-              console.log('ATTENZIONE: Il video potrebbe non essere stato convertito in un formato compatibile con WhatsApp');
-              console.log('Per garantire compatibilità, il video dovrebbe essere in formato MP4 con codec H.264');
-              
-              // Se l'URL è di Cloudinary, prova a modificarlo per aggiungere i parametri di trasformazione
-              if (mediaUrl.includes('cloudinary.com')) {
-                // Estrai il path dopo /upload/
-                const baseUrlParts = mediaUrl.split('/upload/');
-                if (baseUrlParts.length === 2) {
-                  // Aggiungi parametri di trasformazione
-                  const transformedUrl = `${baseUrlParts[0]}/upload/vc_h264,ac_aac/${baseUrlParts[1]}`;
-                  console.log('URL video modificato per compatibilità WhatsApp:', transformedUrl);
-                  
-                  // Aggiorna l'URL nella configurazione del template
-                  campaign.templateParameters.imageUrl = transformedUrl;
-                }
-              }
-            }
-          }
-        }
-        
         // Prepara gli eventuali bottoni di azione
         const actions = [];
         
