@@ -173,7 +173,7 @@ WhatsAppContactSchema.statics.findOrCreate = async function(restaurantId, phoneN
 };
 
 // Metodo per aggiornare lo stato di opt-out
-WhatsAppContactSchema.methods.optOut = async function(source = 'user_request') {
+WhatsAppContactSchema.methods.optOut = async function(source = 'manual_import') {
   this.marketingConsent.status = false;
   this.marketingConsent.updatedAt = new Date();
   this.marketingConsent.source = source;

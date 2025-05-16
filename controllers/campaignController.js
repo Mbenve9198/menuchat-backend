@@ -1209,7 +1209,7 @@ const handleUnsubscribe = async (req, res) => {
     }
     
     // Aggiorna il contatto in opt-out
-    await contact.optOut('user_request');
+    await contact.optOut('manual_import');
     console.log('Contatto aggiornato a opt-out:', contact._id);
     
     // Determina la lingua del contatto per la risposta
