@@ -1423,7 +1423,6 @@ const submitCampaignTemplate = async (req, res) => {
         if (campaign.templateParameters.unsubscribe !== false) {
           // Prepara l'URL base per unsubscribe
           const backendUrl = 'https://menuchat-backend.onrender.com';
-          const unsubscribeBaseUrl = `${backendUrl}/api/campaign/unsubscribe`;
           
           // Crea titoli per pulsante unsubscribe in varie lingue
           const unsubscribeText = {
@@ -1437,15 +1436,22 @@ const submitCampaignTemplate = async (req, res) => {
           // Seleziona testo in base alla lingua del template
           const buttonText = unsubscribeText[campaign.templateParameters.language || campaign.template.language || 'it'] || "Unsubscribe";
           
-          // Utilizziamo una singola variabile {{2}} per l'intero URL di unsubscribe
+          // Utilizziamo la variabile {{2}} che verrà sostituita
+          // dal servizio twilioService.js con il path effettivo di unsubscribe
           actions.push({
             type: "URL",
             title: buttonText,
             url: `${backendUrl}/{{2}}`
           });
           
-          // Definiamo la variabile come il path relativo di unsubscribe che verrà completato in fase di invio
-          twilioTemplateData.variables["2"] = "api/campaign/unsubscribe/contactId/token";
+          // Definiamo la variabile 2 come segnaposto per il path di unsubscribe
+          twilioTemplateData.variables["2"] = "api/campaign/unsubscribe/ID/TOKEN";
+          
+          // Passiamo anche l'ID della campagna nei parametri
+          // per registrare correttamente il contatto
+          if (!campaign.templateParameters.campaignId) {
+            campaign.templateParameters.campaignId = campaign._id.toString();
+          }
         }
         
         // Costruisci il template in base al tipo e ai parametri della campagna
@@ -1880,6 +1886,72 @@ const checkTemplateStatus = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Test della funzionalità di unsubscribe
+ * @route   GET /api/campaign/test-unsubscribe
+ * @access  Private
+ */
+const testUnsubscribe = async (req, res) => {
+  try {
+    // Trova il ristorante dell'utente
+    const restaurant = await Restaurant.findOne({ user: req.user.id });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ristorante non trovato'
+      });
+    }
+
+    // Trova un contatto del ristorante
+    const contact = await WhatsAppContact.findOne({ restaurant: restaurant._id });
+
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nessun contatto trovato per questo ristorante'
+      });
+    }
+
+    // Genera un token per questo contatto
+    const contactId = contact._id.toString();
+    const token = generateUnsubscribeToken(contactId, contact.phoneNumber);
+
+    // Costruisci l'URL di unsubscribe per la verifica
+    const backendUrl = 'https://menuchat-backend.onrender.com';
+    const unsubscribeUrl = `${backendUrl}/api/campaign/unsubscribe/${contactId}/${token}`;
+    
+    // Costruisci l'URL con il segnaposto Twilio per test
+    const twilioPlaceholderUrl = `${backendUrl}/{{2}}`;
+    
+    // Variabile Twilio che dovrebbe essere sostituita
+    const twilioVariable = `api/campaign/unsubscribe/${contactId}/${token}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        contactId,
+        contactName: contact.name,
+        contactPhone: contact.phoneNumber,
+        token,
+        unsubscribeUrl,
+        twilioInfo: {
+          placeholderUrl: twilioPlaceholderUrl,
+          variableValue: twilioVariable,
+          description: "Questo è come appare il segnaposto nell'URL e come dovrebbe essere sostituito"
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel test di unsubscribe:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il test di unsubscribe',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getContacts,
   createCampaign,
@@ -1894,5 +1966,6 @@ module.exports = {
   submitCampaignTemplate,
   scheduleCampaignSending,
   checkTemplateStatus,
-  handleUnsubscribe
+  handleUnsubscribe,
+  testUnsubscribe
 }; 

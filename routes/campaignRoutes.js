@@ -35,4 +35,7 @@ router.post('/generate-image', campaignController.generateImage);
 // Nuovo endpoint per gestire le unsubscribe
 router.get('/unsubscribe/:contactId/:token', campaignController.handleUnsubscribe);
 
+// Endpoint di test per verificare la funzionalità di unsubscribe
+router.get('/test-unsubscribe', protect, campaignController.testUnsubscribe);
+
 module.exports = router; 

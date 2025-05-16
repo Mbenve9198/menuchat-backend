@@ -352,6 +352,8 @@ class TwilioService {
           });
           await contact.save();
         }
+        
+        console.log(`Contatto trovato: ID=${contact._id}, Nome=${contact.name}`);
       } catch (error) {
         console.error('Errore nel recupero/creazione del contatto:', error);
         // Continuiamo comunque, anche se non abbiamo trovato il contatto
@@ -381,74 +383,51 @@ class TwilioService {
         sendAt: scheduledTime.toISOString()
       };
       
-      // Gestisci le variabili del template
-      if (variables && Object.keys(variables).length > 0) {
-        // Per il formato richiesto da Twilio, utilizziamo solo le variabili essenziali
-        // Twilio si aspetta un formato semplice: {"1": "valore", "2": "valore"}
-        
-        // Creiamo un nuovo oggetto con le variabili necessarie
-        const simplifiedVariables = {};
-        
-        // La prima variabile è sempre il nome del cliente
-        simplifiedVariables["1"] = variables.customerName || "Cliente";
-        
-        // Se il template contiene un URL con segnaposti per l'unsubscribe
-        // e abbiamo il contatto nel database, creiamo un URL reale per l'unsubscribe
-        if (contact) {
-          // Generiamo il token per l'unsubscribe
-          const contactId = contact._id.toString();
-          const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
-          
-          // Se il template contiene un URL con segnaposti per l'unsubscribe
-          if (JSON.stringify(variables).includes('{{2}}')) {
-            console.log('Template richiede URL unsubscribe, generando URL personalizzato...');
-            
-            // Verifichiamo se nel template c'è l'indicazione "contactId" e "token"
-            if (variables["2"] && typeof variables["2"] === 'string' && 
-                variables["2"].includes('contactId') && variables["2"].includes('token')) {
-              
-              // Otteniamo il pattern della variabile 2
-              const pattern = variables["2"];
-              
-              // Sostituiamo letteralmente le stringhe "contactId" e "token" con i valori reali
-              const unsubscribePath = pattern
-                .replace('contactId', contactId)
-                .replace('token', unsubscribeToken);
-              
-              console.log('Generato path unsubscribe:', unsubscribePath);
-              
-              // Impostiamo la variabile completa per l'URL
-              simplifiedVariables["2"] = unsubscribePath;
-            } else {
-              // Fallback: generiamo direttamente il path completo
-              const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
-              console.log('Generato path unsubscribe (fallback):', unsubscribePath);
-              simplifiedVariables["2"] = unsubscribePath;
-            }
-            
-            // Registra il contatto come target della campagna se abbiamo l'ID della campagna
-            if (variables.campaignId && contact) {
-              contact.receivedCampaigns.push({
-                campaignId: variables.campaignId,
-                sentAt: scheduledTime,
-                status: 'scheduled'
-              });
-              await contact.save();
-            }
-          }
-        } else {
-          console.log('Contatto non trovato, impossibile generare URL unsubscribe personalizzato');
-        }
-        
-        messageData.contentVariables = JSON.stringify(simplifiedVariables);
+      // Prepara le variabili di contenuto per Twilio
+      const contentVariables = {};
+      
+      // Variabile 1: Nome del cliente
+      if (contact && contact.name && contact.name !== 'Cliente') {
+        contentVariables["1"] = contact.name;
+        console.log(`Usando nome cliente reale: ${contact.name}`);
+      } else {
+        contentVariables["1"] = "Cliente";
+        console.log('Usando nome cliente predefinito: Cliente');
       }
-
+      
+      // Variabile 2: URL di unsubscribe (solo se abbiamo il contatto)
+      if (contact) {
+        const contactId = contact._id.toString();
+        const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
+        
+        // Crea l'URL completo di unsubscribe
+        const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
+        contentVariables["2"] = unsubscribePath;
+        
+        console.log(`Generato path di unsubscribe: ${unsubscribePath}`);
+        
+        // Registra il contatto come target della campagna se abbiamo l'ID della campagna
+        if (variables.campaignId) {
+          contact.receivedCampaigns.push({
+            campaignId: variables.campaignId,
+            sentAt: scheduledTime,
+            status: 'scheduled'
+          });
+          await contact.save();
+          console.log(`Contatto registrato come target per la campagna ${variables.campaignId}`);
+        }
+      }
+      
+      // Imposta le variabili di contenuto nel messaggio
+      messageData.contentVariables = JSON.stringify(contentVariables);
+      
       console.log('Dati messaggio programmato:', JSON.stringify(messageData));
 
       // Pianifica il messaggio
       const message = await twilioClient.messages.create(messageData);
 
       console.log(`Template programmato con SID: ${message.sid} per il: ${scheduledTime}`);
+      console.log(`Variabili utilizzate: ${JSON.stringify(contentVariables)}`);
       
       return {
         success: true,
