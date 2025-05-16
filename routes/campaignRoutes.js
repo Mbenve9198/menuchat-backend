@@ -4,7 +4,10 @@ const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Tutte le routes richiedono autenticazione
+// Endpoint pubblico per gestire le unsubscribe (senza autenticazione)
+router.get('/unsubscribe/:contactId/:token', campaignController.handleUnsubscribe);
+
+// Tutte le altre routes richiedono autenticazione
 router.use(protect);
 
 // Rotte per i contatti
@@ -32,10 +35,7 @@ router.post('/generate-image-prompt', campaignController.generateImagePrompt);
 // Rotta per la generazione di immagini
 router.post('/generate-image', campaignController.generateImage);
 
-// Nuovo endpoint per gestire le unsubscribe
-router.get('/unsubscribe/:contactId/:token', campaignController.handleUnsubscribe);
-
 // Endpoint di test per verificare la funzionalità di unsubscribe
-router.get('/test-unsubscribe', protect, campaignController.testUnsubscribe);
+router.get('/test-unsubscribe', campaignController.testUnsubscribe);
 
 module.exports = router; 
