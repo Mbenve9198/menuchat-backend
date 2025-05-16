@@ -1209,7 +1209,7 @@ const handleUnsubscribe = async (req, res) => {
     }
     
     // Aggiorna il contatto in opt-out
-    await contact.optOut('unsubscribe_link');
+    await contact.optOut('user_request');
     console.log('Contatto aggiornato a opt-out:', contact._id);
     
     // Determina la lingua del contatto per la risposta
@@ -1516,38 +1516,38 @@ const submitCampaignTemplate = async (req, res) => {
         }
       } else {
         // Fallback al comportamento originale se non ci sono parametri personalizzati
-        if (campaign.template.type === 'MEDIA' && campaign.template.components.header?.example) {
-          twilioTemplateData.types['twilio/media'] = {
-            body: campaign.template.components.body.text,
-            media: [campaign.template.components.header.example]
-          };
-        } else if (campaign.template.type === 'CALL_TO_ACTION' && campaign.template.components.buttons?.length > 0) {
-          const actions = campaign.template.components.buttons.map(button => {
-            if (button.type === 'URL') {
-              return {
-                type: "URL",
-                title: button.text,
-                url: button.url
-              };
-            } else if (button.type === 'PHONE') {
-              return {
-                type: "PHONE_NUMBER",
-                title: button.text,
+      if (campaign.template.type === 'MEDIA' && campaign.template.components.header?.example) {
+        twilioTemplateData.types['twilio/media'] = {
+          body: campaign.template.components.body.text,
+          media: [campaign.template.components.header.example]
+        };
+      } else if (campaign.template.type === 'CALL_TO_ACTION' && campaign.template.components.buttons?.length > 0) {
+        const actions = campaign.template.components.buttons.map(button => {
+          if (button.type === 'URL') {
+            return {
+              type: "URL",
+              title: button.text,
+              url: button.url
+            };
+          } else if (button.type === 'PHONE') {
+            return {
+              type: "PHONE_NUMBER",
+              title: button.text,
                 phone: button.phone_number
-              };
-            }
-            return null;
-          }).filter(Boolean);
-          
-          twilioTemplateData.types['twilio/call-to-action'] = {
-            body: campaign.template.components.body.text,
-            actions
-          };
-        } else {
-          // Fallback a text template
-          twilioTemplateData.types['twilio/text'] = {
-            body: campaign.template.components.body.text
-          };
+            };
+          }
+          return null;
+        }).filter(Boolean);
+        
+        twilioTemplateData.types['twilio/call-to-action'] = {
+          body: campaign.template.components.body.text,
+          actions
+        };
+      } else {
+        // Fallback a text template
+        twilioTemplateData.types['twilio/text'] = {
+          body: campaign.template.components.body.text
+        };
         }
       }
       
