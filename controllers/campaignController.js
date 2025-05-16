@@ -1146,10 +1146,17 @@ const verifyUnsubscribeToken = (contactId, phoneNumber, token) => {
  */
 const handleUnsubscribe = async (req, res) => {
   try {
+    console.log('Richiesta di unsubscribe ricevuta:', {
+      contactId: req.params.contactId,
+      token: req.params.token ? req.params.token.substring(0, 10) + '...' : 'vuoto'
+    });
+    
     const { contactId, token } = req.params;
     
     // Verifica che contactId sia un ObjectId valido
     if (!mongoose.Types.ObjectId.isValid(contactId)) {
+      console.log('ObjectId non valido:', contactId);
+      
       return res.status(400).send(`
         <html>
           <head><title>Errore</title></head>
@@ -1158,13 +1165,15 @@ const handleUnsubscribe = async (req, res) => {
             <p>Il link che hai seguito non è valido.</p>
           </body>
         </html>
-      `);
+      `.trim());
     }
     
     // Trova il contatto
     const contact = await WhatsAppContact.findById(contactId);
     
     if (!contact) {
+      console.log('Contatto non trovato con ID:', contactId);
+      
       return res.status(404).send(`
         <html>
           <head><title>Errore</title></head>
@@ -1173,11 +1182,21 @@ const handleUnsubscribe = async (req, res) => {
             <p>Non è stato possibile trovare il tuo contatto.</p>
           </body>
         </html>
-      `);
+      `.trim());
     }
     
+    console.log('Contatto trovato:', {
+      id: contact._id,
+      phone: contact.phoneNumber,
+      name: contact.name,
+      lang: contact.language
+    });
+    
     // Verifica il token
-    if (!verifyUnsubscribeToken(contactId, contact.phoneNumber, token)) {
+    const isTokenValid = verifyUnsubscribeToken(contactId, contact.phoneNumber, token);
+    console.log('Verifica token:', isTokenValid ? 'Valido' : 'Non valido');
+    
+    if (!isTokenValid) {
       return res.status(403).send(`
         <html>
           <head><title>Errore</title></head>
@@ -1186,14 +1205,16 @@ const handleUnsubscribe = async (req, res) => {
             <p>Il link di disiscrizione non è valido o è scaduto.</p>
           </body>
         </html>
-      `);
+      `.trim());
     }
     
     // Aggiorna il contatto in opt-out
     await contact.optOut('unsubscribe_link');
+    console.log('Contatto aggiornato a opt-out:', contact._id);
     
     // Determina la lingua del contatto per la risposta
     const lang = contact.language || 'it';
+    console.log('Lingua risposta:', lang);
     
     // Prepara messaggi in varie lingue
     const messages = {
@@ -1227,66 +1248,74 @@ const handleUnsubscribe = async (req, res) => {
     // Usa lingua italiana come fallback
     const responseText = messages[lang] || messages.it;
     
-    // Restituisci una pagina di conferma nella lingua appropriata
-    res.status(200).send(`
-      <html>
-        <head>
-          <title>${responseText.title}</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              text-align: center;
-              padding: 50px;
-              background-color: #f7f7f7;
-              color: #333;
-            }
-            .container {
-              max-width: 600px;
-              margin: 0 auto;
-              background-color: white;
-              padding: 30px;
-              border-radius: 10px;
-              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            h1 {
-              color: #4CAF50;
-              margin-bottom: 20px;
-            }
-            p {
-              font-size: 18px;
-              line-height: 1.6;
-              margin-bottom: 15px;
-            }
-            .emoji {
-              font-size: 50px;
-              margin: 20px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="emoji">✅</div>
-            <h1>${responseText.title}</h1>
-            <p>${responseText.message}</p>
-            <p>${responseText.thanks}</p>
-          </div>
-        </body>
-      </html>
-    `);
+    // Crea una pagina HTML più semplice che dovrebbe funzionare in tutti i browser
+    const htmlResponse = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>${responseText.title}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 50px;
+        background-color: #f7f7f7;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+      h1 {
+        color: #4CAF50;
+        margin-bottom: 20px;
+      }
+      p {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 15px;
+      }
+      .emoji {
+        font-size: 50px;
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="emoji">✅</div>
+      <h1>${responseText.title}</h1>
+      <p>${responseText.message}</p>
+      <p>${responseText.thanks}</p>
+    </div>
+  </body>
+</html>`;
+    
+    // Imposta esplicitamente l'header Content-Type per HTML
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(200).send(htmlResponse);
+    
+    console.log('Risposta di unsubscribe inviata con successo');
   } catch (error) {
     console.error('Errore nella gestione dell\'unsubscribe:', error);
     
-    // Pagina di errore generica
-    res.status(500).send(`
-      <html>
-        <head><title>Errore</title></head>
-        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-          <h1>Si è verificato un errore</h1>
-          <p>Non è stato possibile completare la tua richiesta. Riprova più tardi.</p>
-        </body>
-      </html>
-    `);
+    // Pagina di errore generica più semplice
+    const errorHtml = `<!DOCTYPE html>
+<html>
+  <head><title>Errore</title></head>
+  <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+    <h1>Si è verificato un errore</h1>
+    <p>Non è stato possibile completare la tua richiesta. Riprova più tardi.</p>
+    <p>Dettagli errore: ${error.message || 'Errore sconosciuto'}</p>
+  </body>
+</html>`;
+    
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(500).send(errorHtml);
   }
 };
 
