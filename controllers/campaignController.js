@@ -1445,7 +1445,7 @@ const submitCampaignTemplate = async (req, res) => {
           });
           
           // Definiamo la variabile come il path relativo di unsubscribe che verrà completato in fase di invio
-          twilioTemplateData.variables["2"] = "api/campaign/unsubscribe/[contactId]/[token]";
+          twilioTemplateData.variables["2"] = "api/campaign/unsubscribe/contactId/token";
         }
         
         // Costruisci il template in base al tipo e ai parametri della campagna

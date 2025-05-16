@@ -392,7 +392,7 @@ class TwilioService {
         // La prima variabile è sempre il nome del cliente
         simplifiedVariables["1"] = variables.customerName || "Cliente";
         
-        // Se il template contiene un URL con segnaposti per unsubscribe
+        // Se il template contiene un URL con segnaposti per l'unsubscribe
         // e abbiamo il contatto nel database, creiamo un URL reale per l'unsubscribe
         if (contact) {
           // Generiamo il token per l'unsubscribe
@@ -403,11 +403,28 @@ class TwilioService {
           if (JSON.stringify(variables).includes('{{2}}')) {
             console.log('Template richiede URL unsubscribe, generando URL personalizzato...');
             
-            // Generiamo il path completo per unsubscribe
-            const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
-            
-            // Impostiamo la variabile completa per l'URL
-            simplifiedVariables["2"] = unsubscribePath;
+            // Verifichiamo se nel template c'è l'indicazione "contactId" e "token"
+            if (variables["2"] && typeof variables["2"] === 'string' && 
+                variables["2"].includes('contactId') && variables["2"].includes('token')) {
+              
+              // Otteniamo il pattern della variabile 2
+              const pattern = variables["2"];
+              
+              // Sostituiamo letteralmente le stringhe "contactId" e "token" con i valori reali
+              const unsubscribePath = pattern
+                .replace('contactId', contactId)
+                .replace('token', unsubscribeToken);
+              
+              console.log('Generato path unsubscribe:', unsubscribePath);
+              
+              // Impostiamo la variabile completa per l'URL
+              simplifiedVariables["2"] = unsubscribePath;
+            } else {
+              // Fallback: generiamo direttamente il path completo
+              const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
+              console.log('Generato path unsubscribe (fallback):', unsubscribePath);
+              simplifiedVariables["2"] = unsubscribePath;
+            }
             
             // Registra il contatto come target della campagna se abbiamo l'ID della campagna
             if (variables.campaignId && contact) {
