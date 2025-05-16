@@ -78,7 +78,7 @@ class UploadController {
       
       // Verifica se è richiesta la conversione video
       const needsConversion = req.body.needsConversion === 'true';
-      const targetFormat = req.body.targetFormat || 'mp4';
+      const targetFormat = req.body.targetFormat || 'webm';
       
       // Se è un video e richiede conversione, applica le trasformazioni Cloudinary
       if (resource_type === 'video' && needsConversion) {
@@ -103,14 +103,14 @@ class UploadController {
             }
             
             // Costruisci il nuovo URL con le trasformazioni per la conversione
-            // f_mp4: formato MP4
-            // vc_h264:baseline:3.1: codec video h264 con profilo baseline e livello 3.1 compatibile con WhatsApp
-            const transformations = `f_${targetFormat},vc_h264:baseline:3.1`;
+            // f_webm: formato WebM
+            // vc_vp9: codec video VP9 che è ampiamente supportato
+            const transformations = `f_${targetFormat},vc_vp9`;
             
             // Costruisce l'URL con trasformazioni
             path = originalUrl.replace(/\/upload\//, `/upload/${transformations}/`);
             
-            // Assicurati che l'estensione finale sia .mp4
+            // Assicurati che l'estensione finale sia corretta
             if (!path.endsWith(`.${targetFormat}`)) {
               path = path.replace(/\.[^/.]+$/, '') + `.${targetFormat}`;
             }

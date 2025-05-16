@@ -2004,41 +2004,41 @@ const ensureMediaCompatibility = (mediaUrl) => {
     return mediaUrl;
   }
   
-  // Per i video Cloudinary, assicurati che sia utilizzato il codec h264:baseline:3.1
+  // Per i video Cloudinary, assicurati che sia utilizzato il formato WebM con codec VP9
   // che è ampiamente supportato da WhatsApp
   let optimizedUrl = mediaUrl;
   
   // Aggiungi trasformazione del codec se non presente
-  if (!optimizedUrl.includes('vc_h264:baseline:3.1')) {
+  if (!optimizedUrl.includes('f_webm') || !optimizedUrl.includes('vc_vp9')) {
     if (optimizedUrl.includes('/upload/')) {
       // Sostituisci trasformazioni esistenti o aggiungi nuove trasformazioni
       if (optimizedUrl.includes('/upload/f_')) {
-        // Ci sono già delle trasformazioni, sostituisci il codec
-        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_mp4,');
+        // Ci sono già delle trasformazioni, sostituisci il formato e il codec
+        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_webm,');
         
         // Assicurati che ci sia il parametro del codec
         if (!optimizedUrl.includes('vc_')) {
-          optimizedUrl = optimizedUrl.replace('/upload/f_mp4', '/upload/f_mp4,vc_h264:baseline:3.1');
+          optimizedUrl = optimizedUrl.replace('/upload/f_webm', '/upload/f_webm,vc_vp9');
         } else {
           // Sostituisci il codec esistente
-          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_h264:baseline:3.1');
+          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_vp9');
         }
       } else {
         // Non ci sono trasformazioni, aggiungi quelle necessarie
-        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_mp4,vc_h264:baseline:3.1/');
+        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_webm,vc_vp9/');
       }
     }
   }
   
-  // Assicurati che il file abbia estensione .mp4
-  if (!optimizedUrl.endsWith('.mp4')) {
+  // Assicurati che il file abbia estensione .webm
+  if (!optimizedUrl.endsWith('.webm')) {
     const extensionPattern = /\.[a-zA-Z0-9]+$/;
     if (extensionPattern.test(optimizedUrl)) {
       // Sostituisci l'estensione esistente
-      optimizedUrl = optimizedUrl.replace(extensionPattern, '.mp4');
+      optimizedUrl = optimizedUrl.replace(extensionPattern, '.webm');
     } else {
       // Aggiungi l'estensione
-      optimizedUrl += '.mp4';
+      optimizedUrl += '.webm';
     }
   }
   
