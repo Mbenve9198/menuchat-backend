@@ -2009,28 +2009,19 @@ const ensureMediaCompatibility = (mediaUrl) => {
   let optimizedUrl = mediaUrl;
   
   // Aggiungi trasformazione del codec se non presente
-  if (!optimizedUrl.includes('vc_h264') || !optimizedUrl.includes('ac_aac')) {
+  if (!optimizedUrl.includes('vc_h264:high:3.1')) {
     if (optimizedUrl.includes('/upload/')) {
-      // Sostituisci trasformazioni esistenti o aggiungi nuove trasformazioni
-      if (optimizedUrl.includes('/upload/f_')) {
-        // Ci sono già delle trasformazioni, sostituisci il formato e il codec
-        optimizedUrl = optimizedUrl.replace(/\/upload\/f_[^\/,]+,?/, '/upload/f_mp4,');
-        
-        // Assicurati che ci siano i parametri dei codec video e audio
-        if (!optimizedUrl.includes('vc_')) {
-          optimizedUrl = optimizedUrl.replace('/upload/f_mp4', '/upload/f_mp4,vc_h264');
-        } else {
-          // Sostituisci il codec video esistente
-          optimizedUrl = optimizedUrl.replace(/vc_[^\/,]+/, 'vc_h264');
-        }
-        
-        // Aggiungi il codec audio se non presente
-        if (!optimizedUrl.includes('ac_')) {
-          optimizedUrl = optimizedUrl.replace('/vc_h264', '/vc_h264,ac_aac');
+      // Rimuovi qualsiasi trasformazione precedente
+      if (optimizedUrl.includes('/upload/f_') || optimizedUrl.includes('/upload/q_')) {
+        // Estrai la parte prima e dopo le trasformazioni
+        const urlParts = optimizedUrl.match(/(.*\/upload\/)([^\/]*)\/(.*)$/);
+        if (urlParts && urlParts.length > 3) {
+          // Ricostruisci l'URL con le nuove trasformazioni
+          optimizedUrl = `${urlParts[1]}q_70,vc_h264:high:3.1,br_2m,f_mp4/${urlParts[3]}`;
         }
       } else {
         // Non ci sono trasformazioni, aggiungi quelle necessarie
-        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_mp4,vc_h264,ac_aac/');
+        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/q_70,vc_h264:high:3.1,br_2m,f_mp4/');
       }
     }
   }

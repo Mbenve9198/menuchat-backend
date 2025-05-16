@@ -103,10 +103,11 @@ class UploadController {
             }
             
             // Costruisci il nuovo URL con le trasformazioni per la conversione
-            // f_mp4: formato MP4
-            // vc_h264: codec video H.264 specifico per WhatsApp
-            // ac_aac: codec audio AAC per WhatsApp
-            const transformations = `f_${targetFormat},vc_h264,ac_aac`;
+            // Utilizza trasformazioni specifiche con controllo bitrate e codec specifico
+            // vc_h264:high:3.1 - Codifica video H.264 con profilo High e livello 3.1
+            // br_2m - Bitrate massimo di 2 Mbps
+            // q_70 - Qualità del 70%
+            const transformations = `q_70,vc_h264:high:3.1,br_2m,f_${targetFormat}`;
             
             // Costruisce l'URL con trasformazioni
             path = originalUrl.replace(/\/upload\//, `/upload/${transformations}/`);
