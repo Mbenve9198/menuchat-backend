@@ -104,26 +104,11 @@ class UploadController {
               type: 'upload',
               public_id: optimizedPublicId,
               overwrite: true,
-              transformation: [
-                {
-                  quality: 70,
-                  video_codec: 'h264:baseline:3.1',
-                  audio_codec: 'aac',
-                  bit_rate: '2m',
-                  format: 'mp4',
-                  flags: 'faststart'
-                }
-              ],
-              // Aggiungiamo la trasformazione come "eager" per generare subito la derivata
+              // Imposta il formato a livello di opzioni principali, non dentro transformation
+              format: 'mp4',
+              // Utilizziamo una stringa per la trasformazione eager per assicurarci che tutti i parametri siano interpretati correttamente
               eager: [
-                {
-                  quality: 70,
-                  video_codec: 'h264:baseline:3.1',
-                  audio_codec: 'aac',
-                  bit_rate: '2m',
-                  format: 'mp4',
-                  flags: 'faststart'
-                }
+                'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart,f_mp4'
               ],
               eager_async: false
             };
