@@ -113,7 +113,19 @@ class UploadController {
                   format: 'mp4',
                   flags: 'faststart'
                 }
-              ]
+              ],
+              // Aggiungiamo la trasformazione come "eager" per generare subito la derivata
+              eager: [
+                {
+                  quality: 70,
+                  video_codec: 'h264:baseline:3.1',
+                  audio_codec: 'aac',
+                  bit_rate: '2m',
+                  format: 'mp4',
+                  flags: 'faststart'
+                }
+              ],
+              eager_async: false
             };
             
             // Esegui la trasformazione e crea una nuova risorsa
@@ -122,11 +134,28 @@ class UploadController {
               transformationOptions
             );
             
-            if (result && result.secure_url) {
-              // Usa l'URL "pulito" della nuova risorsa generata
-              // senza parametri di trasformazione nell'URL
-              path = result.secure_url;
+            if (result && result.eager && result.eager[0] && result.eager[0].secure_url) {
+              // Usa l'URL della derivata MP4 (NON l'URL originale)
+              path = result.eager[0].secure_url;
               console.log(`Video ottimizzato per WhatsApp: ${path}`);
+              
+              // Forziamo l'aggiornamento del Content-Type per essere sicuri che sia video/mp4 senza parametri
+              try {
+                await cloudinary.api.update(optimizedPublicId, { 
+                  resource_type: 'video', 
+                  format: 'mp4',
+                  tags: ['whatsapp_optimized']
+                });
+                console.log(`Content-Type aggiornato per ${optimizedPublicId}`);
+              } catch (updateError) {
+                console.warn(`Errore nell'aggiornamento del Content-Type: ${updateError.message}`);
+              }
+            } else if (result && result.secure_url) {
+              // Fallback: costruisci l'URL manualmente se eager non è disponibile
+              // Sostituisci l'estensione nell'URL con .mp4
+              const urlBase = result.secure_url.replace(/\.[^/.]+$/, '');
+              path = `${urlBase}.mp4`;
+              console.log(`URL derivato manualmente: ${path}`);
             } else {
               console.warn("Impossibile ottimizzare il video per WhatsApp, uso l'originale");
             }
