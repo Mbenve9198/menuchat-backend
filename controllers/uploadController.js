@@ -120,8 +120,10 @@ class UploadController {
             );
             
             if (result && result.eager && result.eager[0] && result.eager[0].secure_url) {
-              // Usa l'URL della derivata MP4 (NON l'URL originale)
-              path = result.eager[0].secure_url;
+              // Usa l'URL della derivata MA sostituisci l'estensione .mov o .quicktime con .mp4
+              // perché Twilio guarda l'estensione nel link
+              path = result.eager[0].secure_url
+                        .replace(/\.(mov|quicktime)$/i, '.mp4');
               console.log(`Video ottimizzato per WhatsApp: ${path}`);
               
               // Forziamo l'aggiornamento del Content-Type per essere sicuri che sia video/mp4 senza parametri
@@ -136,11 +138,35 @@ class UploadController {
                 console.warn(`Errore nell'aggiornamento del Content-Type: ${updateError.message}`);
               }
             } else if (result && result.secure_url) {
-              // Fallback: costruisci l'URL manualmente se eager non è disponibile
-              // Sostituisci l'estensione nell'URL con .mp4
-              const urlBase = result.secure_url.replace(/\.[^/.]+$/, '');
-              path = `${urlBase}.mp4`;
-              console.log(`URL derivato manualmente: ${path}`);
+              // Fallback: prova a creare un vero asset MP4 con upload (Soluzione B)
+              try {
+                console.log("Tentativo di creare un vero asset MP4 tramite upload...");
+                
+                // Ottieni l'URL del file originale
+                const originalUrl = result.secure_url;
+                
+                // Esegui un nuovo upload specificando formato mp4
+                const uploadRes = await cloudinary.uploader.upload(originalUrl, {
+                  resource_type: 'video',
+                  public_id: optimizedPublicId,
+                  format: 'mp4',
+                  transformation: 'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart'
+                });
+                
+                if (uploadRes && uploadRes.secure_url) {
+                  path = uploadRes.secure_url; // Dovrebbe terminare con .mp4
+                  console.log(`Video ricaricato come MP4: ${path}`);
+                } else {
+                  throw new Error("Upload non riuscito");
+                }
+              } catch (uploadError) {
+                console.error("Errore nel tentativo di upload MP4:", uploadError);
+                
+                // Fallback estremo: sostituisci l'estensione manualmente
+                const urlBase = result.secure_url.replace(/\.[^/.]+$/, '');
+                path = `${urlBase}.mp4`;
+                console.log(`URL derivato manualmente: ${path}`);
+              }
             } else {
               console.warn("Impossibile ottimizzare il video per WhatsApp, uso l'originale");
             }
