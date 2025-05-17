@@ -2004,42 +2004,26 @@ const ensureMediaCompatibility = (mediaUrl) => {
     return mediaUrl;
   }
   
-  // Per i video Cloudinary, assicurati che sia utilizzato il formato MP4 con codec H.264 (baseline) e audio AAC
-  // come specificamente richiesto dalla documentazione di WhatsApp
-  let optimizedUrl = mediaUrl;
-  
-  // Aggiungi trasformazione del codec se non presente
-  if (!optimizedUrl.includes('vc_h264:baseline:3.1') || !optimizedUrl.includes('ac_aac')) {
-    if (optimizedUrl.includes('/upload/')) {
-      // Rimuovi qualsiasi trasformazione precedente
-      if (optimizedUrl.includes('/upload/f_') || optimizedUrl.includes('/upload/q_')) {
-        // Estrai la parte prima e dopo le trasformazioni
-        const urlParts = optimizedUrl.match(/(.*\/upload\/)([^\/]*)\/(.*)$/);
-        if (urlParts && urlParts.length > 3) {
-          // Ricostruisci l'URL con le nuove trasformazioni
-          optimizedUrl = `${urlParts[1]}q_70,vc_h264:baseline:3.1,ac_aac,br_2m,f_mp4/${urlParts[3]}`;
-        }
-      } else {
-        // Non ci sono trasformazioni, aggiungi quelle necessarie
-        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/q_70,vc_h264:baseline:3.1,ac_aac,br_2m,f_mp4/');
-      }
-    }
+  // Per i video Cloudinary, controlla se l'URL contiene _whatsapp_optimized
+  if (mediaUrl.includes('_whatsapp_optimized')) {
+    // È già un URL ottimizzato senza trasformazioni, usalo così com'è
+    console.log(`L'URL video è già ottimizzato per WhatsApp: ${mediaUrl}`);
+    return mediaUrl;
   }
   
-  // Assicurati che il file abbia estensione .mp4
-  if (!optimizedUrl.endsWith('.mp4')) {
-    const extensionPattern = /\.[a-zA-Z0-9]+$/;
-    if (extensionPattern.test(optimizedUrl)) {
-      // Sostituisci l'estensione esistente
-      optimizedUrl = optimizedUrl.replace(extensionPattern, '.mp4');
-    } else {
-      // Aggiungi l'estensione
-      optimizedUrl += '.mp4';
-    }
+  // L'URL contiene trasformazioni che possono causare problemi con Twilio?
+  const hasTransformations = mediaUrl.match(/\/upload\/([^\/]+)\//);
+  
+  if (hasTransformations) {
+    console.log(`ATTENZIONE: L'URL video contiene trasformazioni nell'URL che potrebbero causare problemi con Twilio/WhatsApp: ${mediaUrl}`);
+    console.log(`Considera di caricare il video senza trasformazioni nell'URL.`);
+    
+    // Non tentiamo di modificare l'URL poiché il problema è che Cloudinary serve 
+    // Content-Type: video/mp4; codecs=avc1 quando ci sono trasformazioni nell'URL
+    return mediaUrl;
   }
   
-  console.log(`Media URL ottimizzato per WhatsApp: ${optimizedUrl}`);
-  return optimizedUrl;
+  return mediaUrl;
 };
 
 module.exports = {
