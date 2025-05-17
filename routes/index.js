@@ -6,6 +6,7 @@ const templateRoutes = require('./templateRoutes');
 const apiRoutes = require('./api');
 const campaignRoutes = require('./campaignRoutes');
 const campaignTemplateRoutes = require('./campaignTemplateRoutes');
+const configRoutes = require('./configRoutes');
 
 const router = express.Router();
 
@@ -26,6 +27,9 @@ router.use('/campaign', campaignRoutes);
 
 // Rotte dei template delle campagne
 router.use('/campaign-templates', campaignTemplateRoutes);
+
+// Rotte di configurazione
+router.use('/config', configRoutes);
 
 // Rotte API generali
 router.use('/', apiRoutes);
