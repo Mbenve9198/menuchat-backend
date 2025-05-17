@@ -85,96 +85,44 @@ class UploadController {
         try {
           console.log(`Ottimizzazione video per WhatsApp: ${originalname}`);
           
-          // Ottenimento dell'ID pubblico base, senza estensione
-          let publicIdBase = "";
-          const uploadMatch = path.match(/\/upload\/v\d+\/(.+)$/);
-          if (uploadMatch && uploadMatch[1]) {
-            publicIdBase = uploadMatch[1].replace(/\.[^/.]+$/, '');
-            
-            // Genera un nuovo public_id per il file ottimizzato
-            const optimizedPublicId = `${publicIdBase}_whatsapp_optimized`;
-            
-            // SOLUZIONE B: Upload completo del file invece di explicit con eager
-            // Questo garantisce che l'URL finale non abbia trasformazioni e termini in .mp4,
-            // e che l'header Content-Type sia video/mp4 senza parametri aggiuntivi
-            console.log("Esecuzione upload MP4 ottimizzato per WhatsApp...");
-            
-            // 1️⃣ URL del file sorgente .mov così com'è appena caricato
-            const originalUrl = path;    
-
-            // 3️⃣ upload vero e proprio, con transcodifica e salvataggio in MP4
-            const uploadRes = await cloudinary.uploader.upload(originalUrl, {
-              resource_type: 'video',
-              public_id: optimizedPublicId,   // ⚠️ qui funziona perché è un *upload*
-              format: 'mp4',
-              transformation: 'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart'
-            });
-            
-            if (uploadRes && uploadRes.secure_url) {
-              path = uploadRes.secure_url;      // …/upload/<folder>/<public_id>.mp4
-              console.log(`Video compatibile WhatsApp: ${path}`);
-              
-              // Verifica che l'URL finisca effettivamente con .mp4
-              if (!path.endsWith('.mp4')) {
-                console.warn("ATTENZIONE: L'URL non termina con .mp4");
-                // Fallback: modifica l'estensione manualmente se necessario
-                path = path.replace(/\.[^/.]+$/, '.mp4');
-                console.log(`URL corretto manualmente: ${path}`);
-              }
-            } else {
-              throw new Error("Upload MP4 non riuscito");
-            }
-          } else {
+          // Estrai il public_id originale dall'URL
+          const match = path.match(/\/upload\/v\d+\/(.+)\.\w+$/);
+          if (!match) {
             console.warn("Impossibile estrarre l'ID pubblico dal path:", path);
+            throw new Error("Formato URL non riconosciuto");
           }
+          
+          const originalPublicId = match[1];
+          const optimizedPublicId = `${originalPublicId}_whatsapp_optimized`;
+          
+          console.log("Creazione asset MP4 per WhatsApp:", optimizedPublicId);
+          
+          /* 1️⃣ UNICO upload: crea davvero l'asset .mp4 */
+          const { secure_url } = await cloudinary.uploader.upload(path, {
+            resource_type: 'video',
+            public_id: optimizedPublicId,
+            format: 'mp4',
+            overwrite: true,
+            transformation: 'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart'
+          });
+          
+          /* 2️⃣ Usa sempre quell'URL */
+          path = secure_url.replace(/\.(mov|quicktime)$/i, '.mp4');
+          console.log('URL MP4 finale:', path);
+          
+          /* 3️⃣ Salta completamente gli altri blocchi "conversione video" */
         } catch (optimizationError) {
           console.error("Errore nell'ottimizzazione del video per WhatsApp:", optimizationError);
           // Continuiamo con l'URL originale se c'è un errore
         }
-      } else if (isVideo && !noTransformations) {
-        // Comportamento precedente con trasformazioni nell'URL
-        console.log(`Conversione video richiesta: ${originalname} in formato MP4`);
-        
-        try {
-          // URL originale
-          const originalUrl = path;
-          
-          // Estrai l'ID pubblico per aggiungere trasformazioni
-          let publicId = "";
-          
-          // Cerca l'ID pubblico nell'URL
-          const uploadMatch = originalUrl.match(/\/upload\/v\d+\/(.+)$/);
-          if (uploadMatch && uploadMatch[1]) {
-            publicId = uploadMatch[1];
-            
-            // Rimuovi l'estensione dal public_id se presente
-            const extIndex = publicId.lastIndexOf('.');
-            if (extIndex !== -1) {
-              publicId = publicId.substring(0, extIndex);
-            }
-            
-            // Costruisci il nuovo URL con le trasformazioni per la conversione
-            // Utilizza trasformazioni specifiche con:
-            // vc_h264:baseline:3.1 - Codifica video H.264 con profilo baseline e livello 3.1
-            // ac_aac - Codec audio AAC LC esplicitamente richiesto da WhatsApp
-            // br_2m - Bitrate massimo di 2 Mbps
-            // q_70 - Qualità del 70%
-            const transformations = `q_70,vc_h264:baseline:3.1,ac_aac,br_2m,f_mp4`;
-            
-            // Costruisce l'URL con trasformazioni
-            path = originalUrl.replace(/\/upload\//, `/upload/${transformations}/`);
-            
-            // Assicurati che l'estensione finale sia corretta
-            if (!path.endsWith('.mp4')) {
-              path = path.replace(/\.[^/.]+$/, '') + '.mp4';
-            }
-            
-            console.log(`Video convertito: ${path}`);
-          }
-        } catch (conversionError) {
-          console.error("Errore nella conversione del video:", conversionError);
-          // Continuiamo con l'URL originale se c'è un errore nella conversione
-        }
+      } 
+      // Rimuoviamo completamente il blocco else if (isVideo && !noTransformations)
+      // per evitare di sovrascrivere il path ottimizzato
+      
+      /* 4️⃣ PRIMA di fare res.json, assicurati che sia .mp4 */
+      if (isVideo && !path.endsWith('.mp4')) {
+        path = path.replace(/\.\w+$/, '.mp4');
+        console.log('URL corretto a .mp4:', path);
       }
       
       // Restituisci l'URL del file caricato e altre informazioni
@@ -184,7 +132,7 @@ class UploadController {
           url: path,
           originalName: originalname,
           size: size,
-          format: format,
+          format: isVideo ? 'mp4' : format, // Forza formato mp4 per i video
           resourceType: resource_type,
           fileName: public_id || originalname,
           publicId: public_id
