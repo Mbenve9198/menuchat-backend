@@ -76,10 +76,20 @@ class UploadController {
 
       let { path, originalname, size, format, resource_type, public_id } = req.file;
       
+      // Verifica parametri richiesta
+      console.log('DEBUG - Parametri richiesta:');
+      console.log('body:', req.body);
+      console.log('resource_type:', resource_type);
+      console.log('originalname:', originalname);
+      console.log('URL iniziale:', path);
+      
       // Verifica se è un video e se è richiesta l'ottimizzazione per WhatsApp
       const noTransformations = req.body.noTransformations === 'true';
       const optimizeForWhatsApp = req.body.optimizeForWhatsApp === 'true';
       const isVideo = resource_type === 'video';
+      
+      console.log('isVideo:', isVideo);
+      console.log('optimizeForWhatsApp:', optimizeForWhatsApp);
       
       if (isVideo && optimizeForWhatsApp) {
         try {
@@ -115,15 +125,20 @@ class UploadController {
           console.error("Errore nell'ottimizzazione del video per WhatsApp:", optimizationError);
           // Continuiamo con l'URL originale se c'è un errore
         }
-      } 
-      // Rimuoviamo completamente il blocco else if (isVideo && !noTransformations)
-      // per evitare di sovrascrivere il path ottimizzato
+      } else if (isVideo) {
+        // Se è un video ma non stiamo ottimizzando per WhatsApp, loghiamo il motivo
+        console.log('Video non ottimizzato per WhatsApp perché:');
+        if (!optimizeForWhatsApp) console.log('- Flag optimizeForWhatsApp non è true');
+        if (resource_type !== 'video') console.log('- resource_type non è "video"');
+      }
       
       /* 4️⃣ PRIMA di fare res.json, assicurati che sia .mp4 */
-      if (isVideo && !path.endsWith('.mp4')) {
+      if (!path.endsWith('.mp4') && (isVideo || originalname.endsWith('.mp4') || originalname.endsWith('.mov'))) {
         path = path.replace(/\.\w+$/, '.mp4');
         console.log('URL corretto a .mp4:', path);
       }
+      
+      console.log('URL restituito al client:', path);
       
       // Restituisci l'URL del file caricato e altre informazioni
       res.status(200).json({

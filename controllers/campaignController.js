@@ -1987,7 +1987,12 @@ const testUnsubscribe = async (req, res) => {
  * @returns {string} - URL compatibile con Twilio/WhatsApp
  */
 const ensureMediaCompatibility = (mediaUrl) => {
-  if (!mediaUrl) return mediaUrl;
+  console.log('ensureMediaCompatibility - URL originale:', mediaUrl);
+  
+  if (!mediaUrl) {
+    console.log('ensureMediaCompatibility - URL nullo, nessuna modifica');
+    return mediaUrl;
+  }
   
   // Verifica se è un URL Cloudinary
   const isCloudinaryUrl = mediaUrl.includes('cloudinary.com');
@@ -1999,15 +2004,22 @@ const ensureMediaCompatibility = (mediaUrl) => {
                   mediaUrl.includes('.avi') ||
                   mediaUrl.includes('.webm');
   
+  console.log('ensureMediaCompatibility - Analisi URL:', {
+    isCloudinaryUrl,
+    isVideo,
+    url: mediaUrl
+  });
+  
   // Se non è Cloudinary o non è un video, restituisci l'URL originale
   if (!isCloudinaryUrl || !isVideo) {
+    console.log('ensureMediaCompatibility - Nessuna modifica necessaria (non è un video Cloudinary)');
     return mediaUrl;
   }
   
   // Per i video Cloudinary, controlla se l'URL contiene _whatsapp_optimized
   if (mediaUrl.includes('_whatsapp_optimized')) {
     // È già un URL ottimizzato senza trasformazioni, usalo così com'è
-    console.log(`L'URL video è già ottimizzato per WhatsApp: ${mediaUrl}`);
+    console.log(`ensureMediaCompatibility - L'URL video è già ottimizzato per WhatsApp: ${mediaUrl}`);
     return mediaUrl;
   }
   
@@ -2015,14 +2027,18 @@ const ensureMediaCompatibility = (mediaUrl) => {
   const hasTransformations = mediaUrl.match(/\/upload\/([^\/]+)\//);
   
   if (hasTransformations) {
-    console.log(`ATTENZIONE: L'URL video contiene trasformazioni nell'URL che potrebbero causare problemi con Twilio/WhatsApp: ${mediaUrl}`);
-    console.log(`Considera di caricare il video senza trasformazioni nell'URL.`);
-    
-    // Non tentiamo di modificare l'URL poiché il problema è che Cloudinary serve 
-    // Content-Type: video/mp4; codecs=avc1 quando ci sono trasformazioni nell'URL
-    return mediaUrl;
+    console.log(`ensureMediaCompatibility - ATTENZIONE: L'URL video contiene trasformazioni nell'URL che potrebbero causare problemi con Twilio/WhatsApp: ${mediaUrl}`);
+    console.log(`ensureMediaCompatibility - Considera di caricare il video senza trasformazioni nell'URL.`);
   }
   
+  // Forziamo l'estensione a .mp4 se necessario
+  if (!mediaUrl.endsWith('.mp4')) {
+    const correctedUrl = mediaUrl.replace(/\.\w+$/, '.mp4');
+    console.log(`ensureMediaCompatibility - URL corretto con estensione .mp4: ${correctedUrl}`);
+    return correctedUrl;
+  }
+  
+  console.log('ensureMediaCompatibility - URL finale:', mediaUrl);
   return mediaUrl;
 };
 
