@@ -2018,14 +2018,9 @@ const ensureMediaCompatibility = (mediaUrl) => {
   
   // Per i video Cloudinary, controlla se l'URL contiene _whatsapp_optimized
   if (mediaUrl.includes('_whatsapp_optimized')) {
+    // È già un URL ottimizzato senza trasformazioni, usalo così com'è
     console.log(`ensureMediaCompatibility - L'URL video è già ottimizzato per WhatsApp: ${mediaUrl}`);
-    
-    // Aggiungi fl_attachment se non è già presente
-    if (!mediaUrl.includes('fl_attachment') && mediaUrl.includes('/upload/')) {
-      const modifiedUrl = mediaUrl.replace(/\/upload\//, '/upload/fl_attachment/');
-      console.log(`ensureMediaCompatibility - Aggiunto fl_attachment per forzare Content-Type pulito: ${modifiedUrl}`);
-      mediaUrl = modifiedUrl;
-    }
+    return mediaUrl;
   }
   
   // L'URL contiene trasformazioni che possono causare problemi con Twilio?
@@ -2033,46 +2028,14 @@ const ensureMediaCompatibility = (mediaUrl) => {
   
   if (hasTransformations) {
     console.log(`ensureMediaCompatibility - ATTENZIONE: L'URL video contiene trasformazioni nell'URL che potrebbero causare problemi con Twilio/WhatsApp: ${mediaUrl}`);
-    
-    // Se ci sono trasformazioni ma non include fl_attachment, aggiungilo
-    if (!mediaUrl.includes('fl_attachment') && mediaUrl.includes('/upload/')) {
-      const transformations = hasTransformations[1];
-      const modifiedUrl = mediaUrl.replace(/\/upload\/([^\/]+)\//, `/upload/${transformations},fl_attachment/`);
-      console.log(`ensureMediaCompatibility - Aggiunto fl_attachment alle trasformazioni: ${modifiedUrl}`);
-      mediaUrl = modifiedUrl;
-    }
-  } else if (!mediaUrl.includes('fl_attachment') && mediaUrl.includes('/upload/')) {
-    // Nessuna trasformazione ma aggiungi comunque fl_attachment per sicurezza
-    const modifiedUrl = mediaUrl.replace(/\/upload\//, '/upload/fl_attachment/');
-    console.log(`ensureMediaCompatibility - Aggiunto fl_attachment all'URL senza trasformazioni: ${modifiedUrl}`);
-    mediaUrl = modifiedUrl;
+    console.log(`ensureMediaCompatibility - Considera di caricare il video senza trasformazioni nell'URL.`);
   }
   
   // Forziamo l'estensione a .mp4 se necessario
   if (!mediaUrl.endsWith('.mp4')) {
     const correctedUrl = mediaUrl.replace(/\.\w+$/, '.mp4');
     console.log(`ensureMediaCompatibility - URL corretto con estensione .mp4: ${correctedUrl}`);
-    mediaUrl = correctedUrl;
-  }
-  
-  // Verifica Content-Type con una chiamata HEAD (asincrona)
-  try {
-    const axios = require('axios');
-    axios.head(mediaUrl).then(response => {
-      const contentType = response.headers['content-type'];
-      console.log(`ensureMediaCompatibility - Verifica Content-Type per ${mediaUrl}: ${contentType}`);
-      
-      // Log di avviso se il Content-Type è problematico
-      if (contentType && contentType.includes('codecs=avc1') && !contentType.includes('mp4a.40.2')) {
-        console.warn(`⚠️ ensureMediaCompatibility - Content-Type problematico: ${contentType}`);
-        console.warn('⚠️ Questo potrebbe causare problemi con Twilio/WhatsApp.');
-        console.warn('⚠️ Prova con fl_attachment o carica il file come resource_type:"raw"');
-      }
-    }).catch(error => {
-      console.error(`ensureMediaCompatibility - Errore nella verifica HEAD: ${error.message}`);
-    });
-  } catch (error) {
-    console.error(`ensureMediaCompatibility - Errore generale: ${error.message}`);
+    return correctedUrl;
   }
   
   console.log('ensureMediaCompatibility - URL finale:', mediaUrl);

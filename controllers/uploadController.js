@@ -86,7 +86,7 @@ class UploadController {
       // Verifica se è un video e se è richiesta l'ottimizzazione per WhatsApp
       const noTransformations = req.body.noTransformations === 'true';
       const optimizeForWhatsApp = req.body.optimizeForWhatsApp === 'true';
-      const isVideo = resource_type === 'video';
+      const isVideo = resource_type === 'video' || originalname.endsWith('.mp4') || originalname.endsWith('.mov');
       
       console.log('isVideo:', isVideo);
       console.log('optimizeForWhatsApp:', optimizeForWhatsApp);
@@ -95,96 +95,99 @@ class UploadController {
         try {
           console.log(`Ottimizzazione video per WhatsApp: ${originalname}`);
           
-          // Estrai il public_id originale dall'URL
-          const match = path.match(/\/upload\/v\d+\/(.+)\.\w+$/);
-          if (!match) {
-            console.warn("Impossibile estrarre l'ID pubblico dal path:", path);
-            throw new Error("Formato URL non riconosciuto");
-          }
+          // Verifica con una richiesta HEAD se il Content-Type è già pulito
+          const axios = require('axios');
           
-          const originalPublicId = match[1];
-          const optimizedPublicId = `${originalPublicId}_whatsapp_optimized`;
-          
-          console.log("Creazione asset MP4 per WhatsApp:", optimizedPublicId);
-          
-          /* 1️⃣ UNICO upload: crea davvero l'asset .mp4 */
-          const { secure_url } = await cloudinary.uploader.upload(path, {
-            resource_type: 'video',
-            public_id: optimizedPublicId,
-            format: 'mp4',
-            overwrite: true,
-            transformation: 'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart'
-          });
-          
-          /* 2️⃣ Usa sempre quell'URL */
-          path = secure_url.replace(/\.(mov|quicktime)$/i, '.mp4');
-          console.log('URL MP4 finale:', path);
-          
-          /* 3️⃣ Ora aggiungiamo fl_attachment per forzare il Content-Type pulito */
-          // Modifica l'URL per includere fl_attachment nella trasformazione
-          if (!path.includes('fl_attachment')) {
-            // Cerca il pattern /upload/ e inserisci fl_attachment
-            path = path.replace(/\/upload\//, '/upload/fl_attachment/');
-            console.log('URL con fl_attachment:', path);
-          }
-          
-          /* 4️⃣ Verifica dell'header Content-Type con una richiesta HEAD */
           try {
-            const axios = require('axios');
-            const head = await axios.head(path);
-            const contentType = head.headers['content-type'];
-            console.log('Content-Type dell\'URL:', contentType);
+            const headResponse = await axios.head(path);
+            const contentType = headResponse.headers['content-type'];
+            console.log('Content-Type dell\'URL originale:', contentType);
             
-            // Verifica che il Content-Type sia corretto (video/mp4 senza parametri o con mp4a.40.2)
-            if (contentType && !(/^video\/mp4(;.*mp4a\.40\.2)?$/i.test(contentType) || contentType === 'video/mp4')) {
-              console.warn('⚠️ Content-Type non conforme:', contentType);
-              console.log('URL potrebbe causare problemi con Twilio/WhatsApp');
+            // Se il Content-Type contiene il parametro codecs, dobbiamo creare un nuovo asset
+            if (contentType && contentType.includes('codecs=')) {
+              console.log('Content-Type contiene parametri codec, è necessario creare un nuovo asset');
               
-              // Se l'header è ancora problematico, possiamo provare con resource_type: 'raw'
-              if (contentType.includes('codecs=avc1') && !contentType.includes('mp4a.40.2')) {
-                console.log('Tentativo di upload come raw per forzare Content-Type pulito...');
+              // Estrai il public_id originale dall'URL
+              const match = path.match(/\/upload\/v\d+\/(.+)\.\w+$/);
+              if (!match) {
+                console.warn("Impossibile estrarre l'ID pubblico dal path:", path);
+                throw new Error("Formato URL non riconosciuto");
+              }
+              
+              const originalPublicId = match[1];
+              const optimizedPublicId = `${originalPublicId}_whatsapp_optimized`;
+              
+              console.log("Creazione asset MP4 per WhatsApp:", optimizedPublicId);
+              
+              /* 1️⃣ UNICO upload: crea davvero l'asset .mp4 */
+              const { secure_url } = await cloudinary.uploader.upload(path, {
+                resource_type: 'video',
+                public_id: optimizedPublicId,
+                format: 'mp4',
+                overwrite: true,
+                transformation: 'q_70,vc_h264:baseline:3.1,ac_aac,br_2m,fl_faststart'
+              });
+              
+              // Verifica il Content-Type del nuovo URL
+              const newHeadResponse = await axios.head(secure_url);
+              const newContentType = newHeadResponse.headers['content-type'];
+              console.log('Content-Type del nuovo asset:', newContentType);
+              
+              // Se contiene ancora codecs, dobbiamo creare un raw asset
+              if (newContentType && newContentType.includes('codecs=')) {
+                console.log('Ancora problemi di Content-Type, creiamo un asset raw');
                 
-                // Download del file MP4
-                const tempFile = `/tmp/video_${Date.now()}.mp4`;
-                const fs = require('fs');
-                const { data } = await axios.get(path, { responseType: 'arraybuffer' });
-                fs.writeFileSync(tempFile, data);
+                // Scarica il file
+                const fileResponse = await axios.get(secure_url, { responseType: 'arraybuffer' });
+                const tempFilePath = `/tmp/${optimizedPublicId}.mp4`;
+                require('fs').writeFileSync(tempFilePath, Buffer.from(fileResponse.data));
                 
-                // Upload come raw con mime_type forzato
-                const rawUploadResult = await cloudinary.uploader.upload(tempFile, {
+                // Carica come raw
+                const rawResult = await cloudinary.uploader.upload(tempFilePath, {
                   resource_type: 'raw',
                   public_id: `${optimizedPublicId}_raw`,
                   folder: 'campaign-media',
-                  access_mode: 'public',
-                  type: 'upload',
-                  format: 'mp4',
-                  mime_type: 'video/mp4'
+                  type: 'upload'
                 });
                 
-                // Usa l'URL raw
-                path = rawUploadResult.secure_url;
-                console.log('URL raw con Content-Type forzato:', path);
+                // Elimina il file temporaneo
+                require('fs').unlinkSync(tempFilePath);
                 
-                // Pulizia
-                fs.unlinkSync(tempFile);
+                // Usa l'URL raw
+                path = rawResult.secure_url;
+                console.log('URL raw per WhatsApp:', path);
+              } else {
+                // Usa l'URL trascodificato
+                path = secure_url;
+                console.log('URL trascodificato per WhatsApp:', path);
               }
+            } else {
+              console.log('Content-Type già pulito, non serve ricaricare');
             }
           } catch (headError) {
-            console.error('Errore nella verifica Content-Type:', headError.message);
+            console.warn('Errore nella verifica del Content-Type:', headError.message);
+            // Continuiamo con l'approccio standard
           }
-        } catch (optimizationError) {
-          console.error("Errore nell'ottimizzazione del video per WhatsApp:", optimizationError);
-          // Continuiamo con l'URL originale se c'è un errore
+              
+          /* 2️⃣ Assicurati che termini con .mp4 */
+          if (!path.endsWith('.mp4')) {
+            path = path.replace(/\.\w+$/, '.mp4');
+            console.log('URL corretto con estensione .mp4:', path);
+          }
+          
+          /* 3️⃣ Verifica finale */
+          console.log('URL MP4 finale:', path);
+        } catch (err) {
+          console.error('Ottimizzazione WhatsApp fallita:', err);
         }
       } else if (isVideo) {
         // Se è un video ma non stiamo ottimizzando per WhatsApp, loghiamo il motivo
         console.log('Video non ottimizzato per WhatsApp perché:');
         if (!optimizeForWhatsApp) console.log('- Flag optimizeForWhatsApp non è true');
-        if (resource_type !== 'video') console.log('- resource_type non è "video"');
       }
       
-      /* 5️⃣ PRIMA di fare res.json, assicurati che sia .mp4 */
-      if (!path.endsWith('.mp4') && (isVideo || originalname.endsWith('.mp4') || originalname.endsWith('.mov'))) {
+      /* 4️⃣ Assicurati che sia .mp4 */
+      if (isVideo && !path.endsWith('.mp4')) {
         path = path.replace(/\.\w+$/, '.mp4');
         console.log('URL corretto a .mp4:', path);
       }
@@ -199,7 +202,7 @@ class UploadController {
           originalName: originalname,
           size: size,
           format: isVideo ? 'mp4' : format, // Forza formato mp4 per i video
-          resourceType: resource_type,
+          resourceType: isVideo ? 'video' : resource_type,
           fileName: public_id || originalname,
           publicId: public_id
         }
