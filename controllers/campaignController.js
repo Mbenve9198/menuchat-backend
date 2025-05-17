@@ -2004,12 +2004,12 @@ const ensureMediaCompatibility = (mediaUrl) => {
     return mediaUrl;
   }
   
-  // Per i video Cloudinary, assicurati che sia utilizzato il formato MP4 con codec H.264 e audio AAC
+  // Per i video Cloudinary, assicurati che sia utilizzato il formato MP4 con codec H.264 (baseline) e audio AAC
   // come specificamente richiesto dalla documentazione di WhatsApp
   let optimizedUrl = mediaUrl;
   
   // Aggiungi trasformazione del codec se non presente
-  if (!optimizedUrl.includes('vc_h264:high:3.1')) {
+  if (!optimizedUrl.includes('vc_h264:baseline:3.1') || !optimizedUrl.includes('ac_aac')) {
     if (optimizedUrl.includes('/upload/')) {
       // Rimuovi qualsiasi trasformazione precedente
       if (optimizedUrl.includes('/upload/f_') || optimizedUrl.includes('/upload/q_')) {
@@ -2017,11 +2017,11 @@ const ensureMediaCompatibility = (mediaUrl) => {
         const urlParts = optimizedUrl.match(/(.*\/upload\/)([^\/]*)\/(.*)$/);
         if (urlParts && urlParts.length > 3) {
           // Ricostruisci l'URL con le nuove trasformazioni
-          optimizedUrl = `${urlParts[1]}q_70,vc_h264:high:3.1,br_2m,f_mp4/${urlParts[3]}`;
+          optimizedUrl = `${urlParts[1]}q_70,vc_h264:baseline:3.1,ac_aac,br_2m,f_mp4/${urlParts[3]}`;
         }
       } else {
         // Non ci sono trasformazioni, aggiungi quelle necessarie
-        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/q_70,vc_h264:high:3.1,br_2m,f_mp4/');
+        optimizedUrl = optimizedUrl.replace('/upload/', '/upload/q_70,vc_h264:baseline:3.1,ac_aac,br_2m,f_mp4/');
       }
     }
   }
