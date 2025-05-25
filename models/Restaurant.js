@@ -95,6 +95,57 @@ const RestaurantSchema = new Schema({
       default: Date.now
     }
   },
+  // Sistema di gamification
+  gamification: {
+    level: {
+      type: Number,
+      default: 1
+    },
+    totalExperience: {
+      type: Number,
+      default: 0
+    },
+    weeklyStreak: {
+      type: Number,
+      default: 0
+    },
+    longestStreak: {
+      type: Number,
+      default: 0
+    },
+    lastWeeklyGoalCompleted: Date,
+    achievements: [{
+      id: String,
+      name: String,
+      description: String,
+      unlockedAt: {
+        type: Date,
+        default: Date.now
+      },
+      category: {
+        type: String,
+        enum: ['reviews', 'streak', 'level', 'special']
+      }
+    }],
+    weeklyGoalHistory: [{
+      weekStart: {
+        type: Date,
+        required: true
+      },
+      target: {
+        type: Number,
+        required: true
+      },
+      achieved: {
+        type: Number,
+        default: 0
+      },
+      completed: {
+        type: Boolean,
+        default: false
+      }
+    }]
+  },
   // Conserviamo anche le recensioni se disponibili
   reviews: [{
     authorName: String,

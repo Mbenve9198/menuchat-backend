@@ -337,11 +337,13 @@ const getCampaignById = async (req, res) => {
       });
     }
 
-    // Trova la campagna
+    // Trova la campagna e popola i contatti destinatari
     const campaign = await WhatsAppCampaign.findOne({
       _id: campaignId,
       restaurant: restaurant._id
-    }).populate('template', 'name type language');
+    })
+    .populate('template', 'name type language')
+    .populate('targetAudience.manualContacts', 'name phoneNumber language interactionCount marketingConsent lastContactDate');
 
     if (!campaign) {
       return res.status(404).json({

@@ -1,6 +1,7 @@
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const Restaurant = require('../models/Restaurant');
+const mongoose = require('mongoose');
 
 /**
  * Controller per gestire le statistiche e le attività della dashboard
@@ -71,27 +72,80 @@ class StatsController {
         });
       }
 
-      // 1. MENU INVIATI: Conta le interazioni con template di menu
-      const menuInteractions = await CustomerInteraction.countDocuments({
-        restaurant: restaurantId,
-        lastTemplateId: { $exists: true, $ne: null },
-        createdAt: { $gte: startDate, $lte: endDate }
-      });
+      // Ottimizzazione: Usa aggregation pipeline per ridurre le query
+      const statsAggregation = await CustomerInteraction.aggregate([
+        {
+          $match: {
+            restaurant: new mongoose.Types.ObjectId(restaurantId)
+          }
+        },
+        {
+          $facet: {
+            // Menu inviati nel periodo corrente
+            currentMenus: [
+              {
+                $match: {
+                  lastTemplateId: { $exists: true, $ne: null },
+                  createdAt: { $gte: startDate, $lte: endDate }
+                }
+              },
+              { $count: "count" }
+            ],
+            // Richieste recensioni nel periodo corrente
+            currentReviews: [
+              {
+                $match: {
+                  $or: [
+                    { 'reviewData.requested': true },
+                    { scheduledReviewMessageId: { $exists: true, $ne: null } }
+                  ],
+                  $and: [
+                    { $or: [
+                      { 'reviewData.requestedAt': { $gte: startDate, $lte: endDate } },
+                      { reviewScheduledFor: { $gte: startDate, $lte: endDate } }
+                    ]}
+                  ]
+                }
+              },
+              { $count: "count" }
+            ],
+            // Menu inviati nel periodo precedente
+            previousMenus: [
+              {
+                $match: {
+                  lastTemplateId: { $exists: true, $ne: null },
+                  createdAt: { $gte: startDate.getTime() - (endDate.getTime() - startDate.getTime()), $lt: startDate.getTime() }
+                }
+              },
+              { $count: "count" }
+            ],
+            // Richieste recensioni settimana corrente
+            weeklyReviews: [
+              {
+                $match: {
+                  $or: [
+                    { 'reviewData.requested': true },
+                    { scheduledReviewMessageId: { $exists: true, $ne: null } }
+                  ],
+                  $and: [
+                    { $or: [
+                      { 'reviewData.requestedAt': { $gte: startOfWeek, $lte: endDate } },
+                      { reviewScheduledFor: { $gte: startOfWeek, $lte: endDate } }
+                    ]}
+                  ]
+                }
+              },
+              { $count: "count" }
+            ]
+          }
+        }
+      ]);
 
-      // 2. RICHIESTE DI RECENSIONE: Conta i messaggi di recensione inviati o programmati
-      const reviewRequests = await CustomerInteraction.countDocuments({
-        restaurant: restaurantId,
-        $or: [
-          { 'reviewData.requested': true },
-          { scheduledReviewMessageId: { $exists: true, $ne: null } }
-        ],
-        $and: [
-          { $or: [
-            { 'reviewData.requestedAt': { $gte: startDate, $lte: endDate } },
-            { reviewScheduledFor: { $gte: startDate, $lte: endDate } }
-          ]}
-        ]
-      });
+      const stats = statsAggregation[0];
+      const menuInteractions = stats.currentMenus[0]?.count || 0;
+      const reviewRequests = stats.currentReviews[0]?.count || 0;
+      const previousMenuInteractions = stats.previousMenus[0]?.count || 0;
+      const lastWeekReviewRequests = stats.weeklyReviews[0]?.count || 0;
 
       // 3. RECENSIONI RACCOLTE: Calcola recensioni nel periodo selezionato
       const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
@@ -109,23 +163,8 @@ class StatsController {
         reviewsCollected = totalReviewsCollected;
       }
 
-      // 4. OBIETTIVO SETTIMANALE: 10% dei messaggi di recensione degli ultimi 7 giorni
-      const lastWeekReviewRequests = await CustomerInteraction.countDocuments({
-        restaurant: restaurantId,
-        $or: [
-          { 'reviewData.requested': true },
-          { scheduledReviewMessageId: { $exists: true, $ne: null } }
-        ],
-        $and: [
-          { $or: [
-            { 'reviewData.requestedAt': { $gte: startOfWeek, $lte: endDate } },
-            { reviewScheduledFor: { $gte: startOfWeek, $lte: endDate } }
-          ]}
-        ]
-      });
-
-      // Calcola l'obiettivo settimanale (10% dei messaggi di recensione)
-      const weeklyGoal = Math.max(Math.ceil(lastWeekReviewRequests * 0.1), 1); // Almeno 1
+      // 4. OBIETTIVO SETTIMANALE: Sistema di gamification migliorato
+      const weeklyGoal = Math.max(Math.ceil(lastWeekReviewRequests * 0.1), 1);
 
       // Recensioni effettivamente raccolte questa settimana
       const weeklyReviewsCollected = restaurant.reviews
@@ -137,6 +176,32 @@ class StatsController {
         ? Math.min(Math.round((weeklyReviewsCollected / weeklyGoal) * 100), 100) 
         : 0;
 
+      // Sistema di livelli basato sul numero totale di recensioni raccolte
+      const totalReviewsEver = Math.max(0, currentReviewCount - initialReviewCount);
+      const level = Math.floor(totalReviewsEver / 10) + 1;
+      const reviewsToNextLevel = (level * 10) - totalReviewsEver;
+      
+      // Calcola streak settimanali (settimane consecutive con obiettivo raggiunto)
+      const weeklyStreak = await this.calculateWeeklyStreak(restaurantId, restaurant);
+      
+      // Aggiorna i dati di gamification nel ristorante
+      await this.updateGamificationData(restaurant, {
+        level,
+        totalExperience: totalReviewsEver * 10, // 10 XP per recensione
+        weeklyStreak,
+        weeklyGoalProgress,
+        weeklyGoal,
+        weeklyReviewsCollected
+      });
+
+      // Sistema di badge/achievement
+      const achievements = await this.calculateAchievements(restaurantId, {
+        totalReviews: totalReviewsEver,
+        weeklyStreak,
+        level,
+        weeklyGoalProgress
+      });
+
       // Calcola i giorni rimanenti nella settimana
       const now = new Date();
       const endOfWeek = new Date(startOfWeek);
@@ -146,36 +211,6 @@ class StatsController {
       // Calcola le tendenze rispetto al periodo precedente (per indicatori di crescita)
       const previousPeriodDuration = endDate.getTime() - startDate.getTime();
       const previousPeriodStart = new Date(startDate.getTime() - previousPeriodDuration);
-
-      // Tendenza per menu inviati
-      const previousMenuInteractions = await CustomerInteraction.countDocuments({
-        restaurant: restaurantId,
-        lastTemplateId: { $exists: true, $ne: null },
-        createdAt: { $gte: previousPeriodStart, $lt: startDate }
-      });
-
-      // Tendenza per recensioni richieste
-      const previousReviewRequests = await CustomerInteraction.countDocuments({
-        restaurant: restaurantId,
-        $or: [
-          { 'reviewData.requested': true },
-          { scheduledReviewMessageId: { $exists: true, $ne: null } }
-        ],
-        $and: [
-          { $or: [
-            { 'reviewData.requestedAt': { $gte: previousPeriodStart, $lt: startDate } },
-            { reviewScheduledFor: { $gte: previousPeriodStart, $lt: startDate } }
-          ]}
-        ]
-      });
-
-      // Tendenza per recensioni raccolte
-      let previousReviewsCollected = 0;
-      if (restaurant.reviews && restaurant.reviews.length > 0) {
-        previousReviewsCollected = restaurant.reviews.filter(review => 
-          new Date(review.time) >= previousPeriodStart && new Date(review.time) < startDate
-        ).length;
-      }
 
       // Funzione per calcolare la variazione percentuale
       const calculateTrend = (current, previous) => {
@@ -199,9 +234,13 @@ class StatsController {
         },
         trends: {
           menusSent: calculateTrend(menuInteractions, previousMenuInteractions),
-          reviewRequests: calculateTrend(reviewRequests, previousReviewRequests),
-          reviewsCollected: calculateTrend(reviewsCollected, previousReviewsCollected)
-        }
+          reviewRequests: calculateTrend(reviewRequests, lastWeekReviewRequests),
+          reviewsCollected: calculateTrend(reviewsCollected, totalReviewsCollected)
+        },
+        level: level,
+        reviewsToNextLevel: reviewsToNextLevel,
+        weeklyStreak: weeklyStreak,
+        achievements
       });
     } catch (error) {
       console.error('Error getting stats:', error);
@@ -332,6 +371,172 @@ class StatsController {
         day: 'numeric',
         year: time.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
       });
+    }
+  }
+
+  async calculateAchievements(restaurantId, data) {
+    const { totalReviews, weeklyStreak, level, weeklyGoalProgress } = data;
+    const achievements = [];
+
+    // Achievement per recensioni totali
+    const reviewMilestones = [5, 10, 25, 50, 100, 250, 500];
+    reviewMilestones.forEach(milestone => {
+      if (totalReviews >= milestone) {
+        achievements.push({
+          id: `reviews_${milestone}`,
+          name: `${milestone} Recensioni`,
+          description: `Hai raccolto ${milestone} recensioni!`,
+          category: 'reviews',
+          icon: '⭐',
+          rarity: milestone >= 100 ? 'legendary' : milestone >= 50 ? 'epic' : 'common'
+        });
+      }
+    });
+
+    // Achievement per streak
+    if (weeklyStreak >= 3) {
+      achievements.push({
+        id: 'streak_3',
+        name: 'Costanza',
+        description: '3 settimane consecutive di obiettivi raggiunti',
+        category: 'streak',
+        icon: '🔥',
+        rarity: 'rare'
+      });
+    }
+
+    if (weeklyStreak >= 10) {
+      achievements.push({
+        id: 'streak_10',
+        name: 'Inarrestabile',
+        description: '10 settimane consecutive di obiettivi raggiunti',
+        category: 'streak',
+        icon: '🚀',
+        rarity: 'legendary'
+      });
+    }
+
+    // Achievement per livello
+    if (level >= 5) {
+      achievements.push({
+        id: 'level_5',
+        name: 'Esperto',
+        description: 'Hai raggiunto il livello 5',
+        category: 'level',
+        icon: '🏆',
+        rarity: 'epic'
+      });
+    }
+
+    // Achievement per performance perfetta
+    if (weeklyGoalProgress === 100) {
+      achievements.push({
+        id: 'perfect_week',
+        name: 'Settimana Perfetta',
+        description: 'Obiettivo settimanale completato al 100%',
+        category: 'special',
+        icon: '💎',
+        rarity: 'rare'
+      });
+    }
+
+    return achievements;
+  }
+
+  async calculateWeeklyStreak(restaurantId, restaurant) {
+    try {
+      // Calcola le settimane consecutive in cui l'obiettivo è stato raggiunto
+      const gamification = restaurant.gamification || {};
+      const weeklyGoalHistory = gamification.weeklyGoalHistory || [];
+      
+      // Ordina per data più recente
+      const sortedHistory = weeklyGoalHistory
+        .sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+      
+      let streak = 0;
+      for (const week of sortedHistory) {
+        if (week.completed) {
+          streak++;
+        } else {
+          break; // Interrompe al primo obiettivo non raggiunto
+        }
+      }
+      
+      return streak;
+    } catch (error) {
+      console.error('Error calculating weekly streak:', error);
+      return 0;
+    }
+  }
+
+  async updateGamificationData(restaurant, data) {
+    try {
+      const { level, totalExperience, weeklyStreak, weeklyGoalProgress, weeklyGoal, weeklyReviewsCollected } = data;
+      
+      // Inizializza gamification se non esiste
+      if (!restaurant.gamification) {
+        restaurant.gamification = {
+          level: 1,
+          totalExperience: 0,
+          weeklyStreak: 0,
+          longestStreak: 0,
+          achievements: [],
+          weeklyGoalHistory: []
+        };
+      }
+      
+      // Aggiorna i dati
+      restaurant.gamification.level = level;
+      restaurant.gamification.totalExperience = totalExperience;
+      restaurant.gamification.weeklyStreak = weeklyStreak;
+      
+      // Aggiorna il record di streak più lungo
+      if (weeklyStreak > restaurant.gamification.longestStreak) {
+        restaurant.gamification.longestStreak = weeklyStreak;
+      }
+      
+      // Calcola l'inizio della settimana corrente
+      const startOfWeek = new Date();
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      
+      // Verifica se esiste già un record per questa settimana
+      const existingWeekIndex = restaurant.gamification.weeklyGoalHistory.findIndex(
+        week => new Date(week.weekStart).getTime() === startOfWeek.getTime()
+      );
+      
+      const weekData = {
+        weekStart: startOfWeek,
+        target: weeklyGoal,
+        achieved: weeklyReviewsCollected,
+        completed: weeklyGoalProgress >= 100
+      };
+      
+      if (existingWeekIndex >= 0) {
+        // Aggiorna il record esistente
+        restaurant.gamification.weeklyGoalHistory[existingWeekIndex] = weekData;
+      } else {
+        // Aggiungi nuovo record
+        restaurant.gamification.weeklyGoalHistory.push(weekData);
+      }
+      
+      // Mantieni solo le ultime 12 settimane per performance
+      if (restaurant.gamification.weeklyGoalHistory.length > 12) {
+        restaurant.gamification.weeklyGoalHistory = restaurant.gamification.weeklyGoalHistory
+          .sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart))
+          .slice(0, 12);
+      }
+      
+      // Aggiorna la data dell'ultimo obiettivo completato
+      if (weeklyGoalProgress >= 100) {
+        restaurant.gamification.lastWeeklyGoalCompleted = new Date();
+      }
+      
+      // Salva le modifiche
+      await restaurant.save();
+      
+    } catch (error) {
+      console.error('Error updating gamification data:', error);
     }
   }
 }
