@@ -176,10 +176,54 @@ class StatsController {
         ? Math.min(Math.round((weeklyReviewsCollected / weeklyGoal) * 100), 100) 
         : 0;
 
-      // Sistema di livelli basato sul numero totale di recensioni raccolte
-      const totalReviewsEver = Math.max(0, currentReviewCount - initialReviewCount);
-      const level = Math.floor(totalReviewsEver / 10) + 1;
-      const reviewsToNextLevel = (level * 10) - totalReviewsEver;
+      // Sistema di livelli narrativi (unificato con il frontend)
+      const getLevelInfo = (totalReviews) => {
+        if (totalReviews < 100) {
+          return {
+            level: "Newbie",
+            nextLevel: "Rising Star",
+            current: totalReviews,
+            target: 100,
+            remaining: 100 - totalReviews,
+            progress: (totalReviews / 100) * 100,
+            numericLevel: Math.floor(totalReviews / 10) + 1
+          }
+        } else if (totalReviews < 500) {
+          return {
+            level: "Rising Star",
+            nextLevel: "MasterChef",
+            current: totalReviews,
+            target: 500,
+            remaining: 500 - totalReviews,
+            progress: ((totalReviews - 100) / 400) * 100,
+            numericLevel: Math.floor(totalReviews / 10) + 1
+          }
+        } else if (totalReviews < 1000) {
+          return {
+            level: "MasterChef",
+            nextLevel: "Culinary Legend",
+            current: totalReviews,
+            target: 1000,
+            remaining: 1000 - totalReviews,
+            progress: ((totalReviews - 500) / 500) * 100,
+            numericLevel: Math.floor(totalReviews / 10) + 1
+          }
+        } else {
+          return {
+            level: "Culinary Legend",
+            nextLevel: null,
+            current: totalReviews,
+            target: 10000,
+            remaining: totalReviews >= 10000 ? 0 : 10000 - totalReviews,
+            progress: ((totalReviews - 1000) / 9000) * 100 > 100 ? 100 : ((totalReviews - 1000) / 9000) * 100,
+            numericLevel: Math.floor(totalReviews / 10) + 1
+          }
+        }
+      }
+
+      const levelInfo = getLevelInfo(totalReviewsCollected)
+      const level = levelInfo.numericLevel
+      const reviewsToNextLevel = levelInfo.remaining
       
       // Calcola streak settimanali (settimane consecutive con obiettivo raggiunto)
       const weeklyStreak = await this.calculateWeeklyStreak(restaurantId, restaurant);
@@ -187,7 +231,7 @@ class StatsController {
       // Aggiorna i dati di gamification nel ristorante
       await this.updateGamificationData(restaurant, {
         level,
-        totalExperience: totalReviewsEver * 10, // 10 XP per recensione
+        totalExperience: totalReviewsCollected * 10, // 10 XP per recensione
         weeklyStreak,
         weeklyGoalProgress,
         weeklyGoal,
@@ -196,7 +240,7 @@ class StatsController {
 
       // Sistema di badge/achievement
       const achievements = await this.calculateAchievements(restaurantId, {
-        totalReviews: totalReviewsEver,
+        totalReviews: totalReviewsCollected,
         weeklyStreak,
         level,
         weeklyGoalProgress
@@ -238,6 +282,14 @@ class StatsController {
           reviewsCollected: calculateTrend(reviewsCollected, totalReviewsCollected)
         },
         level: level,
+        levelInfo: {
+          level: levelInfo.level,
+          nextLevel: levelInfo.nextLevel,
+          current: levelInfo.current,
+          target: levelInfo.target,
+          remaining: levelInfo.remaining,
+          progress: levelInfo.progress
+        },
         reviewsToNextLevel: reviewsToNextLevel,
         weeklyStreak: weeklyStreak,
         achievements
