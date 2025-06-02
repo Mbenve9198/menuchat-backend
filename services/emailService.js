@@ -4,7 +4,13 @@ const CampaignSuggestion = require('../models/CampaignSuggestion');
 
 class EmailService {
   constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    // Solo inizializza Resend se la chiave API è presente
+    if (process.env.RESEND_API_KEY) {
+      this.resend = new Resend(process.env.RESEND_API_KEY);
+    } else {
+      this.resend = null;
+      console.warn('⚠️  RESEND_API_KEY non trovata. Le email non potranno essere inviate, ma le anteprime funzioneranno.');
+    }
     this.fromEmail = process.env.FROM_EMAIL || 'noreply@menuchat.com';
   }
 
@@ -116,6 +122,7 @@ class EmailService {
 
     const t = texts[language];
     const { restaurantName, metrics, period } = data;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://menuchat.com';
 
     return `
 <!DOCTYPE html>
@@ -124,37 +131,223 @@ class EmailService {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${t.title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fffe; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; }
-        .header { background: linear-gradient(135deg, #1B9AAA 0%, #06D6A0 100%); padding: 40px 20px; text-align: center; }
-        .header h1 { color: white; margin: 0; font-size: 24px; font-weight: bold; }
-        .header p { color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px; }
-        .content { padding: 40px 20px; }
-        .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
-        .metrics { display: flex; flex-wrap: wrap; gap: 20px; margin: 30px 0; }
-        .metric { flex: 1; min-width: 150px; background: #f8fffe; padding: 20px; border-radius: 12px; text-align: center; border-left: 4px solid #1B9AAA; }
-        .metric-value { font-size: 32px; font-weight: bold; color: #1B9AAA; margin-bottom: 5px; }
-        .metric-label { font-size: 14px; color: #666; }
-        .performance { background: #e8f5e8; padding: 20px; border-radius: 12px; margin: 30px 0; }
-        .performance h3 { color: #2d5a2d; margin: 0 0 10px 0; }
-        .performance p { color: #4a7c4a; margin: 0; }
-        .cta { text-align: center; margin: 40px 0; }
-        .cta a { background: linear-gradient(135deg, #1B9AAA 0%, #06D6A0 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; }
-        .footer { background: #f8fffe; padding: 20px; text-align: center; color: #666; font-size: 14px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f8fffe; 
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: white; 
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #FFE14D 0%, #FFA726 100%); 
+            padding: 40px 20px; 
+            text-align: center; 
+            position: relative;
+            border-bottom: 3px solid #000;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('${frontendUrl}/mascottes/mascotte_flying.png') no-repeat center;
+            background-size: 80px;
+            opacity: 0.1;
+        }
+        .header h1 { 
+            color: #000; 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: 700; 
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
+        }
+        .header p { 
+            color: #333; 
+            margin: 10px 0 0 0; 
+            font-size: 16px; 
+            font-weight: 500;
+        }
+        .mascotte-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .mascotte-img {
+            width: 120px;
+            height: auto;
+            border-radius: 50%;
+            border: 4px solid #FFE14D;
+            box-shadow: 0 6px 0 #000;
+            background: white;
+            padding: 10px;
+        }
+        .content { 
+            padding: 40px 20px; 
+        }
+        .greeting { 
+            font-size: 20px; 
+            color: #333; 
+            margin-bottom: 20px; 
+            font-weight: 600;
+        }
+        .metrics { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+            margin: 30px 0; 
+        }
+        .metric { 
+            flex: 1; 
+            min-width: 150px; 
+            background: #fff; 
+            padding: 25px 20px; 
+            border-radius: 16px; 
+            text-align: center; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            position: relative;
+        }
+        .metric::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: linear-gradient(45deg, #FFE14D, #FFA726);
+            border-radius: 16px;
+            z-index: -1;
+        }
+        .metric-value { 
+            font-size: 36px; 
+            font-weight: 700; 
+            color: #1B9AAA; 
+            margin-bottom: 8px; 
+            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
+        }
+        .metric-label { 
+            font-size: 14px; 
+            color: #666; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .performance { 
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4f1d4 100%); 
+            padding: 25px; 
+            border-radius: 16px; 
+            margin: 30px 0; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+        }
+        .performance h3 { 
+            color: #2d5a2d; 
+            margin: 0 0 15px 0; 
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .performance p { 
+            color: #4a7c4a; 
+            margin: 0; 
+            font-size: 16px;
+        }
+        .cta { 
+            text-align: center; 
+            margin: 40px 0; 
+        }
+        .cta-button { 
+            background: #FFE14D; 
+            color: #000; 
+            padding: 18px 36px; 
+            text-decoration: none; 
+            border-radius: 50px; 
+            font-weight: 700; 
+            font-size: 16px;
+            display: inline-block; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cta-button:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 0 #000;
+        }
+        .footer { 
+            background: #f8fffe; 
+            padding: 30px 20px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px; 
+            border-top: 3px solid #000;
+        }
+        .footer-logo {
+            width: 60px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        .decorative-elements {
+            position: relative;
+            height: 40px;
+            overflow: hidden;
+        }
+        .star {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #FFE14D;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            animation: twinkle 2s infinite;
+        }
+        .star:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .star:nth-child(2) { left: 30%; animation-delay: 0.5s; }
+        .star:nth-child(3) { left: 50%; animation-delay: 1s; }
+        .star:nth-child(4) { left: 70%; animation-delay: 1.5s; }
+        .star:nth-child(5) { left: 90%; animation-delay: 2s; }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        
+        @media (max-width: 600px) {
+            .metrics { flex-direction: column; }
+            .metric { min-width: auto; }
+            .header h1 { font-size: 24px; }
+            .cta-button { padding: 15px 30px; font-size: 14px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>${restaurantName}</h1>
-            <p>${t.title}</p>
+            <h1>MenuChat</h1>
+            <p>${restaurantName}</p>
+        </div>
+        
+        <div class="mascotte-container">
+            <img src="${frontendUrl}/mascottes/mascotte_base.png" alt="MenuChat Mascotte" class="mascotte-img">
         </div>
         
         <div class="content">
             <div class="greeting">${t.greeting}! 👋</div>
             
-            <h2>${t.subtitle}</h2>
+            <h2 style="color: #333; font-size: 24px; font-weight: 600; margin-bottom: 20px;">${t.subtitle}</h2>
             
             <div class="metrics">
                 <div class="metric">
@@ -177,12 +370,21 @@ class EmailService {
             </div>
             
             <div class="cta">
-                <a href="${process.env.FRONTEND_URL || 'https://menuchat.com'}/dashboard">${t.dashboard}</a>
+                <a href="${frontendUrl}/dashboard" class="cta-button">${t.dashboard}</a>
             </div>
         </div>
         
+        <div class="decorative-elements">
+            <div class="star"></div>
+            <div class="star"></div>
+            <div class="star"></div>
+            <div class="star"></div>
+            <div class="star"></div>
+        </div>
+        
         <div class="footer">
-            ${t.footer}
+            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
+            <div>${t.footer}</div>
         </div>
     </div>
 </body>
@@ -234,6 +436,7 @@ class EmailService {
 
     const t = texts[language];
     const { restaurantName, metrics, period } = data;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://menuchat.com';
 
     return `
 <!DOCTYPE html>
@@ -242,35 +445,229 @@ class EmailService {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${t.title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fffe; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; }
-        .header { background: linear-gradient(135deg, #EF476F 0%, #FF8A9A 100%); padding: 40px 20px; text-align: center; }
-        .header h1 { color: white; margin: 0; font-size: 24px; font-weight: bold; }
-        .header p { color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px; }
-        .content { padding: 40px 20px; }
-        .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
-        .metrics { display: flex; flex-wrap: wrap; gap: 20px; margin: 30px 0; }
-        .metric { flex: 1; min-width: 150px; background: #fff5f7; padding: 20px; border-radius: 12px; text-align: center; border-left: 4px solid #EF476F; }
-        .metric-value { font-size: 32px; font-weight: bold; color: #EF476F; margin-bottom: 5px; }
-        .metric-label { font-size: 14px; color: #666; margin-bottom: 10px; }
-        .metric-growth { font-size: 12px; color: #06D6A0; font-weight: bold; }
-        .cta { text-align: center; margin: 40px 0; }
-        .cta a { background: linear-gradient(135deg, #EF476F 0%, #FF8A9A 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; }
-        .footer { background: #f8fffe; padding: 20px; text-align: center; color: #666; font-size: 14px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f8fffe; 
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: white; 
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #EF476F 0%, #FF8A9A 100%); 
+            padding: 40px 20px; 
+            text-align: center; 
+            position: relative;
+            border-bottom: 3px solid #000;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('${frontendUrl}/mascottes/mascotte_rock.png') no-repeat center;
+            background-size: 80px;
+            opacity: 0.1;
+        }
+        .header h1 { 
+            color: #000; 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: 700; 
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
+        }
+        .header p { 
+            color: #333; 
+            margin: 10px 0 0 0; 
+            font-size: 16px; 
+            font-weight: 500;
+        }
+        .mascotte-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .mascotte-img {
+            width: 120px;
+            height: auto;
+            border-radius: 50%;
+            border: 4px solid #EF476F;
+            box-shadow: 0 6px 0 #000;
+            background: white;
+            padding: 10px;
+        }
+        .content { 
+            padding: 40px 20px; 
+        }
+        .greeting { 
+            font-size: 20px; 
+            color: #333; 
+            margin-bottom: 20px; 
+            font-weight: 600;
+        }
+        .metrics { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+            margin: 30px 0; 
+        }
+        .metric { 
+            flex: 1; 
+            min-width: 150px; 
+            background: #fff; 
+            padding: 25px 20px; 
+            border-radius: 16px; 
+            text-align: center; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            position: relative;
+        }
+        .metric::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: linear-gradient(45deg, #EF476F, #FF8A9A);
+            border-radius: 16px;
+            z-index: -1;
+        }
+        .metric-value { 
+            font-size: 36px; 
+            font-weight: 700; 
+            color: #EF476F; 
+            margin-bottom: 8px; 
+            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
+        }
+        .metric-label { 
+            font-size: 14px; 
+            color: #666; 
+            margin-bottom: 10px; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .metric-growth { 
+            font-size: 12px; 
+            color: #06D6A0; 
+            font-weight: 700;
+            background: rgba(6, 214, 160, 0.1);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 2px solid #06D6A0;
+        }
+        .cta { 
+            text-align: center; 
+            margin: 40px 0; 
+        }
+        .cta-button { 
+            background: #FFE14D; 
+            color: #000; 
+            padding: 18px 36px; 
+            text-decoration: none; 
+            border-radius: 50px; 
+            font-weight: 700; 
+            font-size: 16px;
+            display: inline-block; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cta-button:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 0 #000;
+        }
+        .footer { 
+            background: #f8fffe; 
+            padding: 30px 20px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px; 
+            border-top: 3px solid #000;
+        }
+        .footer-logo {
+            width: 60px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        .decorative-elements {
+            position: relative;
+            height: 40px;
+            overflow: hidden;
+        }
+        .heart {
+            position: absolute;
+            width: 20px;
+            height: 18px;
+            background: #EF476F;
+            transform: rotate(-45deg);
+            animation: pulse 2s infinite;
+        }
+        .heart::before,
+        .heart::after {
+            content: '';
+            width: 20px;
+            height: 18px;
+            position: absolute;
+            left: 10px;
+            background: #EF476F;
+            border-radius: 10px 10px 0 0;
+            transform: rotate(-45deg);
+            transform-origin: 0 100%;
+        }
+        .heart::after {
+            left: 0;
+            transform: rotate(45deg);
+            transform-origin: 100% 100%;
+        }
+        .heart:nth-child(1) { left: 15%; animation-delay: 0s; }
+        .heart:nth-child(2) { left: 35%; animation-delay: 0.4s; }
+        .heart:nth-child(3) { left: 55%; animation-delay: 0.8s; }
+        .heart:nth-child(4) { left: 75%; animation-delay: 1.2s; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: rotate(-45deg) scale(1); }
+            50% { opacity: 1; transform: rotate(-45deg) scale(1.2); }
+        }
+        
+        @media (max-width: 600px) {
+            .metrics { flex-direction: column; }
+            .metric { min-width: auto; }
+            .header h1 { font-size: 24px; }
+            .cta-button { padding: 15px 30px; font-size: 14px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>${restaurantName}</h1>
-            <p>${t.title}</p>
+            <h1>MenuChat</h1>
+            <p>${restaurantName}</p>
+        </div>
+        
+        <div class="mascotte-container">
+            <img src="${frontendUrl}/mascottes/mascotte_rock.png" alt="MenuChat Mascotte" class="mascotte-img">
         </div>
         
         <div class="content">
             <div class="greeting">${t.greeting}! 📈</div>
             
-            <h2>${t.subtitle}</h2>
+            <h2 style="color: #333; font-size: 24px; font-weight: 600; margin-bottom: 20px;">${t.subtitle}</h2>
             
             <div class="metrics">
                 <div class="metric">
@@ -291,12 +688,20 @@ class EmailService {
             </div>
             
             <div class="cta">
-                <a href="${process.env.FRONTEND_URL || 'https://menuchat.com'}/dashboard">${t.dashboard}</a>
+                <a href="${frontendUrl}/dashboard" class="cta-button">${t.dashboard}</a>
             </div>
         </div>
         
+        <div class="decorative-elements">
+            <div class="heart"></div>
+            <div class="heart"></div>
+            <div class="heart"></div>
+            <div class="heart"></div>
+        </div>
+        
         <div class="footer">
-            ${t.footer}
+            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
+            <div>${t.footer}</div>
         </div>
     </div>
 </body>
@@ -318,7 +723,7 @@ class EmailService {
         expected: 'Risultati attesi',
         instructions: 'Istruzioni passo-passo',
         step: 'Passo',
-        implement: 'Implementa Campagna',
+        implement: 'Crea Campagna',
         footer: 'Suggerimento generato dall\'AI di MenuChat'
       },
       english: {
@@ -331,7 +736,7 @@ class EmailService {
         expected: 'Expected results',
         instructions: 'Step-by-step instructions',
         step: 'Step',
-        implement: 'Implement Campaign',
+        implement: 'Create Campaign',
         footer: 'Suggestion generated by MenuChat AI'
       },
       español: {
@@ -344,13 +749,14 @@ class EmailService {
         expected: 'Resultados esperados',
         instructions: 'Instrucciones paso a paso',
         step: 'Paso',
-        implement: 'Implementar Campaña',
+        implement: 'Crear Campaña',
         footer: 'Sugerencia generada por la IA de MenuChat'
       }
     };
 
     const t = texts[language];
     const { restaurantName, suggestion } = data;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://menuchat.com';
 
     return `
 <!DOCTYPE html>
@@ -359,37 +765,271 @@ class EmailService {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${t.title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f8fffe; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; }
-        .header { background: linear-gradient(135deg, #FFE14D 0%, #FFA726 100%); padding: 40px 20px; text-align: center; }
-        .header h1 { color: #333; margin: 0; font-size: 24px; font-weight: bold; }
-        .header p { color: #666; margin: 10px 0 0 0; font-size: 16px; }
-        .content { padding: 40px 20px; }
-        .greeting { font-size: 18px; color: #333; margin-bottom: 20px; }
-        .suggestion-card { background: #fffbf0; border: 2px solid #FFE14D; border-radius: 12px; padding: 25px; margin: 20px 0; }
-        .suggestion-title { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px; }
-        .suggestion-desc { color: #666; margin-bottom: 20px; line-height: 1.6; }
-        .detail-item { margin: 15px 0; }
-        .detail-label { font-weight: bold; color: #333; margin-bottom: 5px; }
-        .detail-value { color: #666; }
-        .instructions { background: #f8fffe; border-radius: 12px; padding: 20px; margin: 20px 0; }
-        .instructions h3 { color: #1B9AAA; margin: 0 0 15px 0; }
-        .step { margin: 15px 0; padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #1B9AAA; }
-        .step-number { font-weight: bold; color: #1B9AAA; }
-        .step-title { font-weight: bold; color: #333; margin: 5px 0; }
-        .step-desc { color: #666; margin: 5px 0; }
-        .step-action { color: #EF476F; font-weight: bold; margin: 5px 0; }
-        .cta { text-align: center; margin: 40px 0; }
-        .cta a { background: linear-gradient(135deg, #FFE14D 0%, #FFA726 100%); color: #333; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; }
-        .footer { background: #f8fffe; padding: 20px; text-align: center; color: #666; font-size: 14px; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f8fffe; 
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: white; 
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); 
+            padding: 40px 20px; 
+            text-align: center; 
+            position: relative;
+            border-bottom: 3px solid #000;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('${frontendUrl}/mascottes/mascotte_running.png') no-repeat center;
+            background-size: 80px;
+            opacity: 0.1;
+        }
+        .header h1 { 
+            color: #000; 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: 700; 
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
+        }
+        .header p { 
+            color: #333; 
+            margin: 10px 0 0 0; 
+            font-size: 16px; 
+            font-weight: 500;
+        }
+        .mascotte-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .mascotte-img {
+            width: 120px;
+            height: auto;
+            border-radius: 50%;
+            border: 4px solid #8B5CF6;
+            box-shadow: 0 6px 0 #000;
+            background: white;
+            padding: 10px;
+        }
+        .content { 
+            padding: 40px 20px; 
+        }
+        .greeting { 
+            font-size: 20px; 
+            color: #333; 
+            margin-bottom: 20px; 
+            font-weight: 600;
+        }
+        .suggestion-card { 
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
+            border: 3px solid #000; 
+            border-radius: 16px; 
+            padding: 30px; 
+            margin: 20px 0; 
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            position: relative;
+        }
+        .suggestion-card::before {
+            content: '💡';
+            position: absolute;
+            top: -15px;
+            right: 20px;
+            font-size: 30px;
+            background: #FFE14D;
+            border: 3px solid #000;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 0 #000;
+        }
+        .suggestion-title { 
+            font-size: 22px; 
+            font-weight: 700; 
+            color: #333; 
+            margin-bottom: 15px; 
+        }
+        .suggestion-desc { 
+            color: #666; 
+            margin-bottom: 25px; 
+            line-height: 1.6; 
+            font-size: 16px;
+        }
+        .detail-item { 
+            margin: 20px 0; 
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            border: 2px solid #000;
+            box-shadow: 0 3px 0 #000;
+            transform: translateY(-3px);
+        }
+        .detail-label { 
+            font-weight: 700; 
+            color: #333; 
+            margin-bottom: 8px; 
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .detail-value { 
+            color: #666; 
+            font-size: 15px;
+        }
+        .instructions { 
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+            border-radius: 16px; 
+            padding: 25px; 
+            margin: 25px 0; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+        }
+        .instructions h3 { 
+            color: #1B9AAA; 
+            margin: 0 0 20px 0; 
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .step { 
+            margin: 20px 0; 
+            padding: 20px; 
+            background: white; 
+            border-radius: 12px; 
+            border: 3px solid #000;
+            box-shadow: 0 4px 0 #000;
+            transform: translateY(-4px);
+            position: relative;
+        }
+        .step::before {
+            content: '';
+            position: absolute;
+            left: -3px;
+            top: -3px;
+            bottom: -3px;
+            width: 6px;
+            background: #1B9AAA;
+            border-radius: 12px 0 0 12px;
+        }
+        .step-number { 
+            font-weight: 700; 
+            color: #1B9AAA; 
+            font-size: 16px;
+        }
+        .step-title { 
+            font-weight: 700; 
+            color: #333; 
+            margin: 8px 0; 
+            font-size: 16px;
+        }
+        .step-desc { 
+            color: #666; 
+            margin: 8px 0; 
+            line-height: 1.5;
+        }
+        .step-action { 
+            color: #EF476F; 
+            font-weight: 700; 
+            margin: 8px 0; 
+            font-size: 14px;
+        }
+        .cta { 
+            text-align: center; 
+            margin: 40px 0; 
+        }
+        .cta-button { 
+            background: #FFE14D; 
+            color: #000; 
+            padding: 18px 36px; 
+            text-decoration: none; 
+            border-radius: 50px; 
+            font-weight: 700; 
+            font-size: 16px;
+            display: inline-block; 
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cta-button:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 0 #000;
+        }
+        .footer { 
+            background: #f8fffe; 
+            padding: 30px 20px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px; 
+            border-top: 3px solid #000;
+        }
+        .footer-logo {
+            width: 60px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        .decorative-elements {
+            position: relative;
+            height: 40px;
+            overflow: hidden;
+        }
+        .sparkle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #8B5CF6;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+            animation: sparkle 1.5s infinite;
+        }
+        .sparkle:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .sparkle:nth-child(2) { left: 25%; animation-delay: 0.3s; }
+        .sparkle:nth-child(3) { left: 40%; animation-delay: 0.6s; }
+        .sparkle:nth-child(4) { left: 55%; animation-delay: 0.9s; }
+        .sparkle:nth-child(5) { left: 70%; animation-delay: 1.2s; }
+        .sparkle:nth-child(6) { left: 85%; animation-delay: 1.5s; }
+        
+        @keyframes sparkle {
+            0%, 100% { opacity: 0.2; transform: scale(1) rotate(0deg); }
+            50% { opacity: 1; transform: scale(1.3) rotate(180deg); }
+        }
+        
+        @media (max-width: 600px) {
+            .header h1 { font-size: 24px; }
+            .cta-button { padding: 15px 30px; font-size: 14px; }
+            .suggestion-card { padding: 20px; }
+            .step { padding: 15px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>${restaurantName}</h1>
-            <p>${t.title}</p>
+            <h1>MenuChat</h1>
+            <p>${restaurantName}</p>
+        </div>
+        
+        <div class="mascotte-container">
+            <img src="${frontendUrl}/mascottes/mascotte_running.png" alt="MenuChat Mascotte" class="mascotte-img">
         </div>
         
         <div class="content">
@@ -433,12 +1073,22 @@ class EmailService {
             </div>
             
             <div class="cta">
-                <a href="${process.env.FRONTEND_URL || 'https://menuchat.com'}/campaign/create">${t.implement}</a>
+                <a href="${frontendUrl}/campaign/create" class="cta-button">${t.implement}</a>
             </div>
         </div>
         
+        <div class="decorative-elements">
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+        </div>
+        
         <div class="footer">
-            ${t.footer}
+            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
+            <div>${t.footer}</div>
         </div>
     </div>
 </body>
@@ -450,6 +1100,11 @@ class EmailService {
    */
   async sendEmail(to, subject, content, type, reportData, userId, restaurantId, language) {
     try {
+      // Controlla se Resend è disponibile
+      if (!this.resend) {
+        throw new Error('Resend non è configurato. Aggiungi RESEND_API_KEY alle variabili ambiente.');
+      }
+
       // Crea il record dell'email nel database
       const emailReport = new EmailReport({
         user: userId,
@@ -570,6 +1225,50 @@ class EmailService {
       restaurant._id,
       user.languagePreference
     );
+  }
+
+  /**
+   * Genera HTML per anteprima report giornaliero
+   */
+  generateDailyReportHTML(user, restaurant, metrics) {
+    const data = {
+      restaurantName: restaurant.name,
+      metrics,
+      period: {
+        startDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        endDate: new Date()
+      }
+    };
+
+    return this.generateDailyReportContent(data, user.languagePreference || 'italiano');
+  }
+
+  /**
+   * Genera HTML per anteprima report settimanale
+   */
+  generateWeeklyReportHTML(user, restaurant, metrics) {
+    const data = {
+      restaurantName: restaurant.name,
+      metrics,
+      period: {
+        startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        endDate: new Date()
+      }
+    };
+
+    return this.generateWeeklyReportContent(data, user.languagePreference || 'italiano');
+  }
+
+  /**
+   * Genera HTML per anteprima suggerimento campagna
+   */
+  generateCampaignSuggestionHTML(user, restaurant, suggestion) {
+    const data = {
+      restaurantName: restaurant.name,
+      suggestion
+    };
+
+    return this.generateCampaignSuggestionContent(data, user.languagePreference || 'italiano');
   }
 }
 

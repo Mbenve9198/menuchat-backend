@@ -91,7 +91,7 @@ class SetupController {
         }
 
         console.log('Lingue con menu valide:', languagesWithMenu.map(l => 
-          `${l.code} - ${l.menuUrl ? 'URL: ' + l.menuUrl : 'PDF: ' + l.menuPdfUrl}`
+          `${l.language.code} - ${l.menuUrl ? 'URL: ' + l.menuUrl : 'PDF: ' + l.menuPdfUrl}`
         ));
 
         // Determina il tipo principale di menu (se c'è almeno un PDF, usa 'pdf', altrimenti 'url')

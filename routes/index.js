@@ -9,6 +9,7 @@ const campaignTemplateRoutes = require('./campaignTemplateRoutes');
 const schedulerRoutes = require('./scheduler');
 const emailPreferencesRoutes = require('./emailPreferences');
 const userPreferencesRoutes = require('./userPreferences');
+const emailTestRoutes = require('./emailTest');
 
 const router = express.Router();
 
@@ -38,6 +39,9 @@ router.use('/email-preferences', emailPreferencesRoutes);
 
 // Rotte delle preferenze utente
 router.use('/user/preferences', userPreferencesRoutes);
+
+// Rotte per testare le email
+router.use('/email-test', emailTestRoutes);
 
 // Rotte API generali
 router.use('/', apiRoutes);

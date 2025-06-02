@@ -212,13 +212,12 @@ class WhatsAppTemplateService {
           return hasUrl || hasPdf;
         });
         
-        console.log('Lingue con menu trovate:', languagesToProcess.map(l => `${l.code} (${l.menuUrl ? 'URL' : 'PDF'})`));
+        console.log('Lingue con menu trovate:', languagesToProcess.map(l => `${l.language.code} (${l.menuUrl ? 'URL' : 'PDF'})`));
       } else {
         // Fallback alle lingue di default con l'URL fornito
         const languages = ['it', 'en', 'es', 'de', 'fr'];
         languagesToProcess = languages.map(lang => ({
-          code: lang,
-          name: lang,
+          language: { code: lang, name: lang },
           menuUrl: type === 'url' ? menuUrl : '',
           menuPdfUrl: type === 'pdf' ? menuUrl : ''
         }));
@@ -229,12 +228,12 @@ class WhatsAppTemplateService {
       }
       
       // Traduci il messaggio in tutte le lingue usando Claude
-      const languageCodes = languagesToProcess.map(lang => lang.code);
+      const languageCodes = languagesToProcess.map(lang => lang.language.code);
       const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, languageCodes);
 
       // Crea un template per ogni lingua con menu
       const templates = await Promise.all(languagesToProcess.map(async (langData) => {
-        const templateName = `${baseTemplateName}_${langData.code}`;
+        const templateName = `${baseTemplateName}_${langData.language.code}`;
         
         // Determina l'URL da usare per questa lingua
         let languageMenuUrl;
@@ -251,13 +250,13 @@ class WhatsAppTemplateService {
           languageMenuUrl = menuUrl;
         }
 
-        console.log(`Creando template per ${langData.code}: tipo=${languageType}, URL=${languageMenuUrl}`);
+        console.log(`Creando template per ${langData.language.code}: tipo=${languageType}, URL=${languageMenuUrl}`);
 
         const templateData = {
           restaurant: restaurantId,
           type: languageType === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
           name: templateName,
-          language: langData.code,
+          language: langData.language.code,
           variables: [{
             index: 1,
             name: "customerName",
@@ -265,9 +264,9 @@ class WhatsAppTemplateService {
           }],
           components: {
             body: {
-              text: translatedMessages[langData.code] || translatedMessages[languageCodes[0]],
+              text: translatedMessages[langData.language.code] || translatedMessages[languageCodes[0]],
               example: {
-                body_text: [(translatedMessages[langData.code] || translatedMessages[languageCodes[0]]).replace('{{1}}', 'John')]
+                body_text: [(translatedMessages[langData.language.code] || translatedMessages[languageCodes[0]]).replace('{{1}}', 'John')]
               }
             }
           }
@@ -276,30 +275,30 @@ class WhatsAppTemplateService {
         // Aggiungi componenti specifici in base al tipo
         if (languageType === 'pdf') {
           if (!languageMenuUrl) {
-            console.error(`ERRORE: PDF URL mancante per il template MEDIA in lingua ${langData.code}`);
-            throw new Error(`PDF URL is required for MEDIA template in language ${langData.code}`);
+            console.error(`ERRORE: PDF URL mancante per il template MEDIA in lingua ${langData.language.code}`);
+            throw new Error(`PDF URL is required for MEDIA template in language ${langData.language.code}`);
           }
           
-          console.log(`Setting up PDF template for ${langData.code} with URL:`, languageMenuUrl);
+          console.log(`Setting up PDF template for ${langData.language.code} with URL:`, languageMenuUrl);
           templateData.components.header = {
             type: 'DOCUMENT',
             format: 'PDF',
             example: languageMenuUrl
           };
         } else if (languageType === 'url' && languageMenuUrl) {
-          console.log(`Setting up URL template for ${langData.code} with URL:`, languageMenuUrl);
+          console.log(`Setting up URL template for ${langData.language.code} with URL:`, languageMenuUrl);
           templateData.components.buttons = [{
             type: 'URL',
-            text: langData.code === 'it' ? 'Vedi Menu' :
-                  langData.code === 'en' ? 'View Menu' :
-                  langData.code === 'es' ? 'Ver Menú' :
-                  langData.code === 'de' ? 'Menü anzeigen' :
+            text: langData.language.code === 'it' ? 'Vedi Menu' :
+                  langData.language.code === 'en' ? 'View Menu' :
+                  langData.language.code === 'es' ? 'Ver Menú' :
+                  langData.language.code === 'de' ? 'Menü anzeigen' :
                   'Voir le Menu',
             url: languageMenuUrl
           }];
         } else {
-          console.error(`ERRORE: URL mancante per il template CALL_TO_ACTION in lingua ${langData.code}`);
-          throw new Error(`URL is required for CALL_TO_ACTION template in language ${langData.code}`);
+          console.error(`ERRORE: URL mancante per il template CALL_TO_ACTION in lingua ${langData.language.code}`);
+          throw new Error(`URL is required for CALL_TO_ACTION template in language ${langData.language.code}`);
         }
 
         // Crea il template nel database
