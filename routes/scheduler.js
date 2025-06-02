@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const schedulerService = require('../services/schedulerService');
-const auth = require('../middleware/auth');
+const { protect } = require('../middleware/authMiddleware');
 
 /**
  * GET /api/scheduler/status
  * Ottieni lo status dello scheduler
  */
-router.get('/status', auth, async (req, res) => {
+router.get('/status', protect, async (req, res) => {
   try {
     const status = schedulerService.getStatus();
     res.json({
@@ -27,7 +27,7 @@ router.get('/status', auth, async (req, res) => {
  * POST /api/scheduler/run/:jobType
  * Esegui manualmente un job specifico
  */
-router.post('/run/:jobType', auth, async (req, res) => {
+router.post('/run/:jobType', protect, async (req, res) => {
   try {
     const { jobType } = req.params;
     
@@ -63,7 +63,7 @@ router.post('/run/:jobType', auth, async (req, res) => {
  * POST /api/scheduler/restart
  * Riavvia lo scheduler
  */
-router.post('/restart', auth, async (req, res) => {
+router.post('/restart', protect, async (req, res) => {
   try {
     schedulerService.restart();
     
@@ -85,7 +85,7 @@ router.post('/restart', auth, async (req, res) => {
  * POST /api/scheduler/stop
  * Ferma lo scheduler
  */
-router.post('/stop', auth, async (req, res) => {
+router.post('/stop', protect, async (req, res) => {
   try {
     schedulerService.stopAll();
     
