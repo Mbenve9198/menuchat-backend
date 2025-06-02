@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { User } = require('../models');
-const auth = require('../middleware/auth');
+const { protect } = require('../middleware/authMiddleware');
 
 /**
  * GET /api/user/preferences
  * Ottieni le preferenze dell'utente corrente
  */
-router.get('/', auth, async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('languagePreference timezone emailPreferences');
     
@@ -45,7 +45,7 @@ router.get('/', auth, async (req, res) => {
  * PUT /api/user/preferences
  * Aggiorna le preferenze dell'utente
  */
-router.put('/', auth, async (req, res) => {
+router.put('/', protect, async (req, res) => {
   try {
     const { languagePreference, timezone, emailPreferences } = req.body;
 
