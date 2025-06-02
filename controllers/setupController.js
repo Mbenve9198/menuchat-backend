@@ -76,41 +76,42 @@ class SetupController {
         // Determina il tipo di menu e crea il template appropriato
         const menuLanguages = formData.menuLanguages || [];
 
-        // Trova una lingua con menuPdfUrl (file PDF caricato)
-        const languageWithPdf = menuLanguages.find(lang => 
-          lang.menuPdfUrl && lang.menuPdfUrl.trim() !== ''
-        );
+        console.log('Menu languages ricevute:', JSON.stringify(menuLanguages, null, 2));
 
-        // Trova una lingua con menuUrl (URL esterno)
-        const languageWithUrl = menuLanguages.find(lang => 
-          lang.menuUrl && lang.menuUrl.trim() !== ''
-        );
+        // Verifica che ci sia almeno una lingua con un menu
+        const languagesWithMenu = menuLanguages.filter(lang => {
+          const hasUrl = lang.menuUrl && lang.menuUrl.trim() !== '';
+          const hasPdf = lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '';
+          return hasUrl || hasPdf;
+        });
 
-        let menuType, menuLinkUrl;
-
-        // Priorità al PDF se disponibile
-        if (languageWithPdf) {
-          console.log('Trovato PDF caricato:', languageWithPdf.menuPdfUrl);
-          menuType = 'pdf';
-          menuLinkUrl = languageWithPdf.menuPdfUrl;
-        } else if (languageWithUrl) {
-          console.log('Trovato URL del menu:', languageWithUrl.menuUrl);
-          menuType = 'url';
-          menuLinkUrl = languageWithUrl.menuUrl;
-        } else {
-          console.error('Nessun URL del menu o PDF trovato');
-          throw new Error('Nessun URL del menu o PDF trovato');
+        if (languagesWithMenu.length === 0) {
+          console.error('Nessuna lingua con menu trovata');
+          throw new Error('È necessario configurare almeno un menu (URL o PDF) per una lingua');
         }
 
-        console.log('Tipo di menu selezionato:', menuType);
-        console.log('URL selezionato:', menuLinkUrl);
+        console.log('Lingue con menu valide:', languagesWithMenu.map(l => 
+          `${l.code} - ${l.menuUrl ? 'URL: ' + l.menuUrl : 'PDF: ' + l.menuPdfUrl}`
+        ));
 
-        // Crea il template del menu
+        // Determina il tipo principale di menu (se c'è almeno un PDF, usa 'pdf', altrimenti 'url')
+        const hasAnyPdf = languagesWithMenu.some(lang => lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '');
+        const menuType = hasAnyPdf ? 'pdf' : 'url';
+
+        // Per retrocompatibilità, trova un URL di fallback
+        const fallbackLanguage = languagesWithMenu[0];
+        const fallbackUrl = fallbackLanguage.menuPdfUrl || fallbackLanguage.menuUrl || '';
+
+        console.log('Tipo di menu determinato:', menuType);
+        console.log('URL di fallback:', fallbackUrl);
+
+        // Crea il template del menu passando le lingue specifiche
         menuTemplate = await whatsappTemplateService.createMenuTemplate(
           restaurant._id,
           menuType,
           formData.welcomeMessage,
-          menuLinkUrl
+          fallbackUrl,
+          menuLanguages // Passa l'array completo delle lingue
         );
 
         // Crea il template per le recensioni

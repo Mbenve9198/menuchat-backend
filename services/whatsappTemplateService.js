@@ -185,11 +185,12 @@ class WhatsAppTemplateService {
   /**
    * Crea un nuovo template per il menu (PDF o URL) in tutte le lingue supportate
    */
-  async createMenuTemplate(restaurantId, type, welcomeMessage, menuUrl = null) {
+  async createMenuTemplate(restaurantId, type, welcomeMessage, menuUrl = null, menuLanguages = null) {
     try {
       console.log('=== CREATING MENU TEMPLATE ===');
       console.log('Type:', type);
       console.log('Menu URL:', menuUrl);
+      console.log('Menu Languages:', menuLanguages);
       
       // Trova il ristorante per ottenere il nome
       const restaurant = await Restaurant.findById(restaurantId);
@@ -200,73 +201,115 @@ class WhatsAppTemplateService {
       // Genera un nome univoco per il template base
       const baseTemplateName = await this.generateTemplateUniqueName(restaurant.name, type);
 
-      // Lingue supportate
-      const languages = ['it', 'en', 'es', 'de', 'fr'];
+      // Se abbiamo menuLanguages specifiche, usale; altrimenti usa le lingue di default
+      let languagesToProcess;
+      
+      if (menuLanguages && menuLanguages.length > 0) {
+        // Filtra solo le lingue che hanno effettivamente un menu (URL o PDF)
+        languagesToProcess = menuLanguages.filter(lang => {
+          const hasUrl = lang.menuUrl && lang.menuUrl.trim() !== '';
+          const hasPdf = lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '';
+          return hasUrl || hasPdf;
+        });
+        
+        console.log('Lingue con menu trovate:', languagesToProcess.map(l => `${l.code} (${l.menuUrl ? 'URL' : 'PDF'})`));
+      } else {
+        // Fallback alle lingue di default con l'URL fornito
+        const languages = ['it', 'en', 'es', 'de', 'fr'];
+        languagesToProcess = languages.map(lang => ({
+          code: lang,
+          name: lang,
+          menuUrl: type === 'url' ? menuUrl : '',
+          menuPdfUrl: type === 'pdf' ? menuUrl : ''
+        }));
+      }
+
+      if (languagesToProcess.length === 0) {
+        throw new Error('Nessuna lingua con menu valido trovata');
+      }
       
       // Traduci il messaggio in tutte le lingue usando Claude
-      const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, languages);
+      const languageCodes = languagesToProcess.map(lang => lang.code);
+      const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, languageCodes);
 
-      // Crea un template per ogni lingua
-      const templates = await Promise.all(languages.map(async (lang) => {
-        const templateName = `${baseTemplateName}_${lang}`;
+      // Crea un template per ogni lingua con menu
+      const templates = await Promise.all(languagesToProcess.map(async (langData) => {
+        const templateName = `${baseTemplateName}_${langData.code}`;
+        
+        // Determina l'URL da usare per questa lingua
+        let languageMenuUrl;
+        let languageType = type;
+        
+        if (langData.menuPdfUrl && langData.menuPdfUrl.trim() !== '') {
+          languageMenuUrl = langData.menuPdfUrl;
+          languageType = 'pdf';
+        } else if (langData.menuUrl && langData.menuUrl.trim() !== '') {
+          languageMenuUrl = langData.menuUrl;
+          languageType = 'url';
+        } else {
+          // Fallback all'URL generale se fornito
+          languageMenuUrl = menuUrl;
+        }
 
-      const templateData = {
-        restaurant: restaurantId,
-        type: type === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
-        name: templateName,
-          language: lang,
+        console.log(`Creando template per ${langData.code}: tipo=${languageType}, URL=${languageMenuUrl}`);
+
+        const templateData = {
+          restaurant: restaurantId,
+          type: languageType === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
+          name: templateName,
+          language: langData.code,
           variables: [{
             index: 1,
             name: "customerName",
             example: "John"
           }],
-        components: {
-          body: {
-              text: translatedMessages[lang],
-            example: {
-                body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
+          components: {
+            body: {
+              text: translatedMessages[langData.code] || translatedMessages[languageCodes[0]],
+              example: {
+                body_text: [(translatedMessages[langData.code] || translatedMessages[languageCodes[0]]).replace('{{1}}', 'John')]
               }
+            }
           }
-        }
-      };
-
-      // Aggiungi componenti specifici in base al tipo
-      if (type === 'pdf') {
-        if (!menuUrl) {
-          console.error('ERRORE: PDF URL mancante per il template MEDIA');
-          throw new Error('PDF URL is required for MEDIA template');
-        }
-        
-        console.log('Setting up PDF template with URL:', menuUrl);
-        templateData.components.header = {
-          type: 'DOCUMENT',
-          format: 'PDF',
-          example: menuUrl
         };
-      } else if (type === 'url' && menuUrl) {
-        console.log('Setting up URL template with URL:', menuUrl);
-        templateData.components.buttons = [{
-          type: 'URL',
-            text: lang === 'it' ? 'Vedi Menu' :
-                  lang === 'en' ? 'View Menu' :
-                  lang === 'es' ? 'Ver Menú' :
-                  lang === 'de' ? 'Menü anzeigen' :
+
+        // Aggiungi componenti specifici in base al tipo
+        if (languageType === 'pdf') {
+          if (!languageMenuUrl) {
+            console.error(`ERRORE: PDF URL mancante per il template MEDIA in lingua ${langData.code}`);
+            throw new Error(`PDF URL is required for MEDIA template in language ${langData.code}`);
+          }
+          
+          console.log(`Setting up PDF template for ${langData.code} with URL:`, languageMenuUrl);
+          templateData.components.header = {
+            type: 'DOCUMENT',
+            format: 'PDF',
+            example: languageMenuUrl
+          };
+        } else if (languageType === 'url' && languageMenuUrl) {
+          console.log(`Setting up URL template for ${langData.code} with URL:`, languageMenuUrl);
+          templateData.components.buttons = [{
+            type: 'URL',
+            text: langData.code === 'it' ? 'Vedi Menu' :
+                  langData.code === 'en' ? 'View Menu' :
+                  langData.code === 'es' ? 'Ver Menú' :
+                  langData.code === 'de' ? 'Menü anzeigen' :
                   'Voir le Menu',
-          url: menuUrl
-        }];
-      } else {
-        console.error('ERRORE: URL mancante per il template CALL_TO_ACTION');
-        throw new Error('URL is required for CALL_TO_ACTION template');
-      }
+            url: languageMenuUrl
+          }];
+        } else {
+          console.error(`ERRORE: URL mancante per il template CALL_TO_ACTION in lingua ${langData.code}`);
+          throw new Error(`URL is required for CALL_TO_ACTION template in language ${langData.code}`);
+        }
 
-      // Crea il template nel database
-      const template = new WhatsAppTemplate(templateData);
-      await template.save();
+        // Crea il template nel database
+        const template = new WhatsAppTemplate(templateData);
+        await template.save();
 
-      // Invia il template a Twilio per approvazione
+        // Invia il template a Twilio per approvazione
         await this.submitTemplateToTwilio(template);
 
-      return template;
+        return template;
       }));
 
       return templates;
