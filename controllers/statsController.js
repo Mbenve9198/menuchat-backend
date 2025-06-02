@@ -85,8 +85,8 @@ class StatsController {
             currentMenus: [
               {
                 $match: {
-                  lastTemplateId: { $exists: true, $ne: null },
-                  createdAt: { $gte: startDate, $lte: endDate }
+        lastTemplateId: { $exists: true, $ne: null },
+        createdAt: { $gte: startDate, $lte: endDate }
                 }
               },
               { $count: "count" }
@@ -95,16 +95,16 @@ class StatsController {
             currentReviews: [
               {
                 $match: {
-                  $or: [
-                    { 'reviewData.requested': true },
-                    { scheduledReviewMessageId: { $exists: true, $ne: null } }
-                  ],
-                  $and: [
-                    { $or: [
-                      { 'reviewData.requestedAt': { $gte: startDate, $lte: endDate } },
-                      { reviewScheduledFor: { $gte: startDate, $lte: endDate } }
-                    ]}
-                  ]
+        $or: [
+          { 'reviewData.requested': true },
+          { scheduledReviewMessageId: { $exists: true, $ne: null } }
+        ],
+        $and: [
+          { $or: [
+            { 'reviewData.requestedAt': { $gte: startDate, $lte: endDate } },
+            { reviewScheduledFor: { $gte: startDate, $lte: endDate } }
+          ]}
+        ]
                 }
               },
               { $count: "count" }

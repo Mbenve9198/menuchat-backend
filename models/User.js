@@ -36,6 +36,30 @@ const UserSchema = new Schema({
     enum: ['italiano', 'english', 'español'],
     default: 'italiano'
   },
+  // Preferenze email transazionali
+  emailPreferences: {
+    dailyReports: {
+      type: Boolean,
+      default: true
+    },
+    weeklyReports: {
+      type: Boolean,
+      default: true
+    },
+    campaignSuggestions: {
+      type: Boolean,
+      default: true
+    },
+    marketingEmails: {
+      type: Boolean,
+      default: true
+    }
+  },
+  // Timezone per l'invio delle email
+  timezone: {
+    type: String,
+    default: 'Europe/Rome'
+  },
   createdAt: {
     type: Date,
     default: Date.now,

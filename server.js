@@ -9,6 +9,7 @@ const routes = require('./routes');
 const axios = require('axios');
 const cron = require('node-cron');
 const googlePlacesService = require('./services/googlePlacesService');
+const schedulerService = require('./services/schedulerService');
 
 // Inizializza Express
 const app = express();
@@ -118,4 +119,7 @@ app.listen(PORT, () => {
   
   // Avvia il job per aggiornare le recensioni da Google Places
   setupGooglePlacesReviewsJob();
+  
+  // Inizializza lo scheduler per le email transazionali
+  schedulerService.init();
 }); 

@@ -6,6 +6,8 @@ const Menu = require('./Menu');
 const BotConfiguration = require('./BotConfiguration');
 const CustomerInteraction = require('./CustomerInteraction');
 const Analytics = require('./Analytics');
+const EmailReport = require('./EmailReport');
+const CampaignSuggestion = require('./CampaignSuggestion');
 
 module.exports = {
   User,
@@ -13,5 +15,7 @@ module.exports = {
   Menu,
   BotConfiguration,
   CustomerInteraction,
-  Analytics
+  Analytics,
+  EmailReport,
+  CampaignSuggestion
 }; 
