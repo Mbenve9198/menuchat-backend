@@ -19,8 +19,19 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Aumenta il timeout per le richieste che potrebbero richiedere più tempo
+app.use((req, res, next) => {
+  // Timeout più lungo per endpoint che creano template o fanno operazioni pesanti
+  if (req.path.includes('/setup') || req.path.includes('/templates')) {
+    req.setTimeout(120000); // 2 minuti
+    res.setTimeout(120000); // 2 minuti
+  }
+  next();
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     const allowedOrigins = [
