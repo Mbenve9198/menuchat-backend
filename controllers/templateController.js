@@ -5,7 +5,7 @@ const Restaurant = require('../models/Restaurant');
 /**
  * Aggiorna un template in tutte le lingue disponibili
  */
-async function updateTemplatesInAllLanguages(sourceTemplate, newMessage) {
+async function updateTemplatesInAllLanguages(sourceTemplate, newMessage, menuUrl = null, menuPdfUrl = null) {
   // Estrai le informazioni necessarie dal template sorgente
   const templateType = sourceTemplate.type;
   const restaurantId = sourceTemplate.restaurant;
@@ -41,6 +41,22 @@ async function updateTemplatesInAllLanguages(sourceTemplate, newMessage) {
     const lang = template.language;
     if (translatedMessages[lang]) {
       template.components.body.text = translatedMessages[lang];
+      
+      // Aggiorna l'URL del menu per template CALL_TO_ACTION
+      if (menuUrl && template.type === 'CALL_TO_ACTION') {
+        if (template.components.buttons && template.components.buttons.length > 0) {
+          template.components.buttons[0].url = menuUrl;
+        }
+      }
+      
+      // Aggiorna il PDF del menu per template MEDIA
+      if (menuPdfUrl && template.type === 'MEDIA') {
+        if (!template.components.header) {
+          template.components.header = {};
+        }
+        template.components.header.example = menuPdfUrl;
+      }
+      
       template.status = 'PENDING';
       await template.save();
       
@@ -247,7 +263,7 @@ class TemplateController {
   async updateTemplate(req, res) {
     try {
       const { templateId } = req.params;
-      const { message, updateAllLanguages } = req.body;
+      const { message, updateAllLanguages, menuUrl, menuPdfUrl, buttonText } = req.body;
 
       // Trova il template esistente
       const template = await WhatsAppTemplate.findById(templateId);
@@ -260,7 +276,12 @@ class TemplateController {
 
       if (updateAllLanguages) {
         // Se richiesto, aggiorna il template in tutte le lingue
-        const updatedTemplates = await updateTemplatesInAllLanguages(template, message);
+        const updatedTemplates = await updateTemplatesInAllLanguages(template, message, menuUrl, menuPdfUrl);
+        
+        // Se è stato fornito un buttonText, aggiorna anche quello in tutte le lingue
+        if (buttonText && template.type === 'REVIEW') {
+          await updateButtonTextInAllLanguages(template, buttonText);
+        }
         
         return res.json({
           success: true,
@@ -269,6 +290,29 @@ class TemplateController {
       } else {
         // Aggiorna solo il template specifico
         template.components.body.text = message;
+        
+        // Gestisci l'aggiornamento dell'URL del menu per template CALL_TO_ACTION
+        if (menuUrl && template.type === 'CALL_TO_ACTION') {
+          if (template.components.buttons && template.components.buttons.length > 0) {
+            template.components.buttons[0].url = menuUrl;
+          }
+        }
+        
+        // Gestisci l'aggiornamento del PDF del menu per template MEDIA
+        if (menuPdfUrl && template.type === 'MEDIA') {
+          if (!template.components.header) {
+            template.components.header = {};
+          }
+          template.components.header.example = menuPdfUrl;
+        }
+        
+        // Gestisci l'aggiornamento del testo del pulsante per template REVIEW
+        if (buttonText && template.type === 'REVIEW') {
+          if (template.components.buttons && template.components.buttons.length > 0) {
+            template.components.buttons[0].text = buttonText;
+          }
+        }
+        
         template.status = 'PENDING'; // Reset status since we're submitting a new version
         await template.save();
 
