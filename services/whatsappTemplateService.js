@@ -407,7 +407,11 @@ Requirements:
 1. Keep the same tone and style
 2. Preserve all formatting and emojis
 3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY a valid JSON object with language codes as keys and translations as values, like this example:
+4. Return ONLY a valid JSON object with language codes as keys and translations as values
+5. IMPORTANT: If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+6. Do not use quotation marks within the translated text to ensure valid JSON
+
+Example format:
 {
   "it": "Ciao {{1}}, benvenuto!",
   "en": "Hi {{1}}, welcome!",
@@ -437,13 +441,17 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
       }
 
-      // Sanitizza il JSON per rimuovere caratteri di controllo
+      // Sanitizza il JSON per rimuovere caratteri di controllo e gestire le virgolette
       const sanitizedJson = jsonStr
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Rimuove tutti i caratteri di controllo
         .replace(/\n/g, '\\n') // Gestisce correttamente i newline
         .replace(/\r/g, '\\r') // Gestisce correttamente i carriage return
-        .replace(/\\"/g, '"') // Ripara eventuali doppi escape di virgolette
-        .replace(/\\\\n/g, '\\n'); // Ripara eventuali doppi escape di newline
+        .replace(/\t/g, '\\t') // Gestisce correttamente i tab
+        // Gestisce le virgolette non escaped all'interno delle stringhe
+        .replace(/"([^"]*)"([^"]*)"([^"]*)"/g, (match, p1, p2, p3) => {
+          // Se troviamo virgolette doppie all'interno di una stringa, le escapiamo
+          return `"${p1}\\"${p2}\\"${p3}"`;
+        });
 
       console.log('JSON sanitizzato:', sanitizedJson);
 
@@ -455,13 +463,47 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         console.error('Errore nel parsing JSON:', parseError);
         console.error('JSON problematico:', sanitizedJson);
         
-        // Tentativo di riparazione ulteriore
-        const fixedJson = sanitizedJson
-          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":') // Assicura che le chiavi siano tra virgolette
-          .replace(/:\s*'([^']*)'/g, ':"$1"'); // Sostituisce gli apici singoli con doppi per i valori
+        // Tentativo di riparazione più aggressivo
+        let fixedJson = sanitizedJson;
         
-        console.log('JSON riparato:', fixedJson);
-        translations = JSON.parse(fixedJson);
+        try {
+          // Metodo alternativo: usa una regex più robusta per gestire le virgolette
+          fixedJson = sanitizedJson.replace(/"([^"]*(?:"[^"]*)*[^"]*)"/g, (match, content) => {
+            // Escape tutte le virgolette interne
+            const escapedContent = content.replace(/"/g, '\\"');
+            return `"${escapedContent}"`;
+          });
+          
+          console.log('JSON riparato (metodo 1):', fixedJson);
+          translations = JSON.parse(fixedJson);
+        } catch (secondError) {
+          console.error('Secondo tentativo di parsing fallito:', secondError);
+          
+          // Ultimo tentativo: parsing manuale per estrarre le traduzioni
+          try {
+            const languageMatches = sanitizedJson.match(/"([a-z]{2})"\s*:\s*"([^"]+(?:\\.[^"]*)*)"/g);
+            if (languageMatches) {
+              translations = {};
+              languageMatches.forEach(match => {
+                const [, lang, text] = match.match(/"([a-z]{2})"\s*:\s*"([^"]+(?:\\.[^"]*)*)"/);
+                // Rimuovi gli escape aggiunti artificialmente e mantieni solo quelli necessari
+                translations[lang] = text.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+              });
+              console.log('Traduzioni estratte manualmente:', translations);
+            } else {
+              throw new Error('Impossibile estrarre le traduzioni dal JSON malformato');
+            }
+          } catch (manualError) {
+            console.error('Parsing manuale fallito:', manualError);
+            
+            // Fallback: usa solo il messaggio originale per tutte le lingue
+            console.warn('Usando il messaggio originale come fallback per tutte le lingue');
+            translations = {};
+            languages.forEach(lang => {
+              translations[lang] = messageWithTwilioVar;
+            });
+          }
+        }
       }
 
       // Verifica che tutte le lingue richieste siano presenti
@@ -496,7 +538,11 @@ Requirements:
 1. Keep the same tone and style
 2. Preserve all formatting and emojis
 3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY a valid JSON object with language codes as keys and translations as values, like this example:
+4. Return ONLY a valid JSON object with language codes as keys and translations as values
+5. IMPORTANT: If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+6. Do not use quotation marks within the translated text to ensure valid JSON
+
+Example format:
 {
   "it": "Grazie {{1}}!",
   "en": "Thank you {{1}}",
@@ -526,13 +572,17 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         jsonStr = responseText.replace(/```json\n|\```\n|```/g, '').trim();
       }
 
-      // Sanitizza il JSON per rimuovere caratteri di controllo
+      // Sanitizza il JSON per rimuovere caratteri di controllo e gestire le virgolette
       const sanitizedJson = jsonStr
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Rimuove tutti i caratteri di controllo
         .replace(/\n/g, '\\n') // Gestisce correttamente i newline
         .replace(/\r/g, '\\r') // Gestisce correttamente i carriage return
-        .replace(/\\"/g, '"') // Ripara eventuali doppi escape di virgolette
-        .replace(/\\\\n/g, '\\n'); // Ripara eventuali doppi escape di newline
+        .replace(/\t/g, '\\t') // Gestisce correttamente i tab
+        // Gestisce le virgolette non escaped all'interno delle stringhe
+        .replace(/"([^"]*)"([^"]*)"([^"]*)"/g, (match, p1, p2, p3) => {
+          // Se troviamo virgolette doppie all'interno di una stringa, le escapiamo
+          return `"${p1}\\"${p2}\\"${p3}"`;
+        });
 
       console.log('JSON sanitizzato:', sanitizedJson);
 
@@ -544,13 +594,47 @@ DO NOT include any markdown formatting, backticks, or the word "json" in your re
         console.error('Errore nel parsing JSON:', parseError);
         console.error('JSON problematico:', sanitizedJson);
         
-        // Tentativo di riparazione ulteriore
-        const fixedJson = sanitizedJson
-          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":') // Assicura che le chiavi siano tra virgolette
-          .replace(/:\s*'([^']*)'/g, ':"$1"'); // Sostituisce gli apici singoli con doppi per i valori
+        // Tentativo di riparazione più aggressivo
+        let fixedJson = sanitizedJson;
         
-        console.log('JSON riparato:', fixedJson);
-        translations = JSON.parse(fixedJson);
+        try {
+          // Metodo alternativo: usa una regex più robusta per gestire le virgolette
+          fixedJson = sanitizedJson.replace(/"([^"]*(?:"[^"]*)*[^"]*)"/g, (match, content) => {
+            // Escape tutte le virgolette interne
+            const escapedContent = content.replace(/"/g, '\\"');
+            return `"${escapedContent}"`;
+          });
+          
+          console.log('JSON riparato (metodo 1):', fixedJson);
+          translations = JSON.parse(fixedJson);
+        } catch (secondError) {
+          console.error('Secondo tentativo di parsing fallito:', secondError);
+          
+          // Ultimo tentativo: parsing manuale per estrarre le traduzioni
+          try {
+            const languageMatches = sanitizedJson.match(/"([a-z]{2})"\s*:\s*"([^"]+(?:\\.[^"]*)*)"/g);
+            if (languageMatches) {
+              translations = {};
+              languageMatches.forEach(match => {
+                const [, lang, text] = match.match(/"([a-z]{2})"\s*:\s*"([^"]+(?:\\.[^"]*)*)"/);
+                // Rimuovi gli escape aggiunti artificialmente e mantieni solo quelli necessari
+                translations[lang] = text.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+              });
+              console.log('Traduzioni estratte manualmente:', translations);
+            } else {
+              throw new Error('Impossibile estrarre le traduzioni dal JSON malformato');
+            }
+          } catch (manualError) {
+            console.error('Parsing manuale fallito:', manualError);
+            
+            // Fallback: usa solo il messaggio originale per tutte le lingue
+            console.warn('Usando il messaggio originale come fallback per tutte le lingue');
+            translations = {};
+            languages.forEach(lang => {
+              translations[lang] = messageWithTwilioVar;
+            });
+          }
+        }
       }
 
       // Verifica che tutte le lingue richieste siano presenti
