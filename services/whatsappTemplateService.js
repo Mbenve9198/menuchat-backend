@@ -201,62 +201,83 @@ class WhatsAppTemplateService {
       // Genera un nome univoco per il template base
       const baseTemplateName = await this.generateTemplateUniqueName(restaurant.name, type);
 
-      // Se abbiamo menuLanguages specifiche, usale; altrimenti usa le lingue di default
-      let languagesToProcess;
+      // Lingue supportate (come per i template di review)
+      const allSupportedLanguages = ['it', 'en', 'es', 'de', 'fr'];
+      
+      // Determina il menu di fallback
+      let fallbackMenuUrl = null;
+      let fallbackMenuType = type;
       
       if (menuLanguages && menuLanguages.length > 0) {
-        // Filtra solo le lingue che hanno effettivamente un menu (URL o PDF)
-        languagesToProcess = menuLanguages.filter(lang => {
-          const hasUrl = lang.menuUrl && lang.menuUrl.trim() !== '';
-          const hasPdf = lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '';
-          return hasUrl || hasPdf;
-        });
+        // Prima cerca un menu inglese
+        const englishMenu = menuLanguages.find(lang => 
+          lang.language.code === 'en' && 
+          (lang.menuUrl?.trim() || lang.menuPdfUrl?.trim())
+        );
         
-        console.log('Lingue con menu trovate:', languagesToProcess.map(l => `${l.language.code} (${l.menuUrl ? 'URL' : 'PDF'})`));
-      } else {
-        // Fallback alle lingue di default con l'URL fornito
-        const languages = ['it', 'en', 'es', 'de', 'fr'];
-        languagesToProcess = languages.map(lang => ({
-          language: { code: lang, name: lang },
-          menuUrl: type === 'url' ? menuUrl : '',
-          menuPdfUrl: type === 'pdf' ? menuUrl : ''
-        }));
+        if (englishMenu) {
+          fallbackMenuUrl = englishMenu.menuPdfUrl?.trim() || englishMenu.menuUrl?.trim();
+          fallbackMenuType = englishMenu.menuPdfUrl?.trim() ? 'pdf' : 'url';
+          console.log('Usando menu inglese come fallback:', fallbackMenuUrl, 'tipo:', fallbackMenuType);
+        } else {
+          // Se non c'è inglese, usa il primo menu disponibile
+          const firstMenuWithContent = menuLanguages.find(lang => 
+            lang.menuUrl?.trim() || lang.menuPdfUrl?.trim()
+          );
+          
+          if (firstMenuWithContent) {
+            fallbackMenuUrl = firstMenuWithContent.menuPdfUrl?.trim() || firstMenuWithContent.menuUrl?.trim();
+            fallbackMenuType = firstMenuWithContent.menuPdfUrl?.trim() ? 'pdf' : 'url';
+            console.log('Usando primo menu disponibile come fallback:', fallbackMenuUrl, 'tipo:', fallbackMenuType);
+          }
+        }
       }
-
-      if (languagesToProcess.length === 0) {
-        throw new Error('Nessuna lingua con menu valido trovata');
+      
+      // Se non abbiamo un fallback dalle menuLanguages, usa l'URL generale fornito
+      if (!fallbackMenuUrl && menuUrl) {
+        fallbackMenuUrl = menuUrl;
+        fallbackMenuType = type;
+        console.log('Usando URL generale come fallback:', fallbackMenuUrl, 'tipo:', fallbackMenuType);
+      }
+      
+      if (!fallbackMenuUrl) {
+        throw new Error('Nessun menu valido trovato per creare i template');
       }
       
       // Traduci il messaggio in tutte le lingue usando Claude
-      const languageCodes = languagesToProcess.map(lang => lang.language.code);
-      const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, languageCodes);
+      const translatedMessages = await this.translateWelcomeMessage(welcomeMessage, allSupportedLanguages);
 
-      // Crea un template per ogni lingua con menu
-      const templates = await Promise.all(languagesToProcess.map(async (langData) => {
-        const templateName = `${baseTemplateName}_${langData.language.code}`;
+      // Crea un template per ogni lingua supportata
+      const templates = await Promise.all(allSupportedLanguages.map(async (langCode) => {
+        const templateName = `${baseTemplateName}_${langCode}`;
         
         // Determina l'URL da usare per questa lingua
-        let languageMenuUrl;
-        let languageType = type;
+        let languageMenuUrl = fallbackMenuUrl;
+        let languageType = fallbackMenuType;
         
-        if (langData.menuPdfUrl && langData.menuPdfUrl.trim() !== '') {
-          languageMenuUrl = langData.menuPdfUrl;
-          languageType = 'pdf';
-        } else if (langData.menuUrl && langData.menuUrl.trim() !== '') {
-          languageMenuUrl = langData.menuUrl;
-          languageType = 'url';
-        } else {
-          // Fallback all'URL generale se fornito
-          languageMenuUrl = menuUrl;
+        // Se abbiamo menuLanguages specifiche, cerca se questa lingua ha un menu configurato
+        if (menuLanguages && menuLanguages.length > 0) {
+          const specificLanguageMenu = menuLanguages.find(lang => lang.language.code === langCode);
+          
+          if (specificLanguageMenu) {
+            if (specificLanguageMenu.menuPdfUrl && specificLanguageMenu.menuPdfUrl.trim() !== '') {
+              languageMenuUrl = specificLanguageMenu.menuPdfUrl;
+              languageType = 'pdf';
+            } else if (specificLanguageMenu.menuUrl && specificLanguageMenu.menuUrl.trim() !== '') {
+              languageMenuUrl = specificLanguageMenu.menuUrl;
+              languageType = 'url';
+            }
+            // Se la lingua specifica non ha menu, usa il fallback (già impostato sopra)
+          }
         }
 
-        console.log(`Creando template per ${langData.language.code}: tipo=${languageType}, URL=${languageMenuUrl}`);
+        console.log(`Creando template per ${langCode}: tipo=${languageType}, URL=${languageMenuUrl}`);
 
         const templateData = {
           restaurant: restaurantId,
           type: languageType === 'pdf' ? 'MEDIA' : 'CALL_TO_ACTION',
           name: templateName,
-          language: langData.language.code,
+          language: langCode,
           variables: [{
             index: 1,
             name: "customerName",
@@ -264,9 +285,9 @@ class WhatsAppTemplateService {
           }],
           components: {
             body: {
-              text: translatedMessages[langData.language.code] || translatedMessages[languageCodes[0]],
+              text: translatedMessages[langCode] || translatedMessages[allSupportedLanguages[0]],
               example: {
-                body_text: [(translatedMessages[langData.language.code] || translatedMessages[languageCodes[0]]).replace('{{1}}', 'John')]
+                body_text: [(translatedMessages[langCode] || translatedMessages[allSupportedLanguages[0]]).replace('{{1}}', 'John')]
               }
             }
           }
@@ -275,30 +296,30 @@ class WhatsAppTemplateService {
         // Aggiungi componenti specifici in base al tipo
         if (languageType === 'pdf') {
           if (!languageMenuUrl) {
-            console.error(`ERRORE: PDF URL mancante per il template MEDIA in lingua ${langData.language.code}`);
-            throw new Error(`PDF URL is required for MEDIA template in language ${langData.language.code}`);
+            console.error(`ERRORE: PDF URL mancante per il template MEDIA in lingua ${langCode}`);
+            throw new Error(`PDF URL is required for MEDIA template in language ${langCode}`);
           }
           
-          console.log(`Setting up PDF template for ${langData.language.code} with URL:`, languageMenuUrl);
+          console.log(`Setting up PDF template for ${langCode} with URL:`, languageMenuUrl);
           templateData.components.header = {
             type: 'DOCUMENT',
             format: 'PDF',
             example: languageMenuUrl
           };
         } else if (languageType === 'url' && languageMenuUrl) {
-          console.log(`Setting up URL template for ${langData.language.code} with URL:`, languageMenuUrl);
+          console.log(`Setting up URL template for ${langCode} with URL:`, languageMenuUrl);
           templateData.components.buttons = [{
             type: 'URL',
-            text: langData.language.code === 'it' ? 'Vedi Menu' :
-                  langData.language.code === 'en' ? 'View Menu' :
-                  langData.language.code === 'es' ? 'Ver Menú' :
-                  langData.language.code === 'de' ? 'Menü anzeigen' :
+            text: langCode === 'it' ? 'Vedi Menu' :
+                  langCode === 'en' ? 'View Menu' :
+                  langCode === 'es' ? 'Ver Menú' :
+                  langCode === 'de' ? 'Menü anzeigen' :
                   'Voir le Menu',
             url: languageMenuUrl
           }];
         } else {
-          console.error(`ERRORE: URL mancante per il template CALL_TO_ACTION in lingua ${langData.language.code}`);
-          throw new Error(`URL is required for CALL_TO_ACTION template in language ${langData.language.code}`);
+          console.error(`ERRORE: URL mancante per il template CALL_TO_ACTION in lingua ${langCode}`);
+          throw new Error(`URL is required for CALL_TO_ACTION template in language ${langCode}`);
         }
 
         // Crea il template nel database
