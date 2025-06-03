@@ -131,4 +131,36 @@ router.delete('/upload/menu-pdf/:publicId/:menuId?', uploadController.deleteMenu
 // Rotta per l'upload di media per campagne (immagini, video, PDF)
 router.post('/upload/campaign-media', uploadMedia.single('file'), uploadController.uploadCampaignMedia);
 
+// Endpoint per verificare la disponibilità di un'email
+router.post('/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        available: false,
+        error: 'Email is required'
+      });
+    }
+
+    // Verifica se l'email esiste già nel database
+    const User = require('../models/User');
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+
+    return res.json({
+      available: !existingUser,
+      message: existingUser ? 'Email already registered' : 'Email available'
+    });
+
+  } catch (error) {
+    console.error('Error checking email availability:', error);
+    return res.status(500).json({
+      available: false,
+      error: 'Server error'
+    });
+  }
+});
+
+// Endpoint per verificare la disponibilità di una trigger phrase
+
 module.exports = router; 
