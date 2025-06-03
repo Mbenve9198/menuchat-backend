@@ -311,7 +311,8 @@ class WhatsAppTemplateService {
         return template;
       }));
 
-      return templates;
+      // Restituisce il primo template per compatibilità con il controller
+      return templates[0];
     } catch (error) {
       console.error('Errore nella creazione dei template:', error);
       throw error;
@@ -342,46 +343,47 @@ class WhatsAppTemplateService {
       const templates = await Promise.all(languages.map(async (lang) => {
         const templateName = `${baseTemplateName}_${lang}`;
 
-      const templateData = {
-        restaurant: restaurantId,
-        type: 'REVIEW',
-        name: templateName,
+        const templateData = {
+          restaurant: restaurantId,
+          type: 'REVIEW',
+          name: templateName,
           language: lang,
           variables: [{
             index: 1,
             name: "customerName",
             example: "John"
           }],
-        components: {
-          body: {
+          components: {
+            body: {
               text: translatedMessages[lang],
-            example: {
+              example: {
                 body_text: [translatedMessages[lang].replace('{{1}}', 'John')]
-            }
-          },
-          buttons: [{
-            type: 'URL',
+              }
+            },
+            buttons: [{
+              type: 'URL',
               text: lang === 'it' ? 'Lascia una recensione' :
                     lang === 'en' ? 'Leave a review' :
                     lang === 'es' ? 'Dejar una reseña' :
                     lang === 'de' ? 'Bewertung abgeben' :
                     'Laisser un avis',
-            url: reviewLink
-          }]
-        }
-      };
+              url: reviewLink
+            }]
+          }
+        };
 
-      // Crea il template nel database
-      const template = new WhatsAppTemplate(templateData);
-      await template.save();
+        // Crea il template nel database
+        const template = new WhatsAppTemplate(templateData);
+        await template.save();
 
-      // Invia il template a Twilio per approvazione
-      await this.submitTemplateToTwilio(template);
+        // Invia il template a Twilio per approvazione
+        await this.submitTemplateToTwilio(template);
 
-      return template;
+        return template;
       }));
 
-      return templates;
+      // Restituisce il primo template (italiano) per compatibilità con il controller
+      return templates[0];
     } catch (error) {
       console.error('Errore nella creazione dei template di recensione:', error);
       throw error;

@@ -106,6 +106,7 @@ class SetupController {
         console.log('URL di fallback:', fallbackUrl);
 
         // Crea il template del menu passando le lingue specifiche
+        console.log('=== CREAZIONE TEMPLATE MENU ===');
         menuTemplate = await whatsappTemplateService.createMenuTemplate(
           restaurant._id,
           menuType,
@@ -113,13 +114,24 @@ class SetupController {
           fallbackUrl,
           menuLanguages // Passa l'array completo delle lingue
         );
+        console.log('Template menu creato:', menuTemplate ? `ID: ${menuTemplate._id}, Status: ${menuTemplate.status}` : 'FALLITO');
 
         // Crea il template per le recensioni
+        console.log('=== CREAZIONE TEMPLATE REVIEW ===');
+        console.log('Review message:', formData.reviewTemplate);
+        console.log('Review link:', formData.reviewLink);
+        
+        if (!formData.reviewLink || formData.reviewLink.trim() === '') {
+          console.error('Review link mancante, salto la creazione del template di review');
+          throw new Error('Review link è richiesto per creare il template di recensione');
+        }
+        
         reviewTemplate = await whatsappTemplateService.createReviewTemplate(
           restaurant._id,
           formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.",
           formData.reviewLink
         );
+        console.log('Template review creato:', reviewTemplate ? `ID: ${reviewTemplate._id}, Status: ${reviewTemplate.status}` : 'FALLITO');
 
       } catch (error) {
         console.error('Errore nella creazione dei template WhatsApp:', error);
