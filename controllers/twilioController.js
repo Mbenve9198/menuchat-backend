@@ -6,6 +6,7 @@ const Menu = require('../models/Menu');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const WhatsAppContact = require('../models/WhatsAppContact');
+const MessageTracking = require('../models/MessageTracking');
 const twilio = require('twilio');
 
 /**
@@ -65,6 +66,19 @@ const webhookHandler = async (req, res) => {
     if (!restaurant) {
       console.log('❌ Ristorante non trovato');
       return res.status(404).send('Restaurant not found');
+    }
+
+    // TRACKING: Traccia il messaggio inbound ricevuto
+    try {
+      const user = await User.findById(restaurant.user);
+      if (user) {
+        const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+        tracking.addMessage('inboundMessages', 'service');
+        await tracking.save();
+        console.log('✅ Messaggio inbound tracciato');
+      }
+    } catch (trackingError) {
+      console.error('❌ Errore nel tracking del messaggio inbound:', trackingError);
     }
 
     // Determina la lingua del cliente in base al prefisso telefonico
@@ -181,6 +195,19 @@ const webhookHandler = async (req, res) => {
       // Aggiorna l'interazione con il messaggio inviato
       interaction.lastMessageSent = responseMessage;
       await interaction.save();
+
+      // TRACKING: Traccia il messaggio di menu inviato
+      try {
+        const user = await User.findById(restaurant.user);
+        if (user) {
+          const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+          tracking.addMessage('menuMessages', 'service');
+          await tracking.save();
+          console.log('✅ Messaggio menu tracciato');
+        }
+      } catch (trackingError) {
+        console.error('❌ Errore nel tracking del messaggio menu:', trackingError);
+      }
       
       // Invia la risposta
       const twiml = new twilio.twiml.MessagingResponse();
@@ -227,6 +254,19 @@ const webhookHandler = async (req, res) => {
       // Aggiorna l'interazione con il messaggio inviato
       interaction.lastMessageSent = 'Invio template: ' + template.name;
       interaction.lastTemplateId = template.twilioTemplateId;
+
+      // TRACKING: Traccia il messaggio di menu/template inviato
+      try {
+        const user = await User.findById(restaurant.user);
+        if (user) {
+          const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+          tracking.addMessage('menuMessages', 'service');
+          await tracking.save();
+          console.log('✅ Messaggio template tracciato');
+        }
+      } catch (trackingError) {
+        console.error('❌ Errore nel tracking del messaggio template:', trackingError);
+      }
       
       // Se la configurazione include un timer per le recensioni, programma l'invio tramite Twilio
       if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
@@ -266,6 +306,19 @@ const webhookHandler = async (req, res) => {
               interaction.scheduledReviewMessageId = scheduledResult.messageId;
               interaction.reviewScheduledFor = scheduledTime;
               console.log(`✅ Recensione programmata con Twilio (SID: ${scheduledResult.messageId})`);
+
+              // TRACKING: Traccia il messaggio di recensione programmato
+              try {
+                const user = await User.findById(restaurant.user);
+                if (user) {
+                  const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+                  tracking.addMessage('reviewMessages', 'service');
+                  await tracking.save();
+                  console.log('✅ Messaggio recensione programmato tracciato');
+                }
+              } catch (trackingError) {
+                console.error('❌ Errore nel tracking del messaggio recensione:', trackingError);
+              }
             } else {
               console.error('❌ Errore nella programmazione del messaggio di recensione:', scheduledResult.error);
             }

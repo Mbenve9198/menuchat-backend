@@ -3,11 +3,13 @@ const WhatsAppContact = require('../models/WhatsAppContact');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const CampaignTemplate = require('../models/CampaignTemplate');
 const Restaurant = require('../models/Restaurant');
+const MessageTracking = require('../models/MessageTracking');
 const twilioService = require('../services/twilioService');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const User = require('../models/User');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -1760,6 +1762,23 @@ const scheduleCampaignSending = async (req, res) => {
         // Salva l'ID del messaggio programmato
         campaign.twilioScheduledMessageId = result.messageId;
         await campaign.save();
+        
+        // TRACKING: Traccia il messaggio di campagna programmato
+        try {
+          const user = await User.findById(restaurant.user);
+          if (user) {
+            const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+            // Traccia per ogni contatto nella campagna
+            const contactCount = campaign.targetAudience.totalContacts || 1;
+            for (let i = 0; i < contactCount; i++) {
+              tracking.addMessage('campaignMessages', 'marketing');
+            }
+            await tracking.save();
+            console.log(`✅ Tracciati ${contactCount} messaggi di campagna`);
+          }
+        } catch (trackingError) {
+          console.error('❌ Errore nel tracking del messaggio di campagna:', trackingError);
+        }
         
         return res.status(200).json({
           success: true,

@@ -11,11 +11,15 @@ const emailPreferencesRoutes = require('./emailPreferences');
 const userPreferencesRoutes = require('./userPreferences');
 const emailTestRoutes = require('./emailTest');
 const paymentRoutes = require('./payment');
+const adminRoutes = require('./admin');
 
 const router = express.Router();
 
 // Rotte di autenticazione
 router.use('/auth', authRoutes);
+
+// Rotte admin
+router.use('/admin', adminRoutes);
 
 // Rotte di setup
 router.use('/setup', setupRoutes);

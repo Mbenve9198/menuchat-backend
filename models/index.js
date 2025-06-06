@@ -8,6 +8,7 @@ const CustomerInteraction = require('./CustomerInteraction');
 const Analytics = require('./Analytics');
 const EmailReport = require('./EmailReport');
 const CampaignSuggestion = require('./CampaignSuggestion');
+const MessageTracking = require('./MessageTracking');
 
 module.exports = {
   User,
@@ -17,5 +18,6 @@ module.exports = {
   CustomerInteraction,
   Analytics,
   EmailReport,
-  CampaignSuggestion
+  CampaignSuggestion,
+  MessageTracking
 }; 
