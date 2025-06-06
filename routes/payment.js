@@ -29,7 +29,13 @@ router.post('/create-intent', async (req, res) => {
 
     // Calcola il prezzo totale
     const pricePerContact = getPricePerContact(contactCount);
-    const totalAmount = Math.round(contactCount * pricePerContact * 100); // Stripe usa centesimi
+    let totalAmount = Math.round(contactCount * pricePerContact * 100); // Stripe usa centesimi
+
+    // Stripe richiede un minimo di €0.50 (50 centesimi) per EUR
+    const minimumAmount = 50; // 50 centesimi = €0.50
+    if (totalAmount < minimumAmount) {
+      totalAmount = minimumAmount;
+    }
 
     // Crea il Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -41,7 +47,9 @@ router.post('/create-intent', async (req, res) => {
         pricePerContact: pricePerContact.toString(),
         campaignName: campaignName || 'Campaign',
         restaurantName: restaurantName || 'Restaurant',
-        type: 'campaign_payment'
+        type: 'campaign_payment',
+        originalAmount: Math.round(contactCount * pricePerContact * 100).toString(),
+        adjustedForMinimum: totalAmount > Math.round(contactCount * pricePerContact * 100) ? 'true' : 'false'
       },
       description: `Pagamento campagna: ${campaignName || 'Campaign'} - ${contactCount} contatti`
     });
@@ -53,7 +61,9 @@ router.post('/create-intent', async (req, res) => {
         paymentIntentId: paymentIntent.id,
         amount: totalAmount,
         pricePerContact,
-        contactCount
+        contactCount,
+        originalAmount: Math.round(contactCount * pricePerContact * 100),
+        wasAdjustedForMinimum: totalAmount > Math.round(contactCount * pricePerContact * 100)
       }
     });
 
