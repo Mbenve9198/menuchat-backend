@@ -260,7 +260,7 @@ const webhookHandler = async (req, res) => {
         const user = await User.findById(restaurant.user);
         if (user) {
           const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
-          tracking.addMessage('menuMessages', 'service');
+          tracking.addMessage('menuMessages', null, template.type);
           await tracking.save();
           console.log('✅ Messaggio template tracciato');
         }
@@ -312,7 +312,7 @@ const webhookHandler = async (req, res) => {
                 const user = await User.findById(restaurant.user);
                 if (user) {
                   const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
-                  tracking.addMessage('reviewMessages', 'service');
+                  tracking.addMessage('reviewMessages', null, reviewTemplate.type);
                   await tracking.save();
                   console.log('✅ Messaggio recensione programmato tracciato');
                 }

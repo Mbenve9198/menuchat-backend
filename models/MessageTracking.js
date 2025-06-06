@@ -70,8 +70,40 @@ MessageTrackingSchema.index({ restaurant: 1, period: 1 });
 MessageTrackingSchema.index({ user: 1, period: 1 });
 MessageTrackingSchema.index({ lastUpdated: -1 });
 
+// Metodo statico per mappare tipi di template a tipi di conversazione Twilio
+MessageTrackingSchema.statics.getConversationTypeFromTemplate = function(templateType, messageType) {
+  // Mappa i tipi di template ai tipi di conversazione Twilio
+  const templateToConversationMap = {
+    'MEDIA': 'utility',        // Template media (menu, benvenuto) -> utility
+    'CALL_TO_ACTION': 'utility', // Template con bottoni -> utility  
+    'REVIEW': 'service',       // Template recensioni -> service
+    'MARKETING': 'marketing'   // Template campagne -> marketing
+  };
+  
+  // Mappa i tipi di messaggio ai tipi di conversazione
+  const messageToConversationMap = {
+    'menuMessages': 'utility',
+    'reviewMessages': 'service', 
+    'campaignMessages': 'marketing',
+    'inboundMessages': 'service'
+  };
+  
+  // Se abbiamo il tipo di template, usalo
+  if (templateType && templateToConversationMap[templateType]) {
+    return templateToConversationMap[templateType];
+  }
+  
+  // Altrimenti usa il tipo di messaggio
+  if (messageType && messageToConversationMap[messageType]) {
+    return messageToConversationMap[messageType];
+  }
+  
+  // Default
+  return 'service';
+};
+
 // Metodo per aggiornare le statistiche
-MessageTrackingSchema.methods.addMessage = function(type, conversationType = 'service') {
+MessageTrackingSchema.methods.addMessage = function(type, conversationType = null, templateType = null) {
   // Prezzi per tipo di conversazione Twilio
   const conversationPrices = {
     utility: 0.03,
@@ -87,12 +119,20 @@ MessageTrackingSchema.methods.addMessage = function(type, conversationType = 'se
     return this;
   }
   
+  // Determina il tipo di conversazione corretto
+  let finalConversationType = conversationType;
+  if (!finalConversationType) {
+    finalConversationType = this.constructor.getConversationTypeFromTemplate(templateType, type);
+  }
+  
+  console.log(`📊 Tracking messaggio: tipo=${type}, templateType=${templateType}, conversationType=${finalConversationType}`);
+  
   // Incrementa contatori
   this.messageStats[type].messages += 1;
   this.messageStats[type].conversations += 1; // Assumiamo 1 conversazione per messaggio per semplicità
   
   // Calcola costo
-  const conversationCost = conversationPrices[conversationType] || 0;
+  const conversationCost = conversationPrices[finalConversationType] || 0;
   this.messageStats[type].cost += conversationCost + messageCost;
   
   // Aggiorna totali

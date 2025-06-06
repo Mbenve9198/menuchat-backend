@@ -5,7 +5,8 @@ const {
   adminLogin,
   getUsersStats,
   refreshAllStats,
-  getUserDetails
+  getUserDetails,
+  getTemplateStats
 } = require('../controllers/adminController');
 
 // @route   POST /api/admin/login
@@ -27,5 +28,10 @@ router.post('/refresh-stats', adminAuth, refreshAllStats);
 // @desc    Ottiene dettagli di un singolo utente
 // @access  Private (Admin only)
 router.get('/user/:userId', adminAuth, getUserDetails);
+
+// @route   GET /api/admin/template-stats
+// @desc    Ottiene statistiche dettagliate sui template utilizzati
+// @access  Private (Admin only)
+router.get('/template-stats', adminAuth, getTemplateStats);
 
 module.exports = router; 

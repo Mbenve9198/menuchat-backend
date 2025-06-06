@@ -182,32 +182,45 @@ const calculateUserStats = async (userId, restaurantId) => {
       });
     }
 
-    // Aggiorna le statistiche (usando prezzi service per semplicità)
-    const serviceCost = 0.00; // Service conversations sono gratuite
+    // Calcola i costi usando i tipi di conversazione corretti
+    const conversationPrices = {
+      utility: 0.03,
+      authentication: 0.0378,
+      marketing: 0.0691,
+      service: 0.00
+    };
     const messageCost = 0.005;
 
+    // Menu messages: assumiamo utility (template MEDIA/CALL_TO_ACTION)
+    const menuConversationType = MessageTracking.getConversationTypeFromTemplate(null, 'menuMessages');
     tracking.messageStats.menuMessages = {
       conversations: menuInteractions,
       messages: menuInteractions,
-      cost: menuInteractions * (serviceCost + messageCost)
+      cost: menuInteractions * (conversationPrices[menuConversationType] + messageCost)
     };
 
+    // Review messages: assumiamo service (template REVIEW)
+    const reviewConversationType = MessageTracking.getConversationTypeFromTemplate('REVIEW', 'reviewMessages');
     tracking.messageStats.reviewMessages = {
       conversations: reviewInteractions,
       messages: reviewInteractions,
-      cost: reviewInteractions * (serviceCost + messageCost)
+      cost: reviewInteractions * (conversationPrices[reviewConversationType] + messageCost)
     };
 
+    // Campaign messages: sempre marketing
+    const campaignConversationType = MessageTracking.getConversationTypeFromTemplate(null, 'campaignMessages');
     tracking.messageStats.campaignMessages = {
       conversations: campaignMessages,
       messages: campaignMessages,
-      cost: campaignMessages * (0.0691 + messageCost) // Marketing conversation
+      cost: campaignMessages * (conversationPrices[campaignConversationType] + messageCost)
     };
 
+    // Inbound messages: sempre service
+    const inboundConversationType = MessageTracking.getConversationTypeFromTemplate(null, 'inboundMessages');
     tracking.messageStats.inboundMessages = {
       conversations: inboundMessages,
       messages: inboundMessages,
-      cost: inboundMessages * (serviceCost + messageCost)
+      cost: inboundMessages * (conversationPrices[inboundConversationType] + messageCost)
     };
 
     // Calcola totali
@@ -316,9 +329,109 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Ottiene statistiche dettagliate sui template utilizzati
+ * @route   GET /api/admin/template-stats
+ * @access  Private (Admin only)
+ */
+const getTemplateStats = async (req, res) => {
+  try {
+    const WhatsAppTemplate = require('../models/WhatsAppTemplate');
+    
+    // Ottieni tutti i template attivi
+    const templates = await WhatsAppTemplate.find({ isActive: true })
+      .populate('restaurant', 'name user')
+      .lean();
+
+    const templateStats = [];
+
+    for (const template of templates) {
+      if (!template.restaurant) continue;
+
+      // Conta l'utilizzo del template nelle interazioni
+      let usageCount = 0;
+      let estimatedCost = 0;
+
+      // Conta utilizzi nei messaggi di menu/benvenuto
+      if (template.type === 'MEDIA' || template.type === 'CALL_TO_ACTION') {
+        usageCount += await CustomerInteraction.countDocuments({
+          restaurant: template.restaurant._id,
+          lastTemplateId: template.twilioTemplateId
+        });
+      }
+
+      // Conta utilizzi nelle recensioni
+      if (template.type === 'REVIEW') {
+        usageCount += await CustomerInteraction.countDocuments({
+          restaurant: template.restaurant._id,
+          'reviewData.templateId': template.twilioTemplateId
+        });
+      }
+
+      // Calcola il costo stimato
+      const conversationType = MessageTracking.getConversationTypeFromTemplate(template.type);
+      const conversationPrices = {
+        utility: 0.03,
+        authentication: 0.0378,
+        marketing: 0.0691,
+        service: 0.00
+      };
+      const messageCost = 0.005;
+      estimatedCost = usageCount * (conversationPrices[conversationType] + messageCost);
+
+      templateStats.push({
+        templateId: template._id,
+        templateName: template.name,
+        templateType: template.type,
+        conversationType,
+        restaurantName: template.restaurant.name,
+        userId: template.restaurant.user,
+        language: template.language,
+        status: template.status,
+        usageCount,
+        estimatedCost,
+        costPerMessage: conversationPrices[conversationType] + messageCost
+      });
+    }
+
+    // Ordina per utilizzo decrescente
+    templateStats.sort((a, b) => b.usageCount - a.usageCount);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        templates: templateStats,
+        summary: {
+          totalTemplates: templateStats.length,
+          totalUsage: templateStats.reduce((sum, t) => sum + t.usageCount, 0),
+          totalEstimatedCost: templateStats.reduce((sum, t) => sum + t.estimatedCost, 0),
+          byType: {
+            MEDIA: templateStats.filter(t => t.templateType === 'MEDIA').length,
+            CALL_TO_ACTION: templateStats.filter(t => t.templateType === 'CALL_TO_ACTION').length,
+            REVIEW: templateStats.filter(t => t.templateType === 'REVIEW').length
+          },
+          byConversationType: {
+            utility: templateStats.filter(t => t.conversationType === 'utility').reduce((sum, t) => sum + t.estimatedCost, 0),
+            service: templateStats.filter(t => t.conversationType === 'service').reduce((sum, t) => sum + t.estimatedCost, 0),
+            marketing: templateStats.filter(t => t.conversationType === 'marketing').reduce((sum, t) => sum + t.estimatedCost, 0)
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel recupero statistiche template:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle statistiche template',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   adminLogin,
   getUsersStats,
   refreshAllStats,
-  getUserDetails
+  getUserDetails,
+  getTemplateStats
 }; 
