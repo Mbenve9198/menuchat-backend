@@ -97,22 +97,6 @@ app.get('/', (req, res) => {
   res.json({ message: 'MenuChat API' });
 });
 
-// Configura il job per aggiornare le recensioni da Google Places
-const setupGooglePlacesReviewsJob = () => {
-  // Esegui ogni giorno alle 3 del mattino
-  cron.schedule('0 3 * * *', async () => {
-    console.log('🔄 Avvio aggiornamento recensioni da Google Places...');
-    try {
-      await googlePlacesService.updateAllRestaurantsReviews();
-      console.log('✅ Aggiornamento recensioni completato con successo');
-    } catch (error) {
-      console.error('❌ Errore nell\'aggiornamento delle recensioni:', error);
-    }
-  }, {
-    timezone: 'Europe/Rome'
-  });
-};
-
 // Gestione errori 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint non trovato' });
@@ -127,9 +111,6 @@ app.use((err, req, res, next) => {
 // Avvio del server
 app.listen(PORT, () => {
   console.log(`Server in esecuzione sulla porta ${PORT} in modalità ${process.env.NODE_ENV || 'development'}`);
-  
-  // Avvia il job per aggiornare le recensioni da Google Places
-  setupGooglePlacesReviewsJob();
   
   // Inizializza lo scheduler per le email transazionali
   schedulerService.init();

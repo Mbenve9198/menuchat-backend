@@ -41,9 +41,9 @@ class SchedulerService {
    * Schedula i report giornalieri
    */
   scheduleDailyReports() {
-    // Ogni giorno alle 8:00 (timezone server)
+    // Ogni giorno alle 8:00 - Prima aggiorna gli snapshot, poi invia i report
     const dailyJob = cron.schedule('0 8 * * *', async () => {
-      console.log('📊 Avvio invio report giornalieri...');
+      console.log('📊 Avvio aggiornamento snapshot e invio report giornalieri...');
       await this.sendDailyReports();
     }, {
       scheduled: false,
@@ -52,7 +52,7 @@ class SchedulerService {
 
     this.jobs.set('daily_reports', dailyJob);
     dailyJob.start();
-    console.log('✅ Job report giornalieri schedulato (8:00 ogni giorno)');
+    console.log('✅ Job report giornalieri schedulato (8:00 ogni giorno - include aggiornamento snapshot)');
   }
 
   /**
@@ -96,7 +96,19 @@ class SchedulerService {
    */
   async sendDailyReports() {
     try {
-      // Trova tutti gli utenti attivi con preferenze email abilitate
+      console.log('📊 Avvio processo report giornalieri...');
+      
+      // STEP 1: Prima aggiorniamo tutti gli snapshot delle recensioni
+      console.log('🔄 Aggiornamento snapshot recensioni da Google Places...');
+      try {
+        await googlePlacesService.updateAllRestaurantsReviews();
+        console.log('✅ Snapshot recensioni aggiornati con successo');
+      } catch (error) {
+        console.error('❌ Errore aggiornamento snapshot recensioni:', error);
+        // Continuiamo comunque con l'invio dei report anche se il sync fallisce
+      }
+
+      // STEP 2: Trova tutti gli utenti attivi con preferenze email abilitate
       const users = await User.find({
         isActive: true,
         'emailPreferences.dailyReports': true,
@@ -108,6 +120,7 @@ class SchedulerService {
       let successCount = 0;
       let errorCount = 0;
 
+      // STEP 3: Invia i report con dati freschissimi
       for (const user of users) {
         try {
           if (!user.restaurant) {
@@ -115,7 +128,7 @@ class SchedulerService {
             continue;
           }
 
-          // Calcola le metriche del giorno precedente
+          // Calcola le metriche del giorno precedente (ora con snapshot aggiornati)
           const metrics = await this.calculateDailyMetrics(user.restaurant._id);
           
           // Invia il report
