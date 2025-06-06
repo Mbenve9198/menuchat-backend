@@ -86,6 +86,7 @@ class UserService {
       if (userData.fullName) user.fullName = userData.fullName;
       if (userData.languagePreference) user.languagePreference = userData.languagePreference;
       if (userData.isActive !== undefined) user.isActive = userData.isActive;
+      if (userData.restaurant) user.restaurant = userData.restaurant;
       
       // Se la password è stata fornita, aggiorna anche quella
       if (userData.password) {
