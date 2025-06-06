@@ -43,20 +43,18 @@ const mediaStorage = new CloudinaryStorage({
       return 'auto'; // Fallback
     },
     format: (req, file) => {
-      // Estrae il formato dall'estensione originale o dal mimetype
+      // Per i video destinati a WhatsApp, forza sempre mp4
+      if (file.mimetype.startsWith('video/')) {
+        return 'mp4';
+      }
+      
+      // Per PDF mantieni il formato
       if (file.mimetype === 'application/pdf') {
         return 'pdf';
       }
       
-      // Per estensioni video e immagini, estrai dal nome file
+      // Per le immagini, estrai dal nome file o usa il formato originale
       const originalExt = file.originalname.split('.').pop().toLowerCase();
-      
-      // Se è un video che richiede conversione, usa mp4
-      if (file.mimetype.startsWith('video/') && req.body.needsConversion === 'true') {
-        return req.body.targetFormat || 'mp4';
-      }
-      
-      // Altrimenti mantieni il formato originale
       return originalExt;
     },
     public_id: (req, file) => {
@@ -76,7 +74,22 @@ const mediaStorage = new CloudinaryStorage({
         prefix = 'pdf';
       }
       
-      return `${prefix}-${sanitizedType}-${Date.now()}`;
+      // Per i video, non includere l'estensione originale nel public_id
+      // per evitare problemi con estensioni multiple
+      const timestamp = Date.now();
+      return `${prefix}-${sanitizedType}-${timestamp}`;
+    },
+    // Aggiungi trasformazioni specifiche per i video destinati a WhatsApp
+    transformation: (req, file) => {
+      if (file.mimetype.startsWith('video/') && req.body.optimizeForWhatsApp === 'true') {
+        return [
+          { quality: 'auto:good' },
+          { video_codec: 'h264' },
+          { audio_codec: 'aac' },
+          { flags: 'streaming_attachment' }
+        ];
+      }
+      return undefined; // Nessuna trasformazione per altri tipi di file
     }
   }
 });

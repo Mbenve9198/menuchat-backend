@@ -38,4 +38,7 @@ router.post('/generate-image', campaignController.generateImage);
 // Endpoint di test per verificare la funzionalità di unsubscribe
 router.get('/test-unsubscribe', campaignController.testUnsubscribe);
 
+// Endpoint di test per verificare la compatibilità degli URL video con WhatsApp
+router.post('/test-video-url', campaignController.testVideoUrl);
+
 module.exports = router; 

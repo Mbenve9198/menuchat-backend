@@ -1989,10 +1989,10 @@ const testUnsubscribe = async (req, res) => {
  * @returns {string} - URL compatibile con Twilio/WhatsApp
  */
 const ensureMediaCompatibility = (mediaUrl) => {
-  console.log('ensureMediaCompatibility - URL originale:', mediaUrl);
+  console.log('🔗 ensureMediaCompatibility - URL originale:', mediaUrl);
   
   if (!mediaUrl) {
-    console.log('ensureMediaCompatibility - URL nullo, nessuna modifica');
+    console.log('🔗 ensureMediaCompatibility - URL nullo, nessuna modifica');
     return mediaUrl;
   }
   
@@ -2004,44 +2004,152 @@ const ensureMediaCompatibility = (mediaUrl) => {
                   mediaUrl.includes('.mp4') || 
                   mediaUrl.includes('.mov') || 
                   mediaUrl.includes('.avi') ||
-                  mediaUrl.includes('.webm');
+                  mediaUrl.includes('.webm') ||
+                  mediaUrl.includes('/raw/') && (
+                    mediaUrl.includes('video-') || 
+                    mediaUrl.endsWith('.mp4')
+                  );
   
-  console.log('ensureMediaCompatibility - Analisi URL:', {
+  console.log('🔗 ensureMediaCompatibility - Analisi URL:', {
     isCloudinaryUrl,
     isVideo,
-    url: mediaUrl
+    url: mediaUrl.substring(0, 100) + '...'
   });
   
-  // Se non è Cloudinary o non è un video, restituisci l'URL originale
-  if (!isCloudinaryUrl || !isVideo) {
-    console.log('ensureMediaCompatibility - Nessuna modifica necessaria (non è un video Cloudinary)');
+  // Se non è Cloudinary, restituisci l'URL originale
+  if (!isCloudinaryUrl) {
+    console.log('🔗 ensureMediaCompatibility - Non è un URL Cloudinary, nessuna modifica');
     return mediaUrl;
   }
   
-  // Per i video Cloudinary, controlla se l'URL contiene _whatsapp_optimized
-  if (mediaUrl.includes('_whatsapp_optimized')) {
-    // È già un URL ottimizzato senza trasformazioni, usalo così com'è
-    console.log(`ensureMediaCompatibility - L'URL video è già ottimizzato per WhatsApp: ${mediaUrl}`);
-    return mediaUrl;
+  // Per i video Cloudinary
+  if (isVideo) {
+    // Controlla se l'URL contiene _whatsapp o _whatsapp_optimized
+    if (mediaUrl.includes('_whatsapp')) {
+      console.log('🔗 ensureMediaCompatibility - URL già ottimizzato per WhatsApp:', mediaUrl);
+      return mediaUrl;
+    }
+    
+    // Controlla se ha estensioni multiple (es. .MOV.mp4)
+    const hasMultipleExtensions = /\.[A-Z]{3,4}\.(mp4|mov|avi)$/i.test(mediaUrl);
+    if (hasMultipleExtensions) {
+      // Rimuovi l'estensione doppia
+      const correctedUrl = mediaUrl.replace(/\.[A-Z]{3,4}\.(mp4|mov|avi)$/i, '.mp4');
+      console.log('🔗 ensureMediaCompatibility - Corretto URL con estensioni multiple:', correctedUrl);
+      return correctedUrl;
+    }
+    
+    // Assicurati che termini con .mp4
+    if (!mediaUrl.endsWith('.mp4')) {
+      const correctedUrl = mediaUrl.replace(/\.\w+$/, '.mp4');
+      console.log('🔗 ensureMediaCompatibility - URL corretto con estensione .mp4:', correctedUrl);
+      return correctedUrl;
+    }
+    
+    // Controlla se l'URL contiene trasformazioni che potrebbero causare problemi
+    const hasProblematicTransformations = mediaUrl.match(/\/upload\/[^\/]*[qf]_[^\/]*\//);
+    if (hasProblematicTransformations) {
+      console.log('🔗 ATTENZIONE: URL video contiene trasformazioni che potrebbero causare problemi:', mediaUrl);
+      console.log('🔗 Considera di utilizzare un URL senza trasformazioni o un asset raw');
+    }
   }
   
-  // L'URL contiene trasformazioni che possono causare problemi con Twilio?
-  const hasTransformations = mediaUrl.match(/\/upload\/([^\/]+)\//);
-  
-  if (hasTransformations) {
-    console.log(`ensureMediaCompatibility - ATTENZIONE: L'URL video contiene trasformazioni nell'URL che potrebbero causare problemi con Twilio/WhatsApp: ${mediaUrl}`);
-    console.log(`ensureMediaCompatibility - Considera di caricare il video senza trasformazioni nell'URL.`);
-  }
-  
-  // Forziamo l'estensione a .mp4 se necessario
-  if (!mediaUrl.endsWith('.mp4')) {
-    const correctedUrl = mediaUrl.replace(/\.\w+$/, '.mp4');
-    console.log(`ensureMediaCompatibility - URL corretto con estensione .mp4: ${correctedUrl}`);
-    return correctedUrl;
-  }
-  
-  console.log('ensureMediaCompatibility - URL finale:', mediaUrl);
+  console.log('🔗 ensureMediaCompatibility - URL finale:', mediaUrl);
   return mediaUrl;
+};
+
+/**
+ * @desc    Testa la compatibilità di un URL video con WhatsApp
+ * @route   POST /api/campaign/test-video-url
+ * @access  Private
+ */
+const testVideoUrl = async (req, res) => {
+  try {
+    const { videoUrl } = req.body;
+    
+    if (!videoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL video richiesto'
+      });
+    }
+    
+    console.log('🧪 Test compatibilità URL video:', videoUrl);
+    
+    const axios = require('axios');
+    const testResults = {
+      originalUrl: videoUrl,
+      isAccessible: false,
+      contentType: null,
+      contentLength: null,
+      hasProblematicCodecs: false,
+      correctedUrl: null,
+      recommendations: []
+    };
+    
+    try {
+      // Test dell'URL originale
+      const headResponse = await axios.head(videoUrl, { timeout: 10000 });
+      testResults.isAccessible = true;
+      testResults.contentType = headResponse.headers['content-type'];
+      testResults.contentLength = headResponse.headers['content-length'];
+      
+      // Controlla se il Content-Type contiene parametri problematici
+      if (testResults.contentType && testResults.contentType.includes('codecs=')) {
+        testResults.hasProblematicCodecs = true;
+        testResults.recommendations.push('Content-Type contiene parametri codec che potrebbero causare problemi con WhatsApp');
+      }
+      
+      // Applica la funzione di correzione
+      const correctedUrl = ensureMediaCompatibility(videoUrl);
+      if (correctedUrl !== videoUrl) {
+        testResults.correctedUrl = correctedUrl;
+        testResults.recommendations.push('URL corretto per migliorare la compatibilità');
+        
+        // Testa anche l'URL corretto
+        try {
+          const correctedHeadResponse = await axios.head(correctedUrl, { timeout: 10000 });
+          testResults.correctedContentType = correctedHeadResponse.headers['content-type'];
+          testResults.correctedIsAccessible = true;
+        } catch (correctedError) {
+          testResults.correctedIsAccessible = false;
+          testResults.recommendations.push('URL corretto non accessibile - potrebbe essere necessario rigenerare il video');
+        }
+      }
+      
+      // Controlla se è un URL Cloudinary con trasformazioni
+      if (videoUrl.includes('cloudinary.com') && videoUrl.match(/\/upload\/[^\/]*[qf]_[^\/]*\//)) {
+        testResults.recommendations.push('URL contiene trasformazioni Cloudinary che potrebbero causare problemi - considera di caricare come raw');
+      }
+      
+      // Controlla estensioni multiple
+      if (/\.[A-Z]{3,4}\.(mp4|mov|avi)$/i.test(videoUrl)) {
+        testResults.recommendations.push('URL contiene estensioni multiple - questo può causare errori 404');
+      }
+      
+    } catch (error) {
+      testResults.isAccessible = false;
+      testResults.error = error.message;
+      testResults.recommendations.push('URL non accessibile - verifica che il file esista e sia pubblico');
+    }
+    
+    // Aggiungi raccomandazioni generali
+    if (testResults.isAccessible && !testResults.hasProblematicCodecs && !testResults.correctedUrl) {
+      testResults.recommendations.push('URL sembra compatibile con WhatsApp');
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: testResults
+    });
+  } catch (error) {
+    console.error('Errore nel test dell\'URL video:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore durante il test dell\'URL video',
+      error: error.message
+    });
+  }
 };
 
 module.exports = {
@@ -2059,5 +2167,6 @@ module.exports = {
   scheduleCampaignSending,
   checkTemplateStatus,
   handleUnsubscribe,
-  testUnsubscribe
+  testUnsubscribe,
+  testVideoUrl
 }; 
