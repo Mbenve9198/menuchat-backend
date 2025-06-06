@@ -1,7 +1,11 @@
 const cron = require('node-cron');
-const { User, Restaurant, Analytics, WhatsAppCampaign } = require('../models');
+const { User, Restaurant, Analytics } = require('../models');
+const WhatsAppCampaign = require('../models/WhatsAppCampaign');
 const emailService = require('./emailService');
 const campaignSuggestionService = require('./campaignSuggestionService');
+const CustomerInteraction = require('../models/CustomerInteraction');
+const DailyReviewSnapshot = require('../models/DailyReviewSnapshot');
+const googlePlacesService = require('./googlePlacesService');
 
 class SchedulerService {
   constructor() {
@@ -261,16 +265,34 @@ class SchedulerService {
     today.setHours(0, 0, 0, 0);
 
     try {
-      // Trova le analytics del giorno precedente
-      const analytics = await Analytics.findOne({
+      // 1. MENU INVIATI: Conta le interazioni menu del giorno precedente
+      const menuInteractions = await CustomerInteraction.countDocuments({
         restaurant: restaurantId,
-        date: {
+        interactionType: 'menu_viewed',
+        createdAt: {
           $gte: yesterday,
           $lt: today
         }
       });
 
-      // Conta le campagne WhatsApp del giorno precedente
+      // 2. RICHIESTE RECENSIONI: Conta le richieste del giorno precedente
+      const reviewRequests = await CustomerInteraction.countDocuments({
+        restaurant: restaurantId,
+        'reviewData.requested': true,
+        'reviewData.requestedAt': {
+          $gte: yesterday,
+          $lt: today
+        }
+      });
+
+      // 3. RECENSIONI RACCOLTE: Usa il nuovo sistema di snapshot
+      const reviewsCollected = await googlePlacesService.getReviewsCollectedInPeriod(
+        restaurantId, 
+        yesterday, 
+        yesterday // Solo il giorno precedente
+      );
+
+      // 4. CAMPAGNE INVIATE: Conta le campagne del giorno precedente
       const campaignsCount = await WhatsAppCampaign.countDocuments({
         restaurant: restaurantId,
         createdAt: {
@@ -279,12 +301,19 @@ class SchedulerService {
         }
       });
 
+      console.log(`📊 Metriche giornaliere per ristorante ${restaurantId}:`);
+      console.log(`   - Menu inviati: ${menuInteractions}`);
+      console.log(`   - Richieste recensioni: ${reviewRequests}`);
+      console.log(`   - Recensioni raccolte: ${reviewsCollected}`);
+      console.log(`   - Campagne inviate: ${campaignsCount}`);
+
       return {
-        menusSent: analytics?.menusSent || 0,
-        reviewRequests: analytics?.reviewRequests || 0,
-        reviewsCollected: analytics?.reviewsCollected || 0,
-        newReviews: analytics?.newReviews || 0,
-        campaignsSent: campaignsCount
+        menusSent: menuInteractions,
+        reviewRequests: reviewRequests,
+        reviewsCollected: reviewsCollected,
+        newReviews: reviewsCollected, // Alias per compatibilità
+        campaignsSent: campaignsCount,
+        date: yesterday
       };
 
     } catch (error) {
@@ -294,7 +323,8 @@ class SchedulerService {
         reviewRequests: 0,
         reviewsCollected: 0,
         newReviews: 0,
-        campaignsSent: 0
+        campaignsSent: 0,
+        date: yesterday
       };
     }
   }

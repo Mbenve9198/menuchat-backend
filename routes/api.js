@@ -38,12 +38,17 @@ router.post('/restaurants/:id/sync-reviews', async (req, res) => {
       });
     }
 
-    // Sincronizza le recensioni
-    const updatedRestaurant = await googlePlacesService.syncRestaurantReviews(restaurant);
+    // Sincronizza le recensioni con sync manuale
+    const updatedRestaurant = await googlePlacesService.syncRestaurantReviews(restaurant, 'manual');
+
+    // Ottieni le statistiche giornaliere aggiornate
+    const dailyStats = await googlePlacesService.getDailyReviewStats(restaurant._id);
 
     res.json({
       success: true,
-      restaurant: updatedRestaurant
+      restaurant: updatedRestaurant,
+      dailyStats: dailyStats,
+      message: `Sincronizzazione completata. ${dailyStats.newReviews} nuove recensioni oggi.`
     });
   } catch (error) {
     console.error('Error syncing reviews:', error);

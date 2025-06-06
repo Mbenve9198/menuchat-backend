@@ -1,6 +1,9 @@
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const Restaurant = require('../models/Restaurant');
+const WhatsAppCampaign = require('../models/WhatsAppCampaign');
+const DailyReviewSnapshot = require('../models/DailyReviewSnapshot');
+const googlePlacesService = require('../services/googlePlacesService');
 const mongoose = require('mongoose');
 
 /**
@@ -147,20 +150,20 @@ class StatsController {
       const previousMenuInteractions = stats.previousMenus[0]?.count || 0;
       const lastWeekReviewRequests = stats.weeklyReviews[0]?.count || 0;
 
-      // 3. RECENSIONI RACCOLTE: Calcola recensioni nel periodo selezionato
-      const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
-      const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
-      const totalReviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
-
-      // Filtra recensioni per il periodo selezionato se abbiamo i dati dettagliati
+      // 3. RECENSIONI RACCOLTE: Usa il nuovo sistema di snapshot
       let reviewsCollected = 0;
-      if (restaurant.reviews && restaurant.reviews.length > 0) {
-        reviewsCollected = restaurant.reviews.filter(review => 
-          new Date(review.time) >= startDate && new Date(review.time) <= endDate
-        ).length;
-      } else {
-        // Fallback se non abbiamo i dati dettagliati
-        reviewsCollected = totalReviewsCollected;
+      try {
+        reviewsCollected = await googlePlacesService.getReviewsCollectedInPeriod(
+          restaurant._id,
+          startDate,
+          endDate
+        );
+      } catch (error) {
+        console.error('Errore calcolo recensioni raccolte:', error);
+        // Fallback al metodo precedente se il nuovo sistema non funziona
+        const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
+        const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
+        reviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
       }
 
       // 4. OBIETTIVO SETTIMANALE: Sistema di gamification migliorato
@@ -221,7 +224,7 @@ class StatsController {
         }
       }
 
-      const levelInfo = getLevelInfo(totalReviewsCollected)
+      const levelInfo = getLevelInfo(reviewsCollected)
       const level = levelInfo.numericLevel
       const reviewsToNextLevel = levelInfo.remaining
       
@@ -231,7 +234,7 @@ class StatsController {
       // Aggiorna i dati di gamification nel ristorante
       await this.updateGamificationData(restaurant, {
         level,
-        totalExperience: totalReviewsCollected * 10, // 10 XP per recensione
+        totalExperience: reviewsCollected * 10, // 10 XP per recensione
         weeklyStreak,
         weeklyGoalProgress,
         weeklyGoal,
@@ -240,7 +243,7 @@ class StatsController {
 
       // Sistema di badge/achievement
       const achievements = await this.calculateAchievements(restaurantId, {
-        totalReviews: totalReviewsCollected,
+        totalReviews: reviewsCollected,
         weeklyStreak,
         level,
         weeklyGoalProgress
@@ -267,7 +270,7 @@ class StatsController {
         menusSent: menuInteractions,
         reviewRequests: reviewRequests,
         reviewsCollected: reviewsCollected,
-        totalReviewsCollected: totalReviewsCollected,
+        totalReviewsCollected: reviewsCollected,
         initialReviewCount: initialReviewCount,
         currentReviewCount: currentReviewCount,
         weeklyGoal: {
@@ -279,7 +282,7 @@ class StatsController {
         trends: {
           menusSent: calculateTrend(menuInteractions, previousMenuInteractions),
           reviewRequests: calculateTrend(reviewRequests, lastWeekReviewRequests),
-          reviewsCollected: calculateTrend(reviewsCollected, totalReviewsCollected)
+          reviewsCollected: calculateTrend(reviewsCollected, reviewsCollected)
         },
         level: level,
         levelInfo: {
