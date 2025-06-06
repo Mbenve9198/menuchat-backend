@@ -35,6 +35,7 @@ router.post('/create-intent', async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalAmount,
       currency: 'eur',
+      payment_method_types: ['card'],
       metadata: {
         contactCount: contactCount.toString(),
         pricePerContact: pricePerContact.toString(),
