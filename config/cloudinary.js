@@ -36,10 +36,7 @@ const mediaStorage = new CloudinaryStorage({
       if (file.mimetype.startsWith('image/')) {
         return 'image';
       } else if (file.mimetype.startsWith('video/')) {
-        // Se il video è destinato a WhatsApp, caricalo come raw per evitare problemi di Content-Type
-        if (req.body.optimizeForWhatsApp === 'true') {
-          return 'raw';
-        }
+        // Usa sempre 'video' per la conversione automatica in MP4
         return 'video';
       } else if (file.mimetype === 'application/pdf') {
         return 'raw';
@@ -47,7 +44,7 @@ const mediaStorage = new CloudinaryStorage({
       return 'auto'; // Fallback
     },
     format: (req, file) => {
-      // Per i video destinati a WhatsApp, forza sempre mp4
+      // Per i video, forza sempre mp4
       if (file.mimetype.startsWith('video/')) {
         return 'mp4';
       }
@@ -83,14 +80,13 @@ const mediaStorage = new CloudinaryStorage({
       const timestamp = Date.now();
       return `${prefix}-${sanitizedType}-${timestamp}`;
     },
-    // Aggiungi trasformazioni specifiche per i video destinati a WhatsApp
+    // Trasformazioni semplici per i video
     transformation: (req, file) => {
       if (file.mimetype.startsWith('video/') && req.body.optimizeForWhatsApp === 'true') {
         return [
           { quality: 'auto:good' },
           { video_codec: 'h264' },
-          { audio_codec: 'aac' },
-          { flags: 'streaming_attachment' }
+          { audio_codec: 'aac' }
         ];
       }
       return undefined; // Nessuna trasformazione per altri tipi di file
