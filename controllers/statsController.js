@@ -150,19 +150,26 @@ class StatsController {
       const previousMenuInteractions = stats.previousMenus[0]?.count || 0;
       const lastWeekReviewRequests = stats.weeklyReviews[0]?.count || 0;
 
-      // 3. RECENSIONI RACCOLTE: Usa il nuovo sistema di snapshot
+      // 3. RECENSIONI RACCOLTE: Usa il nuovo sistema di snapshot con fallback migliorato
       let reviewsCollected = 0;
+      const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
+      const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
+      
       try {
         reviewsCollected = await googlePlacesService.getReviewsCollectedInPeriod(
           restaurant._id,
           startDate,
           endDate
         );
+        
+        // Se il nuovo sistema restituisce 0 ma abbiamo dati nel ristorante, usa il fallback
+        if (reviewsCollected === 0 && currentReviewCount > initialReviewCount) {
+          console.log('⚠️ Sistema snapshot restituisce 0, usando fallback al calcolo tradizionale');
+          reviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
+        }
       } catch (error) {
         console.error('Errore calcolo recensioni raccolte:', error);
         // Fallback al metodo precedente se il nuovo sistema non funziona
-        const initialReviewCount = restaurant.googleRating?.initialReviewCount || 0;
-        const currentReviewCount = restaurant.googleRating?.reviewCount || 0;
         reviewsCollected = Math.max(0, currentReviewCount - initialReviewCount);
       }
 
