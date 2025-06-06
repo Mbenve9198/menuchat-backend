@@ -3,9 +3,9 @@ const { CloudinaryStorage } = require('@fluidjs/multer-cloudinary');
 const multer = require('multer');
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dsby0xktf',
+  api_key: process.env.CLOUDINARY_API_KEY || '797287421795773',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'Cd2sF9MfqneRTcsZxLFCU3nLRiE'
 });
 
 // Storage per i PDF dei menu
