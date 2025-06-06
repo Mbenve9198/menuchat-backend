@@ -101,29 +101,29 @@ class UploadController {
         
         const axios = require('axios');
         let urlFunziona = false;
-        let contentTypeProblematico = false;
         
         try {
           const testResponse = await axios.head(path, { timeout: 10000 });
           urlFunziona = true;
           const contentType = testResponse.headers['content-type'];
           console.log('🎬 URL originale accessibile - Content-Type:', contentType);
+          console.log('🎬 Resource type:', resource_type);
           
-          // Controlla se il Content-Type è problematico per WhatsApp
-          if (contentType && contentType.includes('codecs=')) {
-            contentTypeProblematico = true;
-            console.log('🎬 Content-Type contiene parametri codec - serve ottimizzazione');
+          // Se è stato caricato come raw, dovrebbe già essere compatibile con WhatsApp
+          if (resource_type === 'raw') {
+            console.log('🎬 ✅ Video caricato come raw - compatibile con WhatsApp');
+          } else {
+            console.log('🎬 ⚠️ Video caricato come video - potrebbe avere problemi di Content-Type');
           }
+          
         } catch (testError) {
-          console.log('🎬 URL originale non accessibile:', testError.message);
+          console.log('🎬 ❌ URL originale non accessibile:', testError.message);
+          urlFunziona = false;
         }
         
-        // Se l'URL originale funziona e non ha problemi di Content-Type, usalo
-        if (urlFunziona && !contentTypeProblematico) {
-          console.log('🎬 URL originale OK per WhatsApp, nessuna ottimizzazione necessaria');
-        } else {
-          // Solo se necessario, crea una versione ottimizzata
-          console.log('🎬 Creazione versione ottimizzata necessaria...');
+        // Se l'URL non funziona e non è raw, proviamo a creare una versione raw
+        if (!urlFunziona && resource_type !== 'raw') {
+          console.log('🎬 Creazione versione raw necessaria...');
           
           try {
             // Estrai il public_id base senza estensione
@@ -132,10 +132,10 @@ class UploadController {
               basePublicId = basePublicId.split('.')[0];
             }
             
-            // Strategia semplificata: carica direttamente come raw con estensione .mp4
-            const whatsappPublicId = `${basePublicId}_whatsapp_raw`;
+            // Crea un nuovo public_id per la versione raw
+            const rawPublicId = `${basePublicId}_raw`;
             
-            console.log('🎬 Creazione asset raw per WhatsApp:', whatsappPublicId);
+            console.log('🎬 Creazione asset raw per WhatsApp:', rawPublicId);
             
             // Scarica il video originale
             const videoResponse = await axios.get(path, { 
@@ -145,7 +145,7 @@ class UploadController {
             
             // Salva temporaneamente
             const fs = require('fs');
-            const tempFilePath = `/tmp/${whatsappPublicId}.mp4`;
+            const tempFilePath = `/tmp/${rawPublicId}.mp4`;
             fs.writeFileSync(tempFilePath, Buffer.from(videoResponse.data));
             
             console.log('🎬 Video scaricato, carico come raw...');
@@ -153,7 +153,7 @@ class UploadController {
             // Carica come raw per evitare problemi di Content-Type
             const rawResult = await cloudinary.uploader.upload(tempFilePath, {
               resource_type: 'raw',
-              public_id: whatsappPublicId,
+              public_id: rawPublicId,
               folder: 'campaign-media',
               overwrite: true
             });
@@ -174,6 +174,8 @@ class UploadController {
             console.log('🎬 Mantengo URL originale come fallback');
             // Mantieni l'URL originale anche se l'ottimizzazione fallisce
           }
+        } else if (urlFunziona) {
+          console.log('🎬 ✅ URL originale funziona, nessuna ottimizzazione necessaria');
         }
       }
       

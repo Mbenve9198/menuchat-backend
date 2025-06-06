@@ -36,6 +36,10 @@ const mediaStorage = new CloudinaryStorage({
       if (file.mimetype.startsWith('image/')) {
         return 'image';
       } else if (file.mimetype.startsWith('video/')) {
+        // Se il video è destinato a WhatsApp, caricalo come raw per evitare problemi di Content-Type
+        if (req.body.optimizeForWhatsApp === 'true') {
+          return 'raw';
+        }
         return 'video';
       } else if (file.mimetype === 'application/pdf') {
         return 'raw';
