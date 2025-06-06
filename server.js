@@ -72,6 +72,10 @@ if (process.env.NODE_ENV === 'development') {
 // Rotte API
 app.use('/api', routes);
 
+// Route per proxy media (per correggere Content-Type per WhatsApp)
+const mediaProxyRoutes = require('./routes/mediaProxy');
+app.use('/proxy', mediaProxyRoutes);
+
 // Aggiungi una rotta diretta per il webhook di Twilio
 const twilioController = require('./controllers/twilioController');
 app.post('/twilio/webhook', twilioController.webhookHandler);
