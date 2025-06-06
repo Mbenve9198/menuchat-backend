@@ -2022,39 +2022,37 @@ const ensureMediaCompatibility = (mediaUrl) => {
     return mediaUrl;
   }
   
-  // Per i video Cloudinary
+  // Per i video Cloudinary, usa il proxy per correggere il Content-Type
   if (isVideo) {
+    // Estrai il path dal URL Cloudinary per costruire l'URL del proxy
+    const cloudinaryPattern = /https:\/\/res\.cloudinary\.com\/[^\/]+\/(.+)/;
+    const match = mediaUrl.match(cloudinaryPattern);
+    
+    if (match) {
+      const videoPath = match[1];
+      const backendUrl = process.env.BASE_URL || 'https://menuchat-backend.onrender.com';
+      const proxyUrl = `${backendUrl}/proxy/media/${videoPath}`;
+      
+      console.log('🔗 ensureMediaCompatibility - Video Cloudinary rilevato, uso proxy');
+      console.log('🔗 Path estratto:', videoPath);
+      console.log('🔗 URL proxy generato:', proxyUrl);
+      
+      return proxyUrl;
+    } else {
+      console.log('🔗 ensureMediaCompatibility - Impossibile estrarre path da URL Cloudinary:', mediaUrl);
+    }
+  }
+  
+  // Per altri media non video, applica le correzioni esistenti
+  if (!isVideo) {
     // Controlla se l'URL contiene _whatsapp o _whatsapp_optimized
     if (mediaUrl.includes('_whatsapp')) {
       console.log('🔗 ensureMediaCompatibility - URL già ottimizzato per WhatsApp:', mediaUrl);
       return mediaUrl;
     }
-    
-    // Controlla se ha estensioni multiple (es. .MOV.mp4)
-    const hasMultipleExtensions = /\.[A-Z]{3,4}\.(mp4|mov|avi)$/i.test(mediaUrl);
-    if (hasMultipleExtensions) {
-      // Rimuovi l'estensione doppia
-      const correctedUrl = mediaUrl.replace(/\.[A-Z]{3,4}\.(mp4|mov|avi)$/i, '.mp4');
-      console.log('🔗 ensureMediaCompatibility - Corretto URL con estensioni multiple:', correctedUrl);
-      return correctedUrl;
-    }
-    
-    // Assicurati che termini con .mp4
-    if (!mediaUrl.endsWith('.mp4')) {
-      const correctedUrl = mediaUrl.replace(/\.\w+$/, '.mp4');
-      console.log('🔗 ensureMediaCompatibility - URL corretto con estensione .mp4:', correctedUrl);
-      return correctedUrl;
-    }
-    
-    // Controlla se l'URL contiene trasformazioni che potrebbero causare problemi
-    const hasProblematicTransformations = mediaUrl.match(/\/upload\/[^\/]*[qf]_[^\/]*\//);
-    if (hasProblematicTransformations) {
-      console.log('🔗 ATTENZIONE: URL video contiene trasformazioni che potrebbero causare problemi:', mediaUrl);
-      console.log('🔗 Considera di utilizzare un URL senza trasformazioni o un asset raw');
-    }
   }
   
-  console.log('🔗 ensureMediaCompatibility - URL finale:', mediaUrl);
+  console.log('🔗 ensureMediaCompatibility - URL finale (nessuna modifica):', mediaUrl);
   return mediaUrl;
 };
 
