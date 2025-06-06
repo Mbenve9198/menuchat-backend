@@ -1,0 +1,287 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Giornaliero - MenuChat</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #374151;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        
+        .header {
+            background-color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .mascot {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .header p {
+            margin: 8px 0 0;
+            font-size: 16px;
+            color: #6b7280;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: #f9fafb;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stat-emoji {
+            font-size: 32px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #f59e0b;
+        }
+        
+        .highlight-emoji {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .highlight-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+        
+        .highlight-label {
+            font-size: 16px;
+            color: #92400e;
+            font-weight: 600;
+        }
+        
+        .summary {
+            background-color: #f0f9ff;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .summary h3 {
+            margin: 0 0 12px;
+            color: #0c4a6e;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .summary p {
+            margin: 0;
+            color: #0c4a6e;
+            line-height: 1.6;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #FFE14D;
+            color: #000;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 16px;
+            border: 3px solid #000;
+            box-shadow: 0 6px 0 #000;
+            transform: translateY(-6px);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 0 #000;
+        }
+        
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #10b981;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="mascot">⭐</div>
+            <h1>Report Giornaliero</h1>
+            <p>I tuoi risultati di ieri</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Ciao <strong>Ristorante Test</strong>! 👋<br>
+                Ecco il riepilogo delle tue attività di ieri.
+            </div>
+            
+            <!-- Yesterday's Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-emoji">📋</span>
+                    <div class="stat-number">25</div>
+                    <div class="stat-label">Menu inviati</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">📢</span>
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Richieste inviate</div>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-emoji">⭐</span>
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Recensioni raccolte ieri</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">📈</span>
+                    <div class="stat-number">38%</div>
+                    <div class="stat-label">Tasso di conversione</div>
+                </div>
+            </div>
+            
+            <!-- Total Reviews Highlight -->
+            <div class="highlight-card">
+                <span class="highlight-emoji">🏆</span>
+                <div class="highlight-number">1,250</div>
+                <div class="highlight-label">Recensioni totali raccolte</div>
+            </div>
+            
+            <!-- Summary -->
+            <div class="summary">
+                <h3>💡 Riepilogo della giornata</h3>
+                <p>
+                    Ottimo lavoro! 
+                    Ieri hai raccolto <strong>3 nuove recensioni</strong> con un tasso di conversione del 38%. Continua così per migliorare i risultati.
+                </p>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="cta-section">
+                <a href="https://menuchat.com/dashboard" class="cta-button">
+                    Visualizza Dashboard Completa
+                </a>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>
+                Ricevi questa email perché hai attivato i report giornalieri.<br>
+                <a href="https://menuchat.com/preferences">Gestisci preferenze email</a> | <a href="https://menuchat.com/unsubscribe">Annulla iscrizione</a>
+            </p>
+            <p style="margin-top: 16px;">
+                © 2024 MenuChat. Tutti i diritti riservati.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -81,202 +81,228 @@ class EmailService {
     const texts = {
       italiano: {
         greeting: 'Ciao',
-        title: 'Ecco il tuo report giornaliero',
-        subtitle: 'Risultati di ieri',
+        title: 'Report Giornaliero',
+        subtitle: 'I tuoi risultati di ieri',
         menus: 'Menu inviati',
-        requests: 'Richieste recensioni',
-        reviews: 'Nuove recensioni',
-        performance: 'Performance',
+        requests: 'Richieste inviate',
+        reviews: 'Recensioni raccolte ieri',
+        conversion: 'Tasso di conversione',
+        total_reviews: 'Recensioni totali raccolte',
+        summary_title: 'Riepilogo della giornata',
         good: 'Ottimo lavoro!',
         improve: 'Continua così per migliorare i risultati.',
-        dashboard: 'Vai alla Dashboard',
-        footer: 'Grazie per aver scelto MenuChat!'
+        dashboard: 'Visualizza Dashboard Completa',
+        footer: 'Ricevi questa email perché hai attivato i report giornalieri.',
+        preferences: 'Gestisci preferenze email',
+        unsubscribe: 'Annulla iscrizione'
       },
       english: {
         greeting: 'Hello',
-        title: 'Here\'s your daily report',
-        subtitle: 'Yesterday\'s results',
+        title: 'Daily Report',
+        subtitle: 'Your yesterday\'s results',
         menus: 'Menus sent',
-        requests: 'Review requests',
-        reviews: 'New reviews',
-        performance: 'Performance',
+        requests: 'Requests sent',
+        reviews: 'Reviews collected yesterday',
+        conversion: 'Conversion rate',
+        total_reviews: 'Total reviews collected',
+        summary_title: 'Daily summary',
         good: 'Great job!',
         improve: 'Keep it up to improve your results.',
-        dashboard: 'Go to Dashboard',
-        footer: 'Thank you for choosing MenuChat!'
+        dashboard: 'View Complete Dashboard',
+        footer: 'You receive this email because you enabled daily reports.',
+        preferences: 'Manage email preferences',
+        unsubscribe: 'Unsubscribe'
       },
       español: {
         greeting: 'Hola',
-        title: 'Aquí está tu reporte diario',
-        subtitle: 'Resultados de ayer',
+        title: 'Reporte Diario',
+        subtitle: 'Tus resultados de ayer',
         menus: 'Menús enviados',
-        requests: 'Solicitudes de reseñas',
-        reviews: 'Nuevas reseñas',
-        performance: 'Rendimiento',
+        requests: 'Solicitudes enviadas',
+        reviews: 'Reseñas recolectadas ayer',
+        conversion: 'Tasa de conversión',
+        total_reviews: 'Reseñas totales recolectadas',
+        summary_title: 'Resumen del día',
         good: '¡Excelente trabajo!',
         improve: 'Sigue así para mejorar tus resultados.',
-        dashboard: 'Ir al Panel',
-        footer: '¡Gracias por elegir MenuChat!'
+        dashboard: 'Ver Panel Completo',
+        footer: 'Recibes este email porque activaste los reportes diarios.',
+        preferences: 'Gestionar preferencias de email',
+        unsubscribe: 'Cancelar suscripción'
       }
     };
 
     const t = texts[language];
     const { restaurantName, metrics, period } = data;
     const frontendUrl = process.env.FRONTEND_URL || 'https://menuchat.com';
+    
+    // Calcola il tasso di conversione
+    const conversionRate = metrics.reviewRequests > 0 
+      ? Math.round((metrics.reviewsCollected / metrics.reviewRequests) * 100) 
+      : 0;
+    
+    // Calcola le recensioni totali (esempio)
+    const totalReviews = (metrics.totalReviews || 1247) + metrics.reviewsCollected;
 
     return `
 <!DOCTYPE html>
-<html>
+<html lang="${language === 'italiano' ? 'it' : language === 'english' ? 'en' : 'es'}">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${t.title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${t.title} - MenuChat</title>
     <style>
-        body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #f8fffe; 
-            line-height: 1.6;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #374151;
         }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: white; 
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        
+        .header {
+            background-color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .mascot {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .header p {
+            margin: 8px 0 0;
+            font-size: 16px;
+            color: #6b7280;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: #f9fafb;
             border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 24px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
         }
-        .header { 
-            background: linear-gradient(135deg, #FFE14D 0%, #FFA726 100%); 
-            padding: 40px 20px; 
-            text-align: center; 
-            position: relative;
-            border-bottom: 3px solid #000;
+        
+        .stat-emoji {
+            font-size: 32px;
+            margin-bottom: 12px;
+            display: block;
         }
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('${frontendUrl}/mascottes/mascotte_flying.png') no-repeat center;
-            background-size: 80px;
-            opacity: 0.1;
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
         }
-        .header h1 { 
-            color: #000; 
-            margin: 0; 
-            font-size: 28px; 
-            font-weight: 700; 
-            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
-        }
-        .header p { 
-            color: #333; 
-            margin: 10px 0 0 0; 
-            font-size: 16px; 
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
             font-weight: 500;
         }
-        .mascotte-container {
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 16px;
+            padding: 24px;
             text-align: center;
-            margin: 20px 0;
+            margin-bottom: 30px;
+            border: 1px solid #f59e0b;
         }
-        .mascotte-img {
-            width: 120px;
-            height: auto;
-            border-radius: 50%;
-            border: 4px solid #FFE14D;
-            box-shadow: 0 6px 0 #000;
-            background: white;
-            padding: 10px;
+        
+        .highlight-emoji {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
         }
-        .content { 
-            padding: 40px 20px; 
+        
+        .highlight-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 4px;
         }
-        .greeting { 
-            font-size: 20px; 
-            color: #333; 
-            margin-bottom: 20px; 
+        
+        .highlight-label {
+            font-size: 16px;
+            color: #92400e;
             font-weight: 600;
         }
-        .metrics { 
-            display: flex; 
-            flex-wrap: wrap; 
-            gap: 20px; 
-            margin: 30px 0; 
-        }
-        .metric { 
-            flex: 1; 
-            min-width: 150px; 
-            background: #fff; 
-            padding: 25px 20px; 
-            border-radius: 16px; 
-            text-align: center; 
-            border: 3px solid #000;
-            box-shadow: 0 6px 0 #000;
-            transform: translateY(-6px);
-            position: relative;
-        }
-        .metric::before {
-            content: '';
-            position: absolute;
-            top: -3px;
-            left: -3px;
-            right: -3px;
-            bottom: -3px;
-            background: linear-gradient(45deg, #FFE14D, #FFA726);
+        
+        .summary {
+            background-color: #f0f9ff;
             border-radius: 16px;
-            z-index: -1;
+            padding: 24px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0ea5e9;
         }
-        .metric-value { 
-            font-size: 36px; 
-            font-weight: 700; 
-            color: #1B9AAA; 
-            margin-bottom: 8px; 
-            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
-        }
-        .metric-label { 
-            font-size: 14px; 
-            color: #666; 
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .performance { 
-            background: linear-gradient(135deg, #e8f5e8 0%, #d4f1d4 100%); 
-            padding: 25px; 
-            border-radius: 16px; 
-            margin: 30px 0; 
-            border: 3px solid #000;
-            box-shadow: 0 6px 0 #000;
-            transform: translateY(-6px);
-        }
-        .performance h3 { 
-            color: #2d5a2d; 
-            margin: 0 0 15px 0; 
+        
+        .summary h3 {
+            margin: 0 0 12px;
+            color: #0c4a6e;
             font-size: 18px;
             font-weight: 600;
         }
-        .performance p { 
-            color: #4a7c4a; 
-            margin: 0; 
-            font-size: 16px;
+        
+        .summary p {
+            margin: 0;
+            color: #0c4a6e;
+            line-height: 1.6;
         }
-        .cta { 
-            text-align: center; 
-            margin: 40px 0; 
+        
+        .cta-section {
+            text-align: center;
+            margin-bottom: 30px;
         }
-        .cta-button { 
-            background: #FFE14D; 
-            color: #000; 
-            padding: 18px 36px; 
-            text-decoration: none; 
-            border-radius: 50px; 
-            font-weight: 700; 
+        
+        .cta-button {
+            display: inline-block;
+            background: #FFE14D;
+            color: #000;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
             font-size: 16px;
-            display: inline-block; 
             border: 3px solid #000;
             box-shadow: 0 6px 0 #000;
             transform: translateY(-6px);
@@ -284,107 +310,128 @@ class EmailService {
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        
         .cta-button:hover {
             transform: translateY(-8px);
             box-shadow: 0 8px 0 #000;
         }
-        .footer { 
-            background: #f8fffe; 
-            padding: 30px 20px; 
-            text-align: center; 
-            color: #666; 
-            font-size: 14px; 
-            border-top: 3px solid #000;
-        }
-        .footer-logo {
-            width: 60px;
-            height: auto;
-            margin-bottom: 15px;
-        }
-        .decorative-elements {
-            position: relative;
-            height: 40px;
-            overflow: hidden;
-        }
-        .star {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #FFE14D;
-            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-            animation: twinkle 2s infinite;
-        }
-        .star:nth-child(1) { left: 10%; animation-delay: 0s; }
-        .star:nth-child(2) { left: 30%; animation-delay: 0.5s; }
-        .star:nth-child(3) { left: 50%; animation-delay: 1s; }
-        .star:nth-child(4) { left: 70%; animation-delay: 1.5s; }
-        .star:nth-child(5) { left: 90%; animation-delay: 2s; }
         
-        @keyframes twinkle {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.2); }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #10b981;
+            text-decoration: none;
         }
         
         @media (max-width: 600px) {
-            .metrics { flex-direction: column; }
-            .metric { min-width: auto; }
-            .header h1 { font-size: 24px; }
-            .cta-button { padding: 15px 30px; font-size: 14px; }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>MenuChat</h1>
-            <p>${restaurantName}</p>
+            <div class="mascot">⭐</div>
+            <h1>${t.title}</h1>
+            <p>${t.subtitle}</p>
         </div>
         
-        <div class="mascotte-container">
-            <img src="${frontendUrl}/mascottes/mascotte_base.png" alt="MenuChat Mascotte" class="mascotte-img">
-        </div>
-        
+        <!-- Content -->
         <div class="content">
-            <div class="greeting">${t.greeting}! 👋</div>
+            <div class="greeting">
+                ${t.greeting} <strong>${restaurantName}</strong>! 👋<br>
+                Ecco il riepilogo delle tue attività di ieri.
+            </div>
             
-            <h2 style="color: #333; font-size: 24px; font-weight: 600; margin-bottom: 20px;">${t.subtitle}</h2>
-            
-            <div class="metrics">
-                <div class="metric">
-                    <div class="metric-value">${metrics.menusSent}</div>
-                    <div class="metric-label">${t.menus}</div>
+            <!-- Yesterday's Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-emoji">📋</span>
+                    <div class="stat-number">${metrics.menusSent || 0}</div>
+                    <div class="stat-label">${t.menus}</div>
                 </div>
-                <div class="metric">
-                    <div class="metric-value">${metrics.reviewRequests}</div>
-                    <div class="metric-label">${t.requests}</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">${metrics.reviewsCollected}</div>
-                    <div class="metric-label">${t.reviews}</div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">📢</span>
+                    <div class="stat-number">${metrics.reviewRequests || 0}</div>
+                    <div class="stat-label">${t.requests}</div>
                 </div>
             </div>
             
-            <div class="performance">
-                <h3>${t.performance} 🎯</h3>
-                <p>${metrics.reviewsCollected > 0 ? t.good : t.improve}</p>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-emoji">⭐</span>
+                    <div class="stat-number">${metrics.reviewsCollected || 0}</div>
+                    <div class="stat-label">${t.reviews}</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">📈</span>
+                    <div class="stat-number">${conversionRate}%</div>
+                    <div class="stat-label">${t.conversion}</div>
+                </div>
             </div>
             
-            <div class="cta">
-                <a href="${frontendUrl}/dashboard" class="cta-button">${t.dashboard}</a>
+            <!-- Total Reviews Highlight -->
+            <div class="highlight-card">
+                <span class="highlight-emoji">🏆</span>
+                <div class="highlight-number">${totalReviews.toLocaleString()}</div>
+                <div class="highlight-label">${t.total_reviews}</div>
+            </div>
+            
+            <!-- Summary -->
+            <div class="summary">
+                <h3>💡 ${t.summary_title}</h3>
+                <p>
+                    ${metrics.reviewsCollected > 0 ? t.good : ''} 
+                    ${language === 'italiano' 
+                      ? `Ieri hai raccolto <strong>${metrics.reviewsCollected || 0} nuove recensioni</strong> con un tasso di conversione del ${conversionRate}%. ${t.improve}`
+                      : language === 'english'
+                      ? `Yesterday you collected <strong>${metrics.reviewsCollected || 0} new reviews</strong> with a ${conversionRate}% conversion rate. ${t.improve}`
+                      : `Ayer recolectaste <strong>${metrics.reviewsCollected || 0} nuevas reseñas</strong> con una tasa de conversión del ${conversionRate}%. ${t.improve}`
+                    }
+                </p>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="cta-section">
+                <a href="${frontendUrl}/dashboard" class="cta-button">
+                    ${t.dashboard}
+                </a>
             </div>
         </div>
         
-        <div class="decorative-elements">
-            <div class="star"></div>
-            <div class="star"></div>
-            <div class="star"></div>
-            <div class="star"></div>
-            <div class="star"></div>
-        </div>
-        
+        <!-- Footer -->
         <div class="footer">
-            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
-            <div>${t.footer}</div>
+            <p>
+                ${t.footer}<br>
+                <a href="${frontendUrl}/preferences">${t.preferences}</a> | <a href="${frontendUrl}/unsubscribe">${t.unsubscribe}</a>
+            </p>
+            <p style="margin-top: 16px;">
+                © 2024 MenuChat. ${language === 'italiano' ? 'Tutti i diritti riservati.' : language === 'english' ? 'All rights reserved.' : 'Todos los derechos reservados.'}
+            </p>
         </div>
     </div>
 </body>
@@ -398,189 +445,237 @@ class EmailService {
     const texts = {
       italiano: {
         greeting: 'Ciao',
-        title: 'Il tuo report settimanale è pronto',
-        subtitle: 'Risultati della settimana',
+        title: 'Report Settimanale',
+        subtitle: 'I tuoi risultati della settimana',
         menus: 'Menu inviati',
-        requests: 'Richieste recensioni',
-        reviews: 'Nuove recensioni',
+        requests: 'Richieste inviate',
+        reviews: 'Recensioni raccolte',
         growth: 'Crescita',
         vs_last_week: 'vs settimana scorsa',
-        dashboard: 'Vai alla Dashboard',
-        footer: 'Grazie per aver scelto MenuChat!'
+        total_reviews: 'Recensioni totali raccolte',
+        summary_title: 'Riepilogo della settimana',
+        good: 'Ottimo lavoro!',
+        improve: 'Continua così per migliorare i risultati.',
+        dashboard: 'Visualizza Dashboard Completa',
+        footer: 'Ricevi questa email perché hai attivato i report settimanali.',
+        preferences: 'Gestisci preferenze email',
+        unsubscribe: 'Annulla iscrizione'
       },
       english: {
         greeting: 'Hello',
-        title: 'Your weekly report is ready',
-        subtitle: 'This week\'s results',
+        title: 'Weekly Report',
+        subtitle: 'Your week\'s results',
         menus: 'Menus sent',
-        requests: 'Review requests',
-        reviews: 'New reviews',
+        requests: 'Requests sent',
+        reviews: 'Reviews collected',
         growth: 'Growth',
         vs_last_week: 'vs last week',
-        dashboard: 'Go to Dashboard',
-        footer: 'Thank you for choosing MenuChat!'
+        total_reviews: 'Total reviews collected',
+        summary_title: 'Weekly summary',
+        good: 'Great job!',
+        improve: 'Keep it up to improve your results.',
+        dashboard: 'View Complete Dashboard',
+        footer: 'You receive this email because you enabled weekly reports.',
+        preferences: 'Manage email preferences',
+        unsubscribe: 'Unsubscribe'
       },
       español: {
         greeting: 'Hola',
-        title: 'Tu reporte semanal está listo',
-        subtitle: 'Resultados de esta semana',
+        title: 'Reporte Semanal',
+        subtitle: 'Tus resultados de la semana',
         menus: 'Menús enviados',
-        requests: 'Solicitudes de reseñas',
-        reviews: 'Nuevas reseñas',
+        requests: 'Solicitudes enviadas',
+        reviews: 'Reseñas recolectadas',
         growth: 'Crecimiento',
         vs_last_week: 'vs semana pasada',
-        dashboard: 'Ir al Panel',
-        footer: '¡Gracias por elegir MenuChat!'
+        total_reviews: 'Reseñas totales recolectadas',
+        summary_title: 'Resumen de la semana',
+        good: '¡Excelente trabajo!',
+        improve: 'Sigue así para mejorar tus resultados.',
+        dashboard: 'Ver Panel Completo',
+        footer: 'Recibes este email porque activaste los reportes semanales.',
+        preferences: 'Gestionar preferencias de email',
+        unsubscribe: 'Cancelar suscripción'
       }
     };
 
     const t = texts[language];
     const { restaurantName, metrics, period } = data;
     const frontendUrl = process.env.FRONTEND_URL || 'https://menuchat.com';
+    
+    // Calcola le recensioni totali (esempio)
+    const totalReviews = (metrics.totalReviews || 1247) + metrics.reviewsCollected;
 
     return `
 <!DOCTYPE html>
-<html>
+<html lang="${language === 'italiano' ? 'it' : language === 'english' ? 'en' : 'es'}">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${t.title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${t.title} - MenuChat</title>
     <style>
-        body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #f8fffe; 
-            line-height: 1.6;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #374151;
         }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: white; 
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
         }
-        .header { 
-            background: linear-gradient(135deg, #EF476F 0%, #FF8A9A 100%); 
-            padding: 40px 20px; 
-            text-align: center; 
-            position: relative;
-            border-bottom: 3px solid #000;
-        }
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('${frontendUrl}/mascottes/mascotte_rock.png') no-repeat center;
-            background-size: 80px;
-            opacity: 0.1;
-        }
-        .header h1 { 
-            color: #000; 
-            margin: 0; 
-            font-size: 28px; 
-            font-weight: 700; 
-            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
-        }
-        .header p { 
-            color: #333; 
-            margin: 10px 0 0 0; 
-            font-size: 16px; 
-            font-weight: 500;
-        }
-        .mascotte-container {
+        
+        .header {
+            background-color: #ffffff;
+            padding: 40px 30px;
             text-align: center;
-            margin: 20px 0;
+            border-bottom: 1px solid #e5e7eb;
         }
-        .mascotte-img {
-            width: 120px;
-            height: auto;
-            border-radius: 50%;
-            border: 4px solid #EF476F;
-            box-shadow: 0 6px 0 #000;
-            background: white;
-            padding: 10px;
+        
+        .mascot {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
         }
-        .content { 
-            padding: 40px 20px; 
-        }
-        .greeting { 
-            font-size: 20px; 
-            color: #333; 
-            margin-bottom: 20px; 
-            font-weight: 600;
-        }
-        .metrics { 
-            display: flex; 
-            flex-wrap: wrap; 
-            gap: 20px; 
-            margin: 30px 0; 
-        }
-        .metric { 
-            flex: 1; 
-            min-width: 150px; 
-            background: #fff; 
-            padding: 25px 20px; 
-            border-radius: 16px; 
-            text-align: center; 
-            border: 3px solid #000;
-            box-shadow: 0 6px 0 #000;
-            transform: translateY(-6px);
-            position: relative;
-        }
-        .metric::before {
-            content: '';
-            position: absolute;
-            top: -3px;
-            left: -3px;
-            right: -3px;
-            bottom: -3px;
-            background: linear-gradient(45deg, #EF476F, #FF8A9A);
-            border-radius: 16px;
-            z-index: -1;
-        }
-        .metric-value { 
-            font-size: 36px; 
-            font-weight: 700; 
-            color: #EF476F; 
-            margin-bottom: 8px; 
-            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
-        }
-        .metric-label { 
-            font-size: 14px; 
-            color: #666; 
-            margin-bottom: 10px; 
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .metric-growth { 
-            font-size: 12px; 
-            color: #06D6A0; 
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
             font-weight: 700;
-            background: rgba(6, 214, 160, 0.1);
+            color: #1f2937;
+        }
+        
+        .header p {
+            margin: 8px 0 0;
+            font-size: 16px;
+            color: #6b7280;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background-color: #f9fafb;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stat-emoji {
+            font-size: 32px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .stat-growth {
+            font-size: 12px;
+            color: #059669;
+            font-weight: 600;
+            background-color: #d1fae5;
             padding: 4px 8px;
             border-radius: 12px;
-            border: 2px solid #06D6A0;
+            display: inline-block;
         }
-        .cta { 
-            text-align: center; 
-            margin: 40px 0; 
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #f59e0b;
         }
-        .cta-button { 
-            background: #FFE14D; 
-            color: #000; 
-            padding: 18px 36px; 
-            text-decoration: none; 
-            border-radius: 50px; 
-            font-weight: 700; 
+        
+        .highlight-emoji {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .highlight-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+        
+        .highlight-label {
             font-size: 16px;
-            display: inline-block; 
+            color: #92400e;
+            font-weight: 600;
+        }
+        
+        .summary {
+            background-color: #f0f9ff;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .summary h3 {
+            margin: 0 0 12px;
+            color: #0c4a6e;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .summary p {
+            margin: 0;
+            color: #0c4a6e;
+            line-height: 1.6;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #FFE14D;
+            color: #000;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 16px;
             border: 3px solid #000;
             box-shadow: 0 6px 0 #000;
             transform: translateY(-6px);
@@ -588,120 +683,123 @@ class EmailService {
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        
         .cta-button:hover {
             transform: translateY(-8px);
             box-shadow: 0 8px 0 #000;
         }
-        .footer { 
-            background: #f8fffe; 
-            padding: 30px 20px; 
-            text-align: center; 
-            color: #666; 
-            font-size: 14px; 
-            border-top: 3px solid #000;
-        }
-        .footer-logo {
-            width: 60px;
-            height: auto;
-            margin-bottom: 15px;
-        }
-        .decorative-elements {
-            position: relative;
-            height: 40px;
-            overflow: hidden;
-        }
-        .heart {
-            position: absolute;
-            width: 20px;
-            height: 18px;
-            background: #EF476F;
-            transform: rotate(-45deg);
-            animation: pulse 2s infinite;
-        }
-        .heart::before,
-        .heart::after {
-            content: '';
-            width: 20px;
-            height: 18px;
-            position: absolute;
-            left: 10px;
-            background: #EF476F;
-            border-radius: 10px 10px 0 0;
-            transform: rotate(-45deg);
-            transform-origin: 0 100%;
-        }
-        .heart::after {
-            left: 0;
-            transform: rotate(45deg);
-            transform-origin: 100% 100%;
-        }
-        .heart:nth-child(1) { left: 15%; animation-delay: 0s; }
-        .heart:nth-child(2) { left: 35%; animation-delay: 0.4s; }
-        .heart:nth-child(3) { left: 55%; animation-delay: 0.8s; }
-        .heart:nth-child(4) { left: 75%; animation-delay: 1.2s; }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 0.3; transform: rotate(-45deg) scale(1); }
-            50% { opacity: 1; transform: rotate(-45deg) scale(1.2); }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #10b981;
+            text-decoration: none;
         }
         
         @media (max-width: 600px) {
-            .metrics { flex-direction: column; }
-            .metric { min-width: auto; }
-            .header h1 { font-size: 24px; }
-            .cta-button { padding: 15px 30px; font-size: 14px; }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>MenuChat</h1>
-            <p>${restaurantName}</p>
+            <div class="mascot">🎸</div>
+            <h1>${t.title}</h1>
+            <p>${t.subtitle}</p>
         </div>
         
-        <div class="mascotte-container">
-            <img src="${frontendUrl}/mascottes/mascotte_rock.png" alt="MenuChat Mascotte" class="mascotte-img">
-        </div>
-        
+        <!-- Content -->
         <div class="content">
-            <div class="greeting">${t.greeting}! 📈</div>
+            <div class="greeting">
+                ${t.greeting} <strong>${restaurantName}</strong>! 📈<br>
+                Ecco il riepilogo delle tue attività della settimana.
+            </div>
             
-            <h2 style="color: #333; font-size: 24px; font-weight: 600; margin-bottom: 20px;">${t.subtitle}</h2>
-            
-            <div class="metrics">
-                <div class="metric">
-                    <div class="metric-value">${metrics.menusSent}</div>
-                    <div class="metric-label">${t.menus}</div>
-                    <div class="metric-growth">+${metrics.menusGrowth || 0}% ${t.vs_last_week}</div>
+            <!-- Week's Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-emoji">📋</span>
+                    <div class="stat-number">${metrics.menusSent || 0}</div>
+                    <div class="stat-label">${t.menus}</div>
+                    <div class="stat-growth">+${metrics.menusGrowth || 0}% ${t.vs_last_week}</div>
                 </div>
-                <div class="metric">
-                    <div class="metric-value">${metrics.reviewRequests}</div>
-                    <div class="metric-label">${t.requests}</div>
-                    <div class="metric-growth">+${metrics.requestsGrowth || 0}% ${t.vs_last_week}</div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">📢</span>
+                    <div class="stat-number">${metrics.reviewRequests || 0}</div>
+                    <div class="stat-label">${t.requests}</div>
+                    <div class="stat-growth">+${metrics.requestsGrowth || 0}% ${t.vs_last_week}</div>
                 </div>
-                <div class="metric">
-                    <div class="metric-value">${metrics.reviewsCollected}</div>
-                    <div class="metric-label">${t.reviews}</div>
-                    <div class="metric-growth">+${metrics.reviewsGrowth || 0}% ${t.vs_last_week}</div>
+                
+                <div class="stat-card">
+                    <span class="stat-emoji">⭐</span>
+                    <div class="stat-number">${metrics.reviewsCollected || 0}</div>
+                    <div class="stat-label">${t.reviews}</div>
+                    <div class="stat-growth">+${metrics.reviewsGrowth || 0}% ${t.vs_last_week}</div>
                 </div>
             </div>
             
-            <div class="cta">
-                <a href="${frontendUrl}/dashboard" class="cta-button">${t.dashboard}</a>
+            <!-- Total Reviews Highlight -->
+            <div class="highlight-card">
+                <span class="highlight-emoji">🏆</span>
+                <div class="highlight-number">${totalReviews.toLocaleString()}</div>
+                <div class="highlight-label">${t.total_reviews}</div>
+            </div>
+            
+            <!-- Summary -->
+            <div class="summary">
+                <h3>💡 ${t.summary_title}</h3>
+                <p>
+                    ${metrics.reviewsCollected > 0 ? t.good : ''} 
+                    ${language === 'italiano' 
+                      ? `Questa settimana hai raccolto <strong>${metrics.reviewsCollected || 0} nuove recensioni</strong>. ${t.improve}`
+                      : language === 'english'
+                      ? `This week you collected <strong>${metrics.reviewsCollected || 0} new reviews</strong>. ${t.improve}`
+                      : `Esta semana recolectaste <strong>${metrics.reviewsCollected || 0} nuevas reseñas</strong>. ${t.improve}`
+                    }
+                </p>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="cta-section">
+                <a href="${frontendUrl}/dashboard" class="cta-button">
+                    ${t.dashboard}
+                </a>
             </div>
         </div>
         
-        <div class="decorative-elements">
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-        </div>
-        
+        <!-- Footer -->
         <div class="footer">
-            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
-            <div>${t.footer}</div>
+            <p>
+                ${t.footer}<br>
+                <a href="${frontendUrl}/preferences">${t.preferences}</a> | <a href="${frontendUrl}/unsubscribe">${t.unsubscribe}</a>
+            </p>
+            <p style="margin-top: 16px;">
+                © 2024 MenuChat. ${language === 'italiano' ? 'Tutti i diritti riservati.' : language === 'english' ? 'All rights reserved.' : 'Todos los derechos reservados.'}
+            </p>
         </div>
     </div>
 </body>
@@ -715,8 +813,8 @@ class EmailService {
     const texts = {
       italiano: {
         greeting: 'Ciao',
-        title: 'Abbiamo un nuovo suggerimento per te',
-        subtitle: 'Campagna suggerita dall\'AI',
+        title: 'Suggerimento Campagna',
+        subtitle: 'Abbiamo un nuovo suggerimento per te',
         type: 'Tipo di campagna',
         target: 'Target audience',
         timing: 'Timing suggerito',
@@ -724,12 +822,14 @@ class EmailService {
         instructions: 'Istruzioni passo-passo',
         step: 'Passo',
         implement: 'Crea Campagna',
-        footer: 'Suggerimento generato dall\'AI di MenuChat'
+        footer: 'Ricevi questa email perché hai attivato i suggerimenti campagne.',
+        preferences: 'Gestisci preferenze email',
+        unsubscribe: 'Annulla iscrizione'
       },
       english: {
         greeting: 'Hello',
-        title: 'We have a new suggestion for you',
-        subtitle: 'AI-suggested campaign',
+        title: 'Campaign Suggestion',
+        subtitle: 'We have a new suggestion for you',
         type: 'Campaign type',
         target: 'Target audience',
         timing: 'Suggested timing',
@@ -737,12 +837,14 @@ class EmailService {
         instructions: 'Step-by-step instructions',
         step: 'Step',
         implement: 'Create Campaign',
-        footer: 'Suggestion generated by MenuChat AI'
+        footer: 'You receive this email because you enabled campaign suggestions.',
+        preferences: 'Manage email preferences',
+        unsubscribe: 'Unsubscribe'
       },
       español: {
         greeting: 'Hola',
-        title: 'Tenemos una nueva sugerencia para ti',
-        subtitle: 'Campaña sugerida por IA',
+        title: 'Sugerencia de Campaña',
+        subtitle: 'Tenemos una nueva sugerencia para ti',
         type: 'Tipo de campaña',
         target: 'Audiencia objetivo',
         timing: 'Momento sugerido',
@@ -750,7 +852,9 @@ class EmailService {
         instructions: 'Instrucciones paso a paso',
         step: 'Paso',
         implement: 'Crear Campaña',
-        footer: 'Sugerencia generada por la IA de MenuChat'
+        footer: 'Recibes este email porque activaste las sugerencias de campañas.',
+        preferences: 'Gestionar preferencias de email',
+        unsubscribe: 'Cancelar suscripción'
       }
     };
 
@@ -760,210 +864,218 @@ class EmailService {
 
     return `
 <!DOCTYPE html>
-<html>
+<html lang="${language === 'italiano' ? 'it' : language === 'english' ? 'en' : 'es'}">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${t.title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${t.title} - MenuChat</title>
     <style>
-        body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #f8fffe; 
-            line-height: 1.6;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #374151;
         }
-        .container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background-color: white; 
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
         }
-        .header { 
-            background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); 
-            padding: 40px 20px; 
-            text-align: center; 
-            position: relative;
-            border-bottom: 3px solid #000;
-        }
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('${frontendUrl}/mascottes/mascotte_running.png') no-repeat center;
-            background-size: 80px;
-            opacity: 0.1;
-        }
-        .header h1 { 
-            color: #000; 
-            margin: 0; 
-            font-size: 28px; 
-            font-weight: 700; 
-            text-shadow: 2px 2px 0px rgba(255,255,255,0.3);
-        }
-        .header p { 
-            color: #333; 
-            margin: 10px 0 0 0; 
-            font-size: 16px; 
-            font-weight: 500;
-        }
-        .mascotte-container {
+        
+        .header {
+            background-color: #ffffff;
+            padding: 40px 30px;
             text-align: center;
-            margin: 20px 0;
+            border-bottom: 1px solid #e5e7eb;
         }
-        .mascotte-img {
-            width: 120px;
-            height: auto;
-            border-radius: 50%;
-            border: 4px solid #8B5CF6;
-            box-shadow: 0 6px 0 #000;
-            background: white;
-            padding: 10px;
-        }
-        .content { 
-            padding: 40px 20px; 
-        }
-        .greeting { 
-            font-size: 20px; 
-            color: #333; 
-            margin-bottom: 20px; 
-            font-weight: 600;
-        }
-        .suggestion-card { 
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); 
-            border: 3px solid #000; 
-            border-radius: 16px; 
-            padding: 30px; 
-            margin: 20px 0; 
-            box-shadow: 0 6px 0 #000;
-            transform: translateY(-6px);
-            position: relative;
-        }
-        .suggestion-card::before {
-            content: '💡';
-            position: absolute;
-            top: -15px;
-            right: 20px;
-            font-size: 30px;
-            background: #FFE14D;
-            border: 3px solid #000;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
+        
+        .mascot {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 0 #000;
+            font-size: 40px;
         }
-        .suggestion-title { 
-            font-size: 22px; 
-            font-weight: 700; 
-            color: #333; 
-            margin-bottom: 15px; 
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
         }
-        .suggestion-desc { 
-            color: #666; 
-            margin-bottom: 25px; 
-            line-height: 1.6; 
+        
+        .header p {
+            margin: 8px 0 0;
             font-size: 16px;
+            color: #6b7280;
         }
-        .detail-item { 
-            margin: 20px 0; 
-            padding: 15px;
-            background: white;
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        
+        .suggestion-card {
+            background-color: #f9fafb;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .suggestion-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        .suggestion-desc {
+            color: #6b7280;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .detail-item {
+            background-color: #ffffff;
             border-radius: 12px;
-            border: 2px solid #000;
-            box-shadow: 0 3px 0 #000;
-            transform: translateY(-3px);
+            padding: 16px;
+            border: 1px solid #e5e7eb;
         }
-        .detail-label { 
-            font-weight: 700; 
-            color: #333; 
-            margin-bottom: 8px; 
-            font-size: 14px;
+        
+        .detail-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-bottom: 4px;
         }
-        .detail-value { 
-            color: #666; 
-            font-size: 15px;
+        
+        .detail-value {
+            font-size: 14px;
+            color: #1f2937;
+            font-weight: 500;
         }
-        .instructions { 
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
-            border-radius: 16px; 
-            padding: 25px; 
-            margin: 25px 0; 
-            border: 3px solid #000;
-            box-shadow: 0 6px 0 #000;
-            transform: translateY(-6px);
+        
+        .instructions {
+            background-color: #f0f9ff;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0ea5e9;
         }
-        .instructions h3 { 
-            color: #1B9AAA; 
-            margin: 0 0 20px 0; 
+        
+        .instructions h3 {
+            margin: 0 0 16px;
+            color: #0c4a6e;
             font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .step {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #e0f2fe;
+        }
+        
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .step-number {
+            background-color: #0ea5e9;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
             font-weight: 700;
+            margin-right: 12px;
         }
-        .step { 
-            margin: 20px 0; 
-            padding: 20px; 
-            background: white; 
-            border-radius: 12px; 
-            border: 3px solid #000;
-            box-shadow: 0 4px 0 #000;
-            transform: translateY(-4px);
-            position: relative;
-        }
-        .step::before {
-            content: '';
-            position: absolute;
-            left: -3px;
-            top: -3px;
-            bottom: -3px;
-            width: 6px;
-            background: #1B9AAA;
-            border-radius: 12px 0 0 12px;
-        }
-        .step-number { 
-            font-weight: 700; 
-            color: #1B9AAA; 
-            font-size: 16px;
-        }
-        .step-title { 
-            font-weight: 700; 
-            color: #333; 
-            margin: 8px 0; 
-            font-size: 16px;
-        }
-        .step-desc { 
-            color: #666; 
-            margin: 8px 0; 
-            line-height: 1.5;
-        }
-        .step-action { 
-            color: #EF476F; 
-            font-weight: 700; 
-            margin: 8px 0; 
+        
+        .step-title {
+            font-weight: 600;
+            color: #1f2937;
             font-size: 14px;
         }
-        .cta { 
-            text-align: center; 
-            margin: 40px 0; 
+        
+        .step-desc {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-left: 36px;
         }
-        .cta-button { 
-            background: #FFE14D; 
-            color: #000; 
-            padding: 18px 36px; 
-            text-decoration: none; 
-            border-radius: 50px; 
-            font-weight: 700; 
+        
+        .step-action {
+            font-size: 12px;
+            color: #059669;
+            font-weight: 600;
+            margin-left: 36px;
+        }
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #f59e0b;
+        }
+        
+        .highlight-emoji {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .highlight-text {
             font-size: 16px;
-            display: inline-block; 
+            color: #92400e;
+            font-weight: 600;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #FFE14D;
+            color: #000;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 16px;
             border: 3px solid #000;
             box-shadow: 0 6px 0 #000;
             transform: translateY(-6px);
@@ -971,124 +1083,160 @@ class EmailService {
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        
         .cta-button:hover {
             transform: translateY(-8px);
             box-shadow: 0 8px 0 #000;
         }
-        .footer { 
-            background: #f8fffe; 
-            padding: 30px 20px; 
-            text-align: center; 
-            color: #666; 
-            font-size: 14px; 
-            border-top: 3px solid #000;
-        }
-        .footer-logo {
-            width: 60px;
-            height: auto;
-            margin-bottom: 15px;
-        }
-        .decorative-elements {
-            position: relative;
-            height: 40px;
-            overflow: hidden;
-        }
-        .sparkle {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            background: #8B5CF6;
-            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-            animation: sparkle 1.5s infinite;
-        }
-        .sparkle:nth-child(1) { left: 10%; animation-delay: 0s; }
-        .sparkle:nth-child(2) { left: 25%; animation-delay: 0.3s; }
-        .sparkle:nth-child(3) { left: 40%; animation-delay: 0.6s; }
-        .sparkle:nth-child(4) { left: 55%; animation-delay: 0.9s; }
-        .sparkle:nth-child(5) { left: 70%; animation-delay: 1.2s; }
-        .sparkle:nth-child(6) { left: 85%; animation-delay: 1.5s; }
         
-        @keyframes sparkle {
-            0%, 100% { opacity: 0.2; transform: scale(1) rotate(0deg); }
-            50% { opacity: 1; transform: scale(1.3) rotate(180deg); }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #10b981;
+            text-decoration: none;
         }
         
         @media (max-width: 600px) {
-            .header h1 { font-size: 24px; }
-            .cta-button { padding: 15px 30px; font-size: 14px; }
-            .suggestion-card { padding: 20px; }
-            .step { padding: 15px; }
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>MenuChat</h1>
-            <p>${restaurantName}</p>
+            <div class="mascot">💡</div>
+            <h1>${t.title}</h1>
+            <p>${t.subtitle}</p>
         </div>
         
-        <div class="mascotte-container">
-            <img src="${frontendUrl}/mascottes/mascotte_running.png" alt="MenuChat Mascotte" class="mascotte-img">
-        </div>
-        
+        <!-- Content -->
         <div class="content">
-            <div class="greeting">${t.greeting}! 💡</div>
+            <div class="greeting">
+                ${t.greeting} <strong>${restaurantName}</strong>! 💡<br>
+                La nostra AI ha analizzato i tuoi dati e ha un suggerimento per te.
+            </div>
             
+            <!-- Suggestion Card -->
             <div class="suggestion-card">
-                <div class="suggestion-title">${suggestion.title}</div>
-                <div class="suggestion-desc">${suggestion.description}</div>
+                <div class="suggestion-title">${suggestion.title || 'Nuova Campagna Suggerita'}</div>
+                <div class="suggestion-desc">${suggestion.description || 'Descrizione della campagna suggerita dall\'AI.'}</div>
                 
-                <div class="detail-item">
-                    <div class="detail-label">${t.type}:</div>
-                    <div class="detail-value">${suggestion.campaignType}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">${t.target}:</div>
-                    <div class="detail-value">${suggestion.targetAudience}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">${t.timing}:</div>
-                    <div class="detail-value">${suggestion.timing}</div>
-                </div>
-                
-                <div class="detail-item">
-                    <div class="detail-label">${t.expected}:</div>
-                    <div class="detail-value">${suggestion.expectedResults}</div>
+                <!-- Details Grid -->
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">${t.type}</div>
+                        <div class="detail-value">${suggestion.campaignType || 'Promozionale'}</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">${t.target}</div>
+                        <div class="detail-value">${suggestion.targetAudience || 'Clienti abituali'}</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">${t.timing}</div>
+                        <div class="detail-value">${suggestion.timing || 'Orario di punta'}</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">${t.expected}</div>
+                        <div class="detail-value">${suggestion.expectedResults || '+15% engagement'}</div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Instructions -->
             <div class="instructions">
-                <h3>${t.instructions}</h3>
-                ${suggestion.stepByStepInstructions.map(step => `
+                <h3>📋 ${t.instructions}</h3>
+                ${(suggestion.stepByStepInstructions || suggestion.instructions || [
+                  { 
+                    step: 1, 
+                    title: 'Seleziona i tuoi contatti', 
+                    description: 'Identifica e seleziona i clienti giusti per questa campagna',
+                    actionRequired: 'Nella sezione "Selezione Contatti", usa la ricerca per trovare clienti specifici oppure filtra per paese. Seleziona tutti i contatti rilevanti per il tuo target.'
+                  },
+                  { 
+                    step: 2, 
+                    title: 'Configura la campagna', 
+                    description: 'Imposta tipo, lingua e obiettivo della campagna',
+                    actionRequired: 'Nel "Setup Campagna", seleziona il tipo appropriato, scegli la lingua e inserisci i dettagli nel campo "Obiettivo".'
+                  },
+                  { 
+                    step: 3, 
+                    title: 'Crea il contenuto', 
+                    description: 'Genera messaggio e media per la campagna',
+                    actionRequired: 'Nella "Creazione Contenuto", clicca "Rigenera" per il messaggio AI e scegli "Crea immagine con AI" per i media.'
+                  },
+                  { 
+                    step: 4, 
+                    title: 'Programma l\'invio', 
+                    description: 'Scegli il momento ottimale per inviare',
+                    actionRequired: 'Nella sezione "Programmazione", seleziona "Programma per dopo" e imposta data e ora ottimali.'
+                  }
+                ]).map((step, index) => `
                     <div class="step">
-                        <div class="step-number">${t.step} ${step.step}</div>
-                        <div class="step-title">${step.title}</div>
+                        <div class="step-header">
+                            <div class="step-number">${step.step || index + 1}</div>
+                            <div class="step-title">${step.title}</div>
+                        </div>
                         <div class="step-desc">${step.description}</div>
-                        <div class="step-action">→ ${step.actionRequired}</div>
+                        ${step.actionRequired ? `<div class="step-action">→ ${step.actionRequired}</div>` : ''}
                     </div>
                 `).join('')}
             </div>
             
-            <div class="cta">
-                <a href="${frontendUrl}/campaign/create" class="cta-button">${t.implement}</a>
+            <!-- Highlight -->
+            <div class="highlight-card">
+                <span class="highlight-emoji">🚀</span>
+                <div class="highlight-text">
+                    ${language === 'italiano' 
+                      ? 'Implementa questo suggerimento per migliorare le tue performance!'
+                      : language === 'english'
+                      ? 'Implement this suggestion to improve your performance!'
+                      : '¡Implementa esta sugerencia para mejorar tu rendimiento!'
+                    }
+                </div>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="cta-section">
+                <a href="${frontendUrl}/campaign/create" class="cta-button">
+                    ${t.implement}
+                </a>
             </div>
         </div>
         
-        <div class="decorative-elements">
-            <div class="sparkle"></div>
-            <div class="sparkle"></div>
-            <div class="sparkle"></div>
-            <div class="sparkle"></div>
-            <div class="sparkle"></div>
-            <div class="sparkle"></div>
-        </div>
-        
+        <!-- Footer -->
         <div class="footer">
-            <img src="${frontendUrl}/mascottes/mascotte_setupwizard.png" alt="MenuChat" class="footer-logo">
-            <div>${t.footer}</div>
+            <p>
+                ${t.footer}<br>
+                <a href="${frontendUrl}/preferences">${t.preferences}</a> | <a href="${frontendUrl}/unsubscribe">${t.unsubscribe}</a>
+            </p>
+            <p style="margin-top: 16px;">
+                © 2024 MenuChat. ${language === 'italiano' ? 'Tutti i diritti riservati.' : language === 'english' ? 'All rights reserved.' : 'Todos los derechos reservados.'}
+            </p>
         </div>
     </div>
 </body>

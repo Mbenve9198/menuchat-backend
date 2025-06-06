@@ -1,0 +1,359 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suggerimento Campagna - MenuChat</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8fafc;
+            color: #374151;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        
+        .header {
+            background-color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .mascot {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .header p {
+            margin: 8px 0 0;
+            font-size: 16px;
+            color: #6b7280;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #1f2937;
+        }
+        
+        .suggestion-card {
+            background-color: #f9fafb;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .suggestion-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        .suggestion-desc {
+            color: #6b7280;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .detail-item {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .detail-value {
+            font-size: 14px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        
+        .instructions {
+            background-color: #f0f9ff;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .instructions h3 {
+            margin: 0 0 16px;
+            color: #0c4a6e;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .step {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #e0f2fe;
+        }
+        
+        .step:last-child {
+            margin-bottom: 0;
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .step-number {
+            background-color: #0ea5e9;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            margin-right: 12px;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+        }
+        
+        .step-desc {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-left: 36px;
+        }
+        
+        .highlight-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid #f59e0b;
+        }
+        
+        .highlight-emoji {
+            font-size: 40px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        
+        .highlight-text {
+            font-size: 16px;
+            color: #92400e;
+            font-weight: 600;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #10b981;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 600px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="mascot">💡</div>
+            <h1>Suggerimento Campagna</h1>
+            <p>Abbiamo un nuovo suggerimento per te</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Ciao <strong>Ristorante Test</strong>! 💡<br>
+                La nostra AI ha analizzato i tuoi dati e ha un suggerimento per te.
+            </div>
+            
+            <!-- Suggestion Card -->
+            <div class="suggestion-card">
+                <div class="suggestion-title">Campagna Aperitivo Serale</div>
+                <div class="suggestion-desc">Promuovi i tuoi aperitivi con un messaggio accattivante per attirare clienti nelle ore serali</div>
+                
+                <!-- Details Grid -->
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Tipo di campagna</div>
+                        <div class="detail-value">promotional</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Target audience</div>
+                        <div class="detail-value">Clienti che ordinano di sera</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Timing suggerito</div>
+                        <div class="detail-value">Tra le 17:00 e le 19:00</div>
+                    </div>
+                    
+                    <div class="detail-item">
+                        <div class="detail-label">Risultati attesi</div>
+                        <div class="detail-value">Aumento del 20% degli ordini serali</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Instructions -->
+            <div class="instructions">
+                <h3>📋 Istruzioni passo-passo</h3>
+                
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">1</div>
+                            <div class="step-title">Prepara il messaggio</div>
+                        </div>
+                        <div class="step-desc">Crea un messaggio che evidenzi la varietà dei tuoi aperitivi</div>
+                    </div>
+                
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">2</div>
+                            <div class="step-title">Aggiungi immagini</div>
+                        </div>
+                        <div class="step-desc">Includi foto appetitose dei tuoi drink signature</div>
+                    </div>
+                
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">3</div>
+                            <div class="step-title">Offerta speciale</div>
+                        </div>
+                        <div class="step-desc">Aggiungi un'offerta speciale per il primo drink</div>
+                    </div>
+                
+                    <div class="step">
+                        <div class="step-header">
+                            <div class="step-number">4</div>
+                            <div class="step-title">Programma invio</div>
+                        </div>
+                        <div class="step-desc">Invia il messaggio nell'orario ottimale</div>
+                    </div>
+                
+            </div>
+            
+            <!-- Highlight -->
+            <div class="highlight-card">
+                <span class="highlight-emoji">🚀</span>
+                <div class="highlight-text">
+                    Implementa questo suggerimento per migliorare le tue performance!
+                </div>
+            </div>
+            
+            <!-- Call to Action -->
+            <div class="cta-section">
+                <a href="https://menuchat.com/campaigns/create" class="cta-button">
+                    Crea Campagna
+                </a>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>
+                Ricevi questa email perché hai attivato i suggerimenti campagne.<br>
+                <a href="https://menuchat.com/preferences">Gestisci preferenze email</a> | <a href="https://menuchat.com/unsubscribe">Annulla iscrizione</a>
+            </p>
+            <p style="margin-top: 16px;">
+                © 2024 MenuChat. Tutti i diritti riservati.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
