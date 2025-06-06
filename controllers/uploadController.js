@@ -95,118 +95,123 @@ class UploadController {
       
       console.log('🎬 Analisi file:', { isVideo, optimizeForWhatsApp });
       
+      // Per i video destinati a WhatsApp, verifichiamo prima se l'URL originale funziona
       if (isVideo && optimizeForWhatsApp) {
+        console.log('🎬 Video per WhatsApp - verifica URL originale:', path);
+        
+        const axios = require('axios');
+        let urlFunziona = false;
+        let contentTypeProblematico = false;
+        
         try {
-          console.log('🎬 Inizio ottimizzazione video per WhatsApp');
+          const testResponse = await axios.head(path, { timeout: 10000 });
+          urlFunziona = true;
+          const contentType = testResponse.headers['content-type'];
+          console.log('🎬 URL originale accessibile - Content-Type:', contentType);
           
-          // Estrai il public_id base senza estensione
-          let basePublicId = public_id;
-          if (basePublicId.includes('.')) {
-            basePublicId = basePublicId.split('.')[0];
+          // Controlla se il Content-Type è problematico per WhatsApp
+          if (contentType && contentType.includes('codecs=')) {
+            contentTypeProblematico = true;
+            console.log('🎬 Content-Type contiene parametri codec - serve ottimizzazione');
           }
+        } catch (testError) {
+          console.log('🎬 URL originale non accessibile:', testError.message);
+        }
+        
+        // Se l'URL originale funziona e non ha problemi di Content-Type, usalo
+        if (urlFunziona && !contentTypeProblematico) {
+          console.log('🎬 URL originale OK per WhatsApp, nessuna ottimizzazione necessaria');
+        } else {
+          // Solo se necessario, crea una versione ottimizzata
+          console.log('🎬 Creazione versione ottimizzata necessaria...');
           
-          // Crea un nuovo public_id per la versione WhatsApp
-          const whatsappPublicId = `${basePublicId}_whatsapp`;
-          
-          console.log('🎬 Public IDs:', { original: public_id, whatsapp: whatsappPublicId });
-          
-          // Strategia 1: Crea una versione ottimizzata del video
-          console.log('🎬 Creazione versione ottimizzata...');
-          const optimizedResult = await cloudinary.uploader.upload(path, {
-            resource_type: 'video',
-            public_id: whatsappPublicId,
-            format: 'mp4',
-            overwrite: true,
-            transformation: [
-              { quality: 'auto:good' },
-              { video_codec: 'h264' },
-              { audio_codec: 'aac' },
-              { flags: 'streaming_attachment' }
-            ]
-          });
-          
-          console.log('🎬 Video ottimizzato creato:', optimizedResult.secure_url);
-          
-          // Verifica se l'URL funziona correttamente
-          const axios = require('axios');
           try {
-            const headResponse = await axios.head(optimizedResult.secure_url, { timeout: 10000 });
-            const contentType = headResponse.headers['content-type'];
-            console.log('🎬 Content-Type video ottimizzato:', contentType);
-            
-            // Se il Content-Type è pulito, usa questo URL
-            if (contentType && contentType.startsWith('video/mp4') && !contentType.includes('codecs=')) {
-              path = optimizedResult.secure_url;
-              console.log('🎬 URL finale (ottimizzato):', path);
-            } else {
-              console.log('🎬 Content-Type ancora problematico, provo strategia alternativa');
-              
-              // Strategia 2: Carica come raw per evitare problemi di Content-Type
-              const fs = require('fs');
-              const tempFilePath = `/tmp/${whatsappPublicId}.mp4`;
-              
-              // Scarica il video ottimizzato
-              const videoResponse = await axios.get(optimizedResult.secure_url, { 
-                responseType: 'stream',
-                timeout: 30000
-              });
-              
-              // Salva temporaneamente
-              const writer = fs.createWriteStream(tempFilePath);
-              videoResponse.data.pipe(writer);
-              
-              await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-              });
-              
-              console.log('🎬 Video scaricato temporaneamente, carico come raw...');
-              
-              // Carica come raw
-              const rawResult = await cloudinary.uploader.upload(tempFilePath, {
-                resource_type: 'raw',
-                public_id: `${whatsappPublicId}_raw`,
-                folder: 'campaign-media',
-                overwrite: true
-              });
-              
-              // Elimina il file temporaneo
-              fs.unlinkSync(tempFilePath);
-              
-              path = rawResult.secure_url;
-              console.log('🎬 URL finale (raw):', path);
+            // Estrai il public_id base senza estensione
+            let basePublicId = public_id;
+            if (basePublicId.includes('.')) {
+              basePublicId = basePublicId.split('.')[0];
             }
-          } catch (verifyError) {
-            console.warn('🎬 Errore nella verifica del video ottimizzato:', verifyError.message);
-            // Fallback all'URL originale
-            console.log('🎬 Fallback all\'URL originale');
+            
+            // Strategia semplificata: carica direttamente come raw con estensione .mp4
+            const whatsappPublicId = `${basePublicId}_whatsapp_raw`;
+            
+            console.log('🎬 Creazione asset raw per WhatsApp:', whatsappPublicId);
+            
+            // Scarica il video originale
+            const videoResponse = await axios.get(path, { 
+              responseType: 'arraybuffer',
+              timeout: 30000
+            });
+            
+            // Salva temporaneamente
+            const fs = require('fs');
+            const tempFilePath = `/tmp/${whatsappPublicId}.mp4`;
+            fs.writeFileSync(tempFilePath, Buffer.from(videoResponse.data));
+            
+            console.log('🎬 Video scaricato, carico come raw...');
+            
+            // Carica come raw per evitare problemi di Content-Type
+            const rawResult = await cloudinary.uploader.upload(tempFilePath, {
+              resource_type: 'raw',
+              public_id: whatsappPublicId,
+              folder: 'campaign-media',
+              overwrite: true
+            });
+            
+            // Elimina il file temporaneo
+            fs.unlinkSync(tempFilePath);
+            
+            // Verifica che il nuovo URL funzioni
+            const verifyResponse = await axios.head(rawResult.secure_url, { timeout: 10000 });
+            console.log('🎬 Asset raw creato e verificato:', rawResult.secure_url);
+            console.log('🎬 Content-Type raw:', verifyResponse.headers['content-type']);
+            
+            // Usa il nuovo URL
+            path = rawResult.secure_url;
+            
+          } catch (optimizationError) {
+            console.error('🎬 Errore nell\'ottimizzazione:', optimizationError);
+            console.log('🎬 Mantengo URL originale come fallback');
+            // Mantieni l'URL originale anche se l'ottimizzazione fallisce
           }
-          
-        } catch (optimizationError) {
-          console.error('🎬 Errore nell\'ottimizzazione video:', optimizationError);
-          console.log('🎬 Uso URL originale come fallback');
         }
       }
       
-      // Assicurati che i video abbiano estensione .mp4
+      // Assicurati che i video abbiano estensione .mp4 (solo correzione URL, non ricaricamento)
       if (isVideo && !path.endsWith('.mp4')) {
         // Rimuovi estensioni multiple e forza .mp4
-        path = path.replace(/\.[^.]+$/, '.mp4');
-        console.log('🎬 URL corretto con estensione .mp4:', path);
+        const correctedPath = path.replace(/\.[^.]+$/, '.mp4');
+        console.log('🎬 URL corretto con estensione .mp4:', correctedPath);
+        
+        // Verifica che l'URL corretto funzioni
+        try {
+          const axios = require('axios');
+          await axios.head(correctedPath, { timeout: 5000 });
+          path = correctedPath;
+          console.log('🎬 URL corretto verificato e utilizzato');
+        } catch (correctionError) {
+          console.warn('🎬 URL corretto non funziona, mantengo originale:', correctionError.message);
+        }
       }
       
       // Verifica finale dell'URL
       if (isVideo) {
         console.log('🎬 URL finale del video:', path);
         
-        // Test rapido dell'URL
+        // Test finale dell'URL
         try {
           const axios = require('axios');
-          const testResponse = await axios.head(path, { timeout: 5000 });
-          console.log('🎬 Test URL - Status:', testResponse.status);
-          console.log('🎬 Test URL - Content-Type:', testResponse.headers['content-type']);
-        } catch (testError) {
-          console.warn('🎬 Attenzione: URL potrebbe non essere accessibile:', testError.message);
+          const finalTestResponse = await axios.head(path, { timeout: 5000 });
+          console.log('🎬 ✅ Test finale URL - Status:', finalTestResponse.status);
+          console.log('🎬 ✅ Test finale URL - Content-Type:', finalTestResponse.headers['content-type']);
+        } catch (finalTestError) {
+          console.error('🎬 ❌ ATTENZIONE: URL finale non accessibile!', finalTestError.message);
+          // In questo caso, dovremmo restituire un errore
+          return res.status(500).json({
+            success: false,
+            error: 'URL video finale non accessibile',
+            details: finalTestError.message
+          });
         }
       }
       
