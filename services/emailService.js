@@ -11,7 +11,19 @@ class EmailService {
       this.resend = null;
       console.warn('⚠️  RESEND_API_KEY non trovata. Le email non potranno essere inviate, ma le anteprime funzioneranno.');
     }
-    this.fromEmail = process.env.FROM_EMAIL || 'noreply@menuchat.com';
+    
+    // Usa RESEND_FROM_EMAIL come priorità, poi FROM_EMAIL come fallback
+    this.fromEmail = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL || 'noreply@menuchat.com';
+    
+    // Log della configurazione email (solo in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📧 Configurazione Email:', {
+        resendConfigured: !!this.resend,
+        fromEmail: this.fromEmail,
+        usingResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
+        usingFromEmail: !!process.env.FROM_EMAIL
+      });
+    }
   }
 
   /**
@@ -1247,14 +1259,21 @@ class EmailService {
    * Invia un'email
    */
   async sendEmail(to, subject, content, type, reportData, userId, restaurantId, language) {
+    let emailReport;
+    
     try {
       // Controlla se Resend è disponibile
       if (!this.resend) {
         throw new Error('Resend non è configurato. Aggiungi RESEND_API_KEY alle variabili ambiente.');
       }
 
+      // Validazione email mittente
+      if (!this.fromEmail || this.fromEmail === 'noreply@menuchat.com') {
+        console.warn('⚠️ Usando dominio email di default. Configura RESEND_FROM_EMAIL per un dominio verificato.');
+      }
+
       // Crea il record dell'email nel database
-      const emailReport = new EmailReport({
+      emailReport = new EmailReport({
         user: userId,
         restaurant: restaurantId,
         type,
@@ -1267,6 +1286,14 @@ class EmailService {
 
       await emailReport.save();
 
+      // Log dettagliato prima dell'invio
+      console.log(`📧 Tentativo invio email ${type}:`, {
+        to: to,
+        from: this.fromEmail,
+        subject: subject.substring(0, 50) + '...',
+        timestamp: new Date().toISOString()
+      });
+
       // Invia l'email tramite Resend
       const result = await this.resend.emails.send({
         from: this.fromEmail,
@@ -1275,17 +1302,30 @@ class EmailService {
         html: content
       });
 
+      // Verifica la risposta di Resend
+      if (!result.data || !result.data.id) {
+        throw new Error('Resend non ha restituito un ID email valido');
+      }
+
       // Aggiorna il record con il successo
       emailReport.status = 'sent';
       emailReport.sentAt = new Date();
-      emailReport.resendId = result.data?.id;
+      emailReport.resendId = result.data.id;
       await emailReport.save();
 
-      console.log(`✅ Email ${type} inviata con successo a ${to}`);
-      return { success: true, emailId: emailReport._id, resendId: result.data?.id };
+      console.log(`✅ Email ${type} inviata con successo a ${to} (Resend ID: ${result.data.id})`);
+      return { success: true, emailId: emailReport._id, resendId: result.data.id };
 
     } catch (error) {
-      console.error(`❌ Errore nell'invio email ${type} a ${to}:`, error);
+      console.error(`❌ Errore dettagliato nell'invio email ${type} a ${to}:`, {
+        error: error.name,
+        message: error.message,
+        fromEmail: this.fromEmail,
+        resendConfigured: !!this.resend,
+        timestamp: new Date().toISOString(),
+        // Log specifici per errori Resend comuni
+        possibleCauses: this.analyzeSendError(error)
+      });
       
       // Aggiorna il record con l'errore
       if (emailReport) {
@@ -1296,6 +1336,31 @@ class EmailService {
 
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Analizza gli errori di invio per fornire suggerimenti
+   */
+  analyzeSendError(error) {
+    const suggestions = [];
+    
+    if (error.message.includes('domain')) {
+      suggestions.push('Verifica che il dominio in RESEND_FROM_EMAIL sia configurato e verificato in Resend');
+    }
+    
+    if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+      suggestions.push('Controlla che RESEND_API_KEY sia valida e abbia i permessi necessari');
+    }
+    
+    if (error.message.includes('rate limit')) {
+      suggestions.push('Limite di invio raggiunto, attendi prima di riprovare');
+    }
+    
+    if (this.fromEmail === 'noreply@menuchat.com') {
+      suggestions.push('Configura RESEND_FROM_EMAIL con un dominio verificato invece di usare il default');
+    }
+    
+    return suggestions;
   }
 
   /**

@@ -72,10 +72,23 @@ const webhookHandler = async (req, res) => {
     try {
       const user = await User.findById(restaurant.user);
       if (user) {
+        // Tracking totale
         const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
         tracking.addMessage('inboundMessages', 'service');
         await tracking.save();
-        console.log('✅ Messaggio inbound tracciato');
+        
+        // Tracking mensile
+        const currentDate = new Date();
+        const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+          restaurant._id, 
+          user._id, 
+          currentDate.getFullYear(), 
+          currentDate.getMonth() + 1
+        );
+        monthlyTracking.addMessage('inboundMessages', 'service');
+        await monthlyTracking.save();
+        
+        console.log('✅ Messaggio inbound tracciato (totale e mensile)');
       }
     } catch (trackingError) {
       console.error('❌ Errore nel tracking del messaggio inbound:', trackingError);
@@ -200,10 +213,23 @@ const webhookHandler = async (req, res) => {
       try {
         const user = await User.findById(restaurant.user);
         if (user) {
+          // Tracking totale
           const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
           tracking.addMessage('menuMessages', 'service');
           await tracking.save();
-          console.log('✅ Messaggio menu tracciato');
+          
+          // Tracking mensile
+          const currentDate = new Date();
+          const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+            restaurant._id, 
+            user._id, 
+            currentDate.getFullYear(), 
+            currentDate.getMonth() + 1
+          );
+          monthlyTracking.addMessage('menuMessages', 'service');
+          await monthlyTracking.save();
+          
+          console.log('✅ Messaggio menu tracciato (totale e mensile)');
         }
       } catch (trackingError) {
         console.error('❌ Errore nel tracking del messaggio menu:', trackingError);
@@ -259,10 +285,23 @@ const webhookHandler = async (req, res) => {
       try {
         const user = await User.findById(restaurant.user);
         if (user) {
+          // Tracking totale
           const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
           tracking.addMessage('menuMessages', null, template.type);
           await tracking.save();
-          console.log('✅ Messaggio template tracciato');
+          
+          // Tracking mensile
+          const currentDate = new Date();
+          const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+            restaurant._id, 
+            user._id, 
+            currentDate.getFullYear(), 
+            currentDate.getMonth() + 1
+          );
+          monthlyTracking.addMessage('menuMessages', null, template.type);
+          await monthlyTracking.save();
+          
+          console.log('✅ Messaggio template tracciato (totale e mensile)');
         }
       } catch (trackingError) {
         console.error('❌ Errore nel tracking del messaggio template:', trackingError);
@@ -311,10 +350,23 @@ const webhookHandler = async (req, res) => {
               try {
                 const user = await User.findById(restaurant.user);
                 if (user) {
+                  // Tracking totale
                   const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
                   tracking.addMessage('reviewMessages', null, reviewTemplate.type);
                   await tracking.save();
-                  console.log('✅ Messaggio recensione programmato tracciato');
+                  
+                  // Tracking mensile
+                  const currentDate = new Date();
+                  const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+                    restaurant._id, 
+                    user._id, 
+                    currentDate.getFullYear(), 
+                    currentDate.getMonth() + 1
+                  );
+                  monthlyTracking.addMessage('reviewMessages', null, reviewTemplate.type);
+                  await monthlyTracking.save();
+                  
+                  console.log('✅ Messaggio recensione programmato tracciato (totale e mensile)');
                 }
               } catch (trackingError) {
                 console.error('❌ Errore nel tracking del messaggio recensione:', trackingError);

@@ -39,10 +39,54 @@ router.post('/restaurants/:id/sync-reviews', async (req, res) => {
     }
 
     // Sincronizza le recensioni con sync manuale
-    const updatedRestaurant = await googlePlacesService.syncRestaurantReviews(restaurant, 'manual');
+    let updatedRestaurant;
+    try {
+      updatedRestaurant = await googlePlacesService.syncRestaurantReviews(restaurant, 'manual');
+    } catch (syncError) {
+      console.error('Errore dettagliato sync recensioni:', {
+        restaurantId: id,
+        restaurantName: restaurant.name,
+        error: syncError.name,
+        message: syncError.message,
+        stack: syncError.stack,
+        timestamp: new Date().toISOString()
+      });
+
+      // Gestisci errori specifici
+      if (syncError.name === 'VersionError') {
+        return res.status(409).json({
+          success: false,
+          error: 'Conflitto di concorrenza. Riprova tra qualche secondo.',
+          details: 'Il ristorante è stato modificato da un altro processo'
+        });
+      }
+
+      if (syncError.message.includes('Google Places')) {
+        return res.status(503).json({
+          success: false,
+          error: 'Servizio Google Places temporaneamente non disponibile',
+          details: syncError.message
+        });
+      }
+
+      // Errore generico
+      throw syncError;
+    }
 
     // Ottieni le statistiche giornaliere aggiornate
-    const dailyStats = await googlePlacesService.getDailyReviewStats(restaurant._id);
+    let dailyStats;
+    try {
+      dailyStats = await googlePlacesService.getDailyReviewStats(restaurant._id);
+    } catch (statsError) {
+      console.error('Errore recupero statistiche giornaliere:', statsError);
+      // Non bloccare la risposta per errori nelle statistiche
+      dailyStats = {
+        date: new Date(),
+        newReviews: 0,
+        totalReviews: updatedRestaurant.googleRating?.reviewCount || 0,
+        averageRating: updatedRestaurant.googleRating?.rating || 0
+      };
+    }
 
     res.json({
       success: true,
@@ -51,10 +95,18 @@ router.post('/restaurants/:id/sync-reviews', async (req, res) => {
       message: `Sincronizzazione completata. ${dailyStats.newReviews} nuove recensioni oggi.`
     });
   } catch (error) {
-    console.error('Error syncing reviews:', error);
+    console.error('Error syncing reviews:', {
+      error: error.name,
+      message: error.message,
+      stack: error.stack,
+      restaurantId: req.params.id,
+      timestamp: new Date().toISOString()
+    });
+    
     res.status(500).json({
       success: false,
-      error: 'Errore durante la sincronizzazione delle recensioni'
+      error: 'Errore durante la sincronizzazione delle recensioni',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

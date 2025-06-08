@@ -127,4 +127,17 @@ FRONTEND_URL=http://localhost:3000
 - **NON committare mai** il file `.env` nel repository
 - Usa valori diversi per development e production
 - Mantieni le API key segrete e sicure
-- Rigenera le chiavi se compromesse 
+- Rigenera le chiavi se compromesse
+
+# Email Service (Resend)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
+RESEND_FROM_EMAIL=noreply@tuodominio.com
+
+# IMPORTANTE per le email:
+# 1. RESEND_FROM_EMAIL deve utilizzare un dominio verificato in Resend
+# 2. Il dominio deve essere configurato nel dashboard Resend
+# 3. Se non configurato, verrà usato il default che potrebbe non funzionare
+# 4. Verifica sempre che le email vengano effettivamente consegnate
+
+# Fallback per compatibilità (deprecato, usa RESEND_FROM_EMAIL)
+FROM_EMAIL=noreply@tuodominio.com 

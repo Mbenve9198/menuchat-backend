@@ -6,7 +6,10 @@ const {
   getUsersStats,
   refreshAllStats,
   getUserDetails,
-  getTemplateStats
+  getTemplateStats,
+  getMonthlyStats,
+  getMonthlyTrends,
+  getUserMonthlyStats
 } = require('../controllers/adminController');
 
 // @route   POST /api/admin/login
@@ -33,5 +36,20 @@ router.get('/user/:userId', adminAuth, getUserDetails);
 // @desc    Ottiene statistiche dettagliate sui template utilizzati
 // @access  Private (Admin only)
 router.get('/template-stats', adminAuth, getTemplateStats);
+
+// @route   GET /api/admin/monthly-stats
+// @desc    Ottieni statistiche mensili per tutti gli utenti
+// @access  Private (Admin only)
+router.get('/monthly-stats', adminAuth, getMonthlyStats);
+
+// @route   GET /api/admin/monthly-trends
+// @desc    Ottieni trend mensili
+// @access  Private (Admin only)
+router.get('/monthly-trends', adminAuth, getMonthlyTrends);
+
+// @route   GET /api/admin/user/:userId/monthly-stats
+// @desc    Ottieni statistiche mensili per un utente specifico
+// @access  Private (Admin only)
+router.get('/user/:userId/monthly-stats', adminAuth, getUserMonthlyStats);
 
 module.exports = router; 

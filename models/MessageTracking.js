@@ -167,4 +167,97 @@ MessageTrackingSchema.statics.getOrCreateTracking = async function(restaurantId,
   return tracking;
 };
 
+// Metodo statico per ottenere tracking mensile
+MessageTrackingSchema.statics.getOrCreateMonthlyTracking = async function(restaurantId, userId, year, month) {
+  const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+  const startDate = new Date(year, month - 1, 1); // month è 0-indexed in Date
+  const endDate = new Date(year, month, 0, 23, 59, 59, 999); // ultimo giorno del mese
+  
+  let tracking = await this.findOne({
+    restaurant: restaurantId,
+    user: userId,
+    period: 'monthly',
+    periodStart: {
+      $gte: startDate,
+      $lt: new Date(startDate.getTime() + 24 * 60 * 60 * 1000) // stesso giorno
+    }
+  });
+  
+  if (!tracking) {
+    tracking = new this({
+      restaurant: restaurantId,
+      user: userId,
+      period: 'monthly',
+      periodStart: startDate,
+      periodEnd: endDate
+    });
+    await tracking.save();
+  }
+  
+  return tracking;
+};
+
+// Metodo statico per ottenere statistiche mensili per un utente
+MessageTrackingSchema.statics.getMonthlyStatsForUser = async function(userId, months = 12) {
+  const Restaurant = require('./Restaurant');
+  
+  // Trova il ristorante dell'utente
+  const restaurant = await Restaurant.findOne({ user: userId });
+  if (!restaurant) return [];
+  
+  const monthlyStats = [];
+  const currentDate = new Date();
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+    
+    const tracking = await this.getOrCreateMonthlyTracking(restaurant._id, userId, year, month);
+    
+    monthlyStats.push({
+      year,
+      month,
+      monthName: targetDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
+      periodStart: tracking.periodStart,
+      periodEnd: tracking.periodEnd,
+      messageStats: tracking.messageStats,
+      totalStats: tracking.totalStats
+    });
+  }
+  
+  return monthlyStats;
+};
+
+// Metodo statico per ottenere statistiche mensili per tutti gli utenti
+MessageTrackingSchema.statics.getAllUsersMonthlyStats = async function(year, month) {
+  const User = require('./User');
+  const Restaurant = require('./Restaurant');
+  
+  const users = await User.find({}).select('name email').lean();
+  const monthlyStats = [];
+  
+  for (const user of users) {
+    const restaurant = await Restaurant.findOne({ user: user._id }).select('name').lean();
+    if (!restaurant) continue;
+    
+    const tracking = await this.getOrCreateMonthlyTracking(restaurant._id, user._id, year, month);
+    
+    monthlyStats.push({
+      userId: user._id,
+      userName: user.name,
+      userEmail: user.email,
+      restaurantName: restaurant.name,
+      restaurantId: restaurant._id,
+      year,
+      month,
+      monthName: new Date(year, month - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
+      messageStats: tracking.messageStats,
+      totalStats: tracking.totalStats
+    });
+  }
+  
+  return monthlyStats.sort((a, b) => b.totalStats.totalCost - a.totalStats.totalCost);
+};
+
 module.exports = mongoose.model('MessageTracking', MessageTrackingSchema); 

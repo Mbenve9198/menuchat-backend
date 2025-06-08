@@ -428,10 +428,163 @@ const getTemplateStats = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Ottiene statistiche mensili per tutti gli utenti
+ * @route   GET /api/admin/monthly-stats
+ * @access  Private (Admin only)
+ */
+const getMonthlyStats = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    
+    // Se non specificati, usa il mese corrente
+    const currentDate = new Date();
+    const targetYear = year ? parseInt(year) : currentDate.getFullYear();
+    const targetMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
+
+    const monthlyStats = await MessageTracking.getAllUsersMonthlyStats(targetYear, targetMonth);
+
+    // Calcola il summary per il mese
+    const summary = {
+      year: targetYear,
+      month: targetMonth,
+      monthName: new Date(targetYear, targetMonth - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
+      totalUsers: monthlyStats.length,
+      totalCost: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalCost, 0),
+      totalMessages: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalMessages, 0),
+      totalConversations: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalConversations, 0)
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        users: monthlyStats,
+        summary
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel recupero delle statistiche mensili:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle statistiche mensili',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Ottiene trend mensili per un periodo
+ * @route   GET /api/admin/monthly-trends
+ * @access  Private (Admin only)
+ */
+const getMonthlyTrends = async (req, res) => {
+  try {
+    const { months = 12 } = req.query;
+    const monthsCount = parseInt(months);
+    
+    const trends = [];
+    const currentDate = new Date();
+    
+    for (let i = monthsCount - 1; i >= 0; i--) {
+      const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth() + 1;
+      
+      const monthlyStats = await MessageTracking.getAllUsersMonthlyStats(year, month);
+      
+      trends.push({
+        year,
+        month,
+        monthName: targetDate.toLocaleDateString('it-IT', { month: 'short', year: 'numeric' }),
+        totalUsers: monthlyStats.length,
+        totalCost: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalCost, 0),
+        totalMessages: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalMessages, 0),
+        totalConversations: monthlyStats.reduce((sum, user) => sum + user.totalStats.totalConversations, 0),
+        costBreakdown: {
+          menu: monthlyStats.reduce((sum, user) => sum + user.messageStats.menuMessages.cost, 0),
+          reviews: monthlyStats.reduce((sum, user) => sum + user.messageStats.reviewMessages.cost, 0),
+          campaigns: monthlyStats.reduce((sum, user) => sum + user.messageStats.campaignMessages.cost, 0),
+          inbound: monthlyStats.reduce((sum, user) => sum + user.messageStats.inboundMessages.cost, 0)
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        trends,
+        summary: {
+          totalMonths: trends.length,
+          averageMonthlyCost: trends.reduce((sum, t) => sum + t.totalCost, 0) / trends.length,
+          averageMonthlyMessages: trends.reduce((sum, t) => sum + t.totalMessages, 0) / trends.length,
+          peakMonth: trends.reduce((max, current) => current.totalCost > max.totalCost ? current : max, trends[0] || {}),
+          growth: trends.length > 1 ? {
+            costGrowth: ((trends[trends.length - 1]?.totalCost || 0) - (trends[0]?.totalCost || 0)) / Math.max(trends[0]?.totalCost || 1, 1) * 100,
+            messageGrowth: ((trends[trends.length - 1]?.totalMessages || 0) - (trends[0]?.totalMessages || 0)) / Math.max(trends[0]?.totalMessages || 1, 1) * 100
+          } : null
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel recupero dei trend mensili:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero dei trend mensili',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Ottiene statistiche mensili per un singolo utente
+ * @route   GET /api/admin/user/:userId/monthly-stats
+ * @access  Private (Admin only)
+ */
+const getUserMonthlyStats = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { months = 12 } = req.query;
+    
+    const monthlyStats = await MessageTracking.getMonthlyStatsForUser(userId, parseInt(months));
+    
+    if (!monthlyStats.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nessuna statistica trovata per questo utente'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userId,
+        monthlyStats,
+        summary: {
+          totalMonths: monthlyStats.length,
+          totalCost: monthlyStats.reduce((sum, m) => sum + m.totalStats.totalCost, 0),
+          totalMessages: monthlyStats.reduce((sum, m) => sum + m.totalStats.totalMessages, 0),
+          averageMonthlyCost: monthlyStats.reduce((sum, m) => sum + m.totalStats.totalCost, 0) / monthlyStats.length,
+          peakMonth: monthlyStats.reduce((max, current) => current.totalStats.totalCost > max.totalStats.totalCost ? current : max, monthlyStats[0])
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Errore nel recupero delle statistiche mensili utente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle statistiche mensili utente',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   adminLogin,
   getUsersStats,
   refreshAllStats,
   getUserDetails,
-  getTemplateStats
+  getTemplateStats,
+  getMonthlyStats,
+  getMonthlyTrends,
+  getUserMonthlyStats
 }; 

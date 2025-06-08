@@ -9,6 +9,51 @@ class GooglePlacesService {
   }
 
   /**
+   * Utility per eseguire operazioni con retry automatico
+   * @param {Function} operation - Funzione da eseguire
+   * @param {number} maxRetries - Numero massimo di tentativi
+   * @param {string} operationName - Nome dell'operazione per logging
+   * @returns {Promise<any>} Risultato dell'operazione
+   */
+  async executeWithRetry(operation, maxRetries = 3, operationName = 'operazione') {
+    let attempt = 0;
+    let lastError;
+
+    while (attempt < maxRetries) {
+      try {
+        return await operation();
+      } catch (error) {
+        attempt++;
+        lastError = error;
+        
+        // Se è un VersionError e abbiamo ancora tentativi, riprova
+        if (error.name === 'VersionError' && attempt < maxRetries) {
+          console.warn(`⚠️ VersionError durante ${operationName}, tentativo ${attempt}/${maxRetries}. Riprovo...`);
+          
+          // Backoff esponenziale
+          const delay = Math.pow(2, attempt) * 100;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          continue;
+        }
+        
+        // Per altri errori, esci immediatamente
+        break;
+      }
+    }
+    
+    // Se arriviamo qui, tutti i tentativi sono falliti
+    console.error(`❌ ${operationName} fallita dopo ${maxRetries} tentativi:`, {
+      error: lastError.name,
+      message: lastError.message,
+      version: lastError.version,
+      modifiedPaths: lastError.modifiedPaths
+    });
+    
+    throw lastError;
+  }
+
+  /**
    * Ottiene i dettagli di un posto da Google Places API
    */
   async getPlaceDetails(placeId) {
@@ -102,31 +147,39 @@ class GooglePlacesService {
   }
 
   /**
-   * Sincronizza le recensioni per un singolo ristorante
+   * Sincronizza le recensioni per un singolo ristorante con gestione della concorrenza
    */
   async syncRestaurantReviews(restaurant, syncType = 'daily_auto') {
-    try {
-      if (!restaurant.googlePlaceId) {
-        throw new Error('Restaurant has no Google Place ID');
+    if (!restaurant.googlePlaceId) {
+      throw new Error('Restaurant has no Google Place ID');
+    }
+
+    // Usa la utility per gestire i retry automaticamente
+    return await this.executeWithRetry(async () => {
+      // Ricarica il ristorante dal database per avere la versione più recente
+      const freshRestaurant = await Restaurant.findById(restaurant._id);
+      if (!freshRestaurant) {
+        throw new Error('Ristorante non trovato durante il reload');
       }
 
       // Ottieni i nuovi dati da Google Places
-      const placeDetails = await this.getPlaceDetails(restaurant.googlePlaceId);
+      const placeDetails = await this.getPlaceDetails(freshRestaurant.googlePlaceId);
       
-      // Memorizza l'initialReviewCount esistente se presente
-      const existingInitialReviewCount = restaurant.googleRating?.initialReviewCount;
-      
-      // Aggiorna i dati del ristorante ma preserva l'initialReviewCount
-      restaurant.googleRating = {
-        rating: placeDetails.rating || 0,
-        reviewCount: placeDetails.user_ratings_total || 0,
-        initialReviewCount: existingInitialReviewCount || placeDetails.user_ratings_total || 0,
-        lastUpdated: new Date()
+      // Usa findByIdAndUpdate per operazione atomica
+      const updateData = {
+        'googleRating.rating': placeDetails.rating || 0,
+        'googleRating.reviewCount': placeDetails.user_ratings_total || 0,
+        'googleRating.lastUpdated': new Date()
       };
+
+      // Preserva l'initialReviewCount esistente se presente
+      if (!freshRestaurant.googleRating?.initialReviewCount) {
+        updateData['googleRating.initialReviewCount'] = placeDetails.user_ratings_total || 0;
+      }
 
       // Aggiorna le recensioni se disponibili
       if (placeDetails.reviews) {
-        restaurant.reviews = placeDetails.reviews.map(review => ({
+        updateData.reviews = placeDetails.reviews.map(review => ({
           authorName: review.author_name,
           rating: review.rating,
           text: review.text,
@@ -134,18 +187,28 @@ class GooglePlacesService {
         }));
       }
 
-      await restaurant.save();
+      // Operazione atomica per evitare problemi di concorrenza
+      const updatedRestaurant = await Restaurant.findByIdAndUpdate(
+        freshRestaurant._id,
+        updateData,
+        { 
+          new: true, 
+          runValidators: true,
+          overwrite: false
+        }
+      );
+
+      if (!updatedRestaurant) {
+        throw new Error('Ristorante non trovato durante l\'aggiornamento');
+      }
       
       // Crea snapshot giornaliero
-      await this.createDailySnapshot(restaurant, syncType);
+      await this.createDailySnapshot(updatedRestaurant, syncType);
       
-      console.log(`✅ Aggiornate recensioni per ${restaurant.name}`);
+      console.log(`✅ Aggiornate recensioni per ${updatedRestaurant.name}`);
 
-      return restaurant;
-    } catch (error) {
-      console.error(`❌ Errore sync recensioni per ${restaurant.name}:`, error);
-      throw error;
-    }
+      return updatedRestaurant;
+    }, 3, `sync recensioni per ${restaurant.name}`);
   }
 
   /**

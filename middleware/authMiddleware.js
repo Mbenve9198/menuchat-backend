@@ -4,6 +4,11 @@ const userService = require('../services/userService');
 // Chiave segreta per verificare i token JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
+// Log della configurazione JWT (solo in development)
+if (process.env.NODE_ENV === 'development') {
+  console.log('JWT_SECRET configurato:', JWT_SECRET ? 'SÌ' : 'NO');
+}
+
 /**
  * Middleware per proteggere le rotte che richiedono autenticazione
  * @param {Object} req - Richiesta HTTP
@@ -28,13 +33,58 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Verifica il token
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // Verifica il token con logging migliorato
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtError) {
+      // Log dettagliato dell'errore JWT
+      console.error('Errore verifica JWT:', {
+        error: jwtError.name,
+        message: jwtError.message,
+        tokenPreview: token.substring(0, 20) + '...',
+        jwtSecretConfigured: !!process.env.JWT_SECRET,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Gestisci i diversi tipi di errore JWT
+      if (jwtError.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+          success: false,
+          error: 'Token non valido'
+        });
+      }
+      
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          error: 'Token scaduto'
+        });
+      }
+      
+      if (jwtError.name === 'NotBeforeError') {
+        return res.status(401).json({
+          success: false,
+          error: 'Token non ancora valido'
+        });
+      }
+      
+      // Errore generico JWT
+      return res.status(401).json({
+        success: false,
+        error: 'Errore di autenticazione'
+      });
+    }
 
     // Cerca l'utente nel database
     const user = await userService.findUserById(decoded.userId);
 
     if (!user) {
+      console.error('Utente non trovato per token valido:', {
+        userId: decoded.userId,
+        timestamp: new Date().toISOString()
+      });
+      
       return res.status(401).json({
         success: false,
         error: 'Utente non trovato'
@@ -51,21 +101,12 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Errore in authMiddleware:', error);
-
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: 'Token non valido'
-      });
-    }
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        error: 'Token scaduto'
-      });
-    }
+    console.error('Errore generico in authMiddleware:', {
+      error: error.name,
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
 
     res.status(500).json({
       success: false,
