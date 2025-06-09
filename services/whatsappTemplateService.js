@@ -419,37 +419,30 @@ class WhatsAppTemplateService {
       // Sostituisci {customerName} con {{1}} nel messaggio originale
       const messageWithTwilioVar = message.replace(/\{customerName\}/g, '{{1}}');
 
-      const prompt = `Translate this restaurant menu service message into the following languages: ${languages.join(', ')}
+      const prompt = `Translate this restaurant welcome message into the following languages: ${languages.join(', ')}
 
 Original message:
 ${messageWithTwilioVar}
 
-CRITICAL REQUIREMENTS for SERVICE category compliance:
-1. This is a SERVICE message - it's a RESPONSE to a customer's request for menu information
-2. Use INFORMATIONAL language, not promotional language
-3. Focus on PROVIDING the requested service (menu access) rather than marketing
-4. Use words like: "Here is", "Available", "You can view", "As requested", "Menu information"
-5. AVOID marketing words like: "discover", "explore", "amazing", "delicious", "special", "best", "fantastic"
-6. Keep tone helpful and informative, like a waiter responding to "Can I see the menu?"
-7. Maximum 2-3 lines of text to stay concise and service-focused
-8. Preserve all formatting and emojis from original
-9. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-10. Return ONLY a valid JSON object with language codes as keys and translations as values
-11. Use only standard double quotes (") for JSON formatting
-12. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
-
-Think of this as: Customer asks "Can I see your menu?" → You respond with helpful information
-
-Example SERVICE-appropriate phrases:
-- "Here is our menu" (not "Discover our amazing menu")
-- "You can view our current offerings" (not "Explore our delicious dishes")
-- "Menu available here" (not "Check out our fantastic selection")
+Requirements:
+1. Keep the same tone and style but make it more informational and less promotional
+2. Focus on providing useful information rather than marketing language
+3. Avoid words like "discover", "explore", "amazing", "delicious" that might trigger MARKETING classification
+4. Use more neutral, informational language like "view", "see", "check", "available"
+5. Keep the message to maximum 3 lines of text
+6. Preserve all formatting and emojis
+7. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+8. Return ONLY a valid JSON object with language codes as keys and translations as values
+9. IMPORTANT: Use only standard double quotes (") for JSON formatting
+10. Do not use escaped quotes (\") in the JSON structure
+11. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+12. Ensure the JSON is properly formatted with correct syntax
 
 Example format (copy this exact structure):
 {
-  "it": "Ciao {{1}}, ecco il nostro menu",
-  "en": "Hi {{1}}, here is our menu",
-  "es": "Hola {{1}}, aquí está nuestro menú"
+  "it": "Ciao {{1}}, benvenuto!",
+  "en": "Hi {{1}}, welcome!",
+  "es": "¡Hola {{1}}, bienvenido!"
 }
 
 CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanations.`;
@@ -580,37 +573,30 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
       // Sostituisci {customerName} con {{1}} nel messaggio originale
       const messageWithTwilioVar = message.replace(/\{customerName\}/g, '{{1}}');
 
-      const prompt = `Translate this restaurant review service message into the following languages: ${languages.join(', ')}
+      const prompt = `Translate this restaurant review request message into the following languages: ${languages.join(', ')}
 
 Original message:
 ${messageWithTwilioVar}
 
-CRITICAL REQUIREMENTS for SERVICE category compliance:
-1. This is a SERVICE message - it's a FOLLOW-UP after the customer received service
-2. Use INFORMATIONAL and HELPFUL language, not promotional language
-3. Focus on PROVIDING a service (feedback collection) after service was already delivered
-4. Use words like: "Thank you for", "We hope you enjoyed", "Please share", "Your feedback", "How was your experience"
-5. AVOID marketing words like: "amazing", "fantastic", "incredible", "best", "discover", "explore"
-6. Keep tone grateful and service-oriented, like asking for feedback after a completed service
-7. Maximum 2-3 lines of text to stay concise and service-focused
-8. Preserve all formatting and emojis from original
-9. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-10. Return ONLY a valid JSON object with language codes as keys and translations as values
-11. Use only standard double quotes (") for JSON formatting
-12. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
-
-Think of this as: After service completion → Follow up to collect feedback for service improvement
-
-Example SERVICE-appropriate phrases:
-- "Thank you for dining with us" (not "Thanks for choosing our amazing restaurant")
-- "Please share your experience" (not "Tell everyone about our fantastic food")
-- "Your feedback helps us improve" (not "Help others discover our incredible dishes")
+Requirements:
+1. Keep the same tone and style but make it more informational and less promotional
+2. Focus on providing useful information rather than marketing language
+3. Avoid words like "discover", "explore", "amazing", "delicious" that might trigger MARKETING classification
+4. Use more neutral, informational language like "view", "see", "check", "available"
+5. Keep the message to maximum 3 lines of text
+6. Preserve all formatting and emojis
+7. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+8. Return ONLY a valid JSON object with language codes as keys and translations as values
+9. IMPORTANT: Use only standard double quotes (") for JSON formatting
+10. Do not use escaped quotes (\") in the JSON structure
+11. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+12. Ensure the JSON is properly formatted with correct syntax
 
 Example format (copy this exact structure):
 {
-  "it": "Grazie {{1}} per la visita",
-  "en": "Thank you {{1}} for dining with us",
-  "es": "Gracias {{1}} por visitarnos"
+  "it": "Grazie {{1}}!",
+  "en": "Thank you {{1}}",
+  "es": "¡Gracias {{1}}!"
 }
 
 CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanations.`;
@@ -762,8 +748,7 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
       console.log('URL:', `${this.contentApiBaseUrl}/${contentSid}/ApprovalRequests/whatsapp`);
       console.log('Data da inviare:', JSON.stringify({
         name: template.name.toLowerCase(),
-        category: 'SERVICE',
-        allow_category_change: false
+        category: 'UTILITY'
       }, null, 2));
       
       const approvalResponse = await axios({
@@ -775,20 +760,18 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
         },
         data: {
           name: template.name.toLowerCase(),
-          // I template di menu e recensioni sono SERVICE perché forniscono un servizio al cliente
-          // (informazioni sul menu o richiesta di feedback dopo un servizio ricevuto)
-          category: 'SERVICE',
-          // Blocca Meta dal cambiare automaticamente la categoria
-          allow_category_change: false
+          // Tutti i template di setup e modifica (menu e review) sono sempre UTILITY
+          // perché forniscono informazioni utili al cliente o sono risposte a azioni dell'utente.
+          // MARKETING viene usato solo per le campagne promozionali create dall'utente.
+          category: 'UTILITY'
         }
       });
       
       console.log('Risposta approvazione:', JSON.stringify(approvalResponse.data, null, 2));
       
-      // NOTA: Con allow_category_change: false, Meta non può più riclassificare automaticamente
-      // i template durante l'approvazione. La categoria SERVICE è appropriata per:
-      // - Template menu: forniscono informazioni sui servizi/prodotti del ristorante
-      // - Template recensioni: richiedono feedback su un servizio già ricevuto
+      // NOTA: Meta/WhatsApp può riclassificare automaticamente i template durante l'approvazione
+      // anche se inviamo UTILITY, potrebbero cambiarlo in MARKETING se il contenuto
+      // viene interpretato come promozionale dai loro algoritmi automatici.
 
       // Aggiorna il template con l'ID Twilio e lo stato
       template.twilioTemplateId = contentSid;
