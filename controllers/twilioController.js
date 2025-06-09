@@ -95,7 +95,7 @@ const webhookHandler = async (req, res) => {
     }
 
     // Determina la lingua del cliente in base al prefisso telefonico
-    let language = 'it'; // Default
+    let language = 'en'; // Default cambiato da 'it' a 'en'
     
     // Estrai solo il numero senza il prefisso "whatsapp:"
     const rawPhoneNumber = fromNumber.replace('whatsapp:', '');
@@ -122,7 +122,7 @@ const webhookHandler = async (req, res) => {
         }
       }
       
-      return 'it'; // Default a italiano
+      return 'en'; // Default cambiato da 'it' a 'en'
     };
     
     language = getLanguageFromPhoneNumber(rawPhoneNumber);
