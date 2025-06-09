@@ -713,6 +713,10 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
 
   /**
    * Invia il template a Twilio per approvazione usando direttamente l'API REST
+   * 
+   * IMPORTANTE: Questo metodo è usato SOLO per i template di setup e modifica (menu e review).
+   * I template delle campagne hanno una logica separata nei controller delle campagne
+   * che permette di scegliere la categoria (MARKETING, UTILITY, AUTHENTICATION).
    */
   async submitTemplateToTwilio(template) {
     try {
@@ -741,9 +745,10 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
         },
         data: {
           name: template.name.toLowerCase(),
-          // Le recensioni sono sempre di tipo UTILITY perché sono una risposta a un'azione dell'utente
-          category: template.type === 'REVIEW' ? 'UTILITY' : 
-                   template.type === 'MEDIA' ? 'UTILITY' : 'MARKETING'
+          // Tutti i template di setup e modifica (menu e review) sono sempre UTILITY
+          // perché forniscono informazioni utili al cliente o sono risposte a azioni dell'utente.
+          // MARKETING viene usato solo per le campagne promozionali create dall'utente.
+          category: 'UTILITY'
         }
       });
 
