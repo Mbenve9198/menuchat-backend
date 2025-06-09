@@ -354,8 +354,8 @@ class SetupController {
             "IMPORTANT: Return ONLY the welcome message without any description, explanation, or comments. Do not include quotes around the message."
           ],
           example: menuType === 'pdf'
-            ? "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta got 200+ five-star reviews! I've attached our menu with all our specialties."
-            : "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta got 200+ five-star reviews! Check out our menu with all our specialties below."
+            ? "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta has 200+ five-star reviews! I've attached our menu."
+            : "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta has 200+ five-star reviews! Our menu is available below."
         },
         it: {
           welcomeText: "Analizza i dettagli e le recensioni di questo ristorante per creare un messaggio di benvenuto molto conciso (massimo 40 parole):",
@@ -373,8 +373,8 @@ class SetupController {
             "IMPORTANTE: Restituisci SOLO il messaggio di benvenuto senza descrizioni, spiegazioni o commenti. Non includere virgolette attorno al messaggio."
           ],
           example: menuType === 'pdf'
-            ? "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha ricevuto oltre 200 recensioni a cinque stelle! Ho allegato il nostro menu con tutte le nostre specialità."
-            : "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha ricevuto oltre 200 recensioni a cinque stelle! Scopri il nostro menu con tutte le nostre specialità qui sotto."
+            ? "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha oltre 200 recensioni a cinque stelle! Ho allegato il nostro menu."
+            : "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha oltre 200 recensioni a cinque stelle! Il nostro menu è disponibile qui sotto."
         },
         fr: {
           welcomeText: "Analysez ces détails et avis de restaurant pour créer un message d'accueil très concis (max 40 mots) :",
@@ -392,8 +392,8 @@ class SetupController {
             "IMPORTANT : Retournez UNIQUEMENT le message d'accueil sans description, explication ou commentaires. N'incluez pas de guillemets autour du message."
           ],
           example: menuType === 'pdf'
-            ? "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont reçu plus de 200 avis 5 étoiles! J'ai joint notre menu avec toutes nos spécialités."
-            : "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont reçu plus de 200 avis 5 étoiles! Découvrez notre menu avec toutes nos spécialités ci-dessous."
+            ? "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont plus de 200 avis 5 étoiles! J'ai joint notre menu."
+            : "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont plus de 200 avis 5 étoiles! Notre menu est disponible ci-dessous."
         },
         de: {
           welcomeText: "Analysieren Sie diese Restaurantdetails und Bewertungen, um eine sehr prägnante Willkommensnachricht zu erstellen (max. 40 Wörter):",
@@ -411,8 +411,8 @@ class SetupController {
             "WICHTIG: Geben Sie NUR die Willkommensnachricht ohne Beschreibung, Erklärung oder Kommentare zurück. Verwenden Sie keine Anführungszeichen um die Nachricht."
           ],
           example: menuType === 'pdf'
-            ? "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen erhalten! Ich habe unser Menü mit all unseren Spezialitäten beigefügt."
-            : "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen erhalten! Entdecken Sie unser Menü mit all unseren Spezialitäten unten."
+            ? "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen! Ich habe unser Menü beigefügt."
+            : "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen! Unser Menü ist unten verfügbar."
         },
         es: {
           welcomeText: "Analiza estos detalles y reseñas del restaurante para crear un mensaje de bienvenida muy conciso (máx. 40 palabras):",
@@ -430,8 +430,8 @@ class SetupController {
             "IMPORTANTE: Devuelve SOLO el mensaje de bienvenida sin descripción, explicación o comentarios. No incluyas comillas alrededor del mensaje."
           ],
           example: menuType === 'pdf'
-            ? "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! He adjuntado nuestro menú con todas nuestras especialidades."
-            : "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! Consulta nuestro menú con todas nuestras especialidades a continuación."
+            ? "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! He adjuntado nuestro menú."
+            : "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! Nuestro menú está disponible a continuación."
         }
       };
 
@@ -598,7 +598,7 @@ ${langInstructions.example}`;
             "Make it personal and engaging",
             "Use {{1}} as a placeholder for the customer's name (IMPORTANT: use exactly {{1}}, not {customerName} or other variations)"
           ],
-          example: "Thanks for dining with us, {{1}}! 🌟 Your opinion means the world to us - we'd love to hear about your experience with our dishes."
+          example: "Thanks for dining with us, {{1}}! 🌟 Your feedback helps us serve you better."
         },
         it: {
           welcomeText: "Crea un messaggio ottimizzato per richiedere recensioni a un ristorante. Il messaggio dovrebbe incoraggiare i clienti a lasciare una recensione cliccando su un pulsante che verrà mostrato sotto il messaggio.",
@@ -615,7 +615,7 @@ ${langInstructions.example}`;
             "Rendilo personale e coinvolgente",
             "Usa {{1}} come segnaposto per il nome del cliente (IMPORTANTE: usa esattamente {{1}}, non {customerName} o altre variazioni)"
           ],
-          example: "Grazie per aver cenato da noi, {{1}}! 🌟 La tua opinione è molto importante - ci piacerebbe sapere cosa pensi dei nostri piatti."
+          example: "Grazie per aver cenato da noi, {{1}}! 🌟 Il tuo feedback ci aiuta a servirti meglio."
         },
         fr: {
           welcomeText: "Créez un message optimisé pour demander un avis sur un restaurant. Le message devrait encourager les clients à laisser un avis en cliquant sur un bouton qui sera affiché sous le message.",
@@ -632,7 +632,7 @@ ${langInstructions.example}`;
             "Rendez-le personnel et engageant",
             "Utilisez {{1}} comme espace réservé pour le nom du client (IMPORTANT : utilisez exactement {{1}}, pas {customerName} ou autres variations)"
           ],
-          example: "Merci d'avoir dîné chez nous, {{1}} ! 🌟 Votre avis compte beaucoup pour nous - nous aimerions connaître votre expérience avec nos plats."
+          example: "Merci d'avoir dîné chez nous, {{1}} ! 🌟 Vos commentaires nous aident à mieux vous servir."
         },
         de: {
           welcomeText: "Erstellen Sie eine optimierte Bewertungsanfrage für ein Restaurant. Die Nachricht sollte Kunden ermutigen, eine Bewertung abzugeben, indem sie auf eine Schaltfläche klicken, die unter der Nachricht angezeigt wird.",
@@ -649,7 +649,7 @@ ${langInstructions.example}`;
             "Machen Sie es persönlich und ansprechend",
             "Verwenden Sie {{1}} als Platzhalter für den Namen des Kunden (WICHTIG: Verwenden Sie genau {{1}}, nicht {customerName} oder andere Variationen)"
           ],
-          example: "Danke für Ihren Besuch bei uns, {{1}}! 🌟 Ihre Meinung bedeutet uns sehr viel - wir würden gerne von Ihren Erfahrungen mit unseren Gerichten hören."
+          example: "Danke für Ihren Besuch bei uns, {{1}}! 🌟 Ihr Feedback hilft uns, Sie besser zu bedienen."
         },
         es: {
           welcomeText: "Crea un mensaje optimizado para solicitar reseñas para un restaurante. El mensaje debe animar a los clientes a dejar una reseña haciendo clic en un botón que se mostrará debajo del mensaje.",
@@ -666,7 +666,7 @@ ${langInstructions.example}`;
             "Hazlo personal y atractivo",
             "Usa {{1}} como marcador de posición para el nombre del cliente (IMPORTANTE: usa exactamente {{1}}, no {customerName} u otras variaciones)"
           ],
-          example: "¡Gracias por cenar con nosotros, {{1}}! 🌟 Tu opinión significa mucho para nosotros - nos encantaría saber sobre tu experiencia con nuestros platos."
+          example: "¡Gracias por cenar con nosotros, {{1}}! 🌟 Tus comentarios nos ayudan a servirte mejor."
         }
       };
 

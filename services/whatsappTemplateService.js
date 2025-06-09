@@ -310,11 +310,11 @@ class WhatsAppTemplateService {
           console.log(`Setting up URL template for ${langCode} with URL:`, languageMenuUrl);
           templateData.components.buttons = [{
             type: 'URL',
-            text: langCode === 'it' ? 'Vedi Menu' :
-                  langCode === 'en' ? 'View Menu' :
-                  langCode === 'es' ? 'Ver Menú' :
-                  langCode === 'de' ? 'Menü anzeigen' :
-                  'Voir le Menu',
+            text: langCode === 'it' ? 'Menu' :
+                  langCode === 'en' ? 'Menu' :
+                  langCode === 'es' ? 'Menú' :
+                  langCode === 'de' ? 'Menü' :
+                  'Menu',
             url: languageMenuUrl
           }];
         } else {
@@ -383,11 +383,11 @@ class WhatsAppTemplateService {
             },
             buttons: [{
               type: 'URL',
-              text: lang === 'it' ? 'Lascia una recensione' :
-                    lang === 'en' ? 'Leave a review' :
-                    lang === 'es' ? 'Dejar una reseña' :
-                    lang === 'de' ? 'Bewertung abgeben' :
-                    'Laisser un avis',
+              text: lang === 'it' ? 'Recensione' :
+                    lang === 'en' ? 'Review' :
+                    lang === 'es' ? 'Reseña' :
+                    lang === 'de' ? 'Bewertung' :
+                    'Avis',
               url: reviewLink
             }]
           }
@@ -425,14 +425,18 @@ Original message:
 ${messageWithTwilioVar}
 
 Requirements:
-1. Keep the same tone and style
-2. Preserve all formatting and emojis
-3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY a valid JSON object with language codes as keys and translations as values
-5. IMPORTANT: Use only standard double quotes (") for JSON formatting
-6. Do not use escaped quotes (\") in the JSON structure
-7. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
-8. Ensure the JSON is properly formatted with correct syntax
+1. Keep the same tone and style but make it more informational and less promotional
+2. Focus on providing useful information rather than marketing language
+3. Avoid words like "discover", "explore", "amazing", "delicious" that might trigger MARKETING classification
+4. Use more neutral, informational language like "view", "see", "check", "available"
+5. Keep the message to maximum 3 lines of text
+6. Preserve all formatting and emojis
+7. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+8. Return ONLY a valid JSON object with language codes as keys and translations as values
+9. IMPORTANT: Use only standard double quotes (") for JSON formatting
+10. Do not use escaped quotes (\") in the JSON structure
+11. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+12. Ensure the JSON is properly formatted with correct syntax
 
 Example format (copy this exact structure):
 {
@@ -575,14 +579,18 @@ Original message:
 ${messageWithTwilioVar}
 
 Requirements:
-1. Keep the same tone and style
-2. Preserve all formatting and emojis
-3. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
-4. Return ONLY a valid JSON object with language codes as keys and translations as values
-5. IMPORTANT: Use only standard double quotes (") for JSON formatting
-6. Do not use escaped quotes (\") in the JSON structure
-7. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
-8. Ensure the JSON is properly formatted with correct syntax
+1. Keep the same tone and style but make it more informational and less promotional
+2. Focus on providing useful information rather than marketing language
+3. Avoid words like "discover", "explore", "amazing", "delicious" that might trigger MARKETING classification
+4. Use more neutral, informational language like "view", "see", "check", "available"
+5. Keep the message to maximum 3 lines of text
+6. Preserve all formatting and emojis
+7. Keep the {{1}} variable exactly as is - DO NOT translate or modify it
+8. Return ONLY a valid JSON object with language codes as keys and translations as values
+9. IMPORTANT: Use only standard double quotes (") for JSON formatting
+10. Do not use escaped quotes (\") in the JSON structure
+11. If the text contains quotation marks, use single quotes instead or rephrase to avoid them
+12. Ensure the JSON is properly formatted with correct syntax
 
 Example format (copy this exact structure):
 {
@@ -760,6 +768,10 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
       });
       
       console.log('Risposta approvazione:', JSON.stringify(approvalResponse.data, null, 2));
+      
+      // NOTA: Meta/WhatsApp può riclassificare automaticamente i template durante l'approvazione
+      // anche se inviamo UTILITY, potrebbero cambiarlo in MARKETING se il contenuto
+      // viene interpretato come promozionale dai loro algoritmi automatici.
 
       // Aggiorna il template con l'ID Twilio e lo stato
       template.twilioTemplateId = contentSid;

@@ -93,11 +93,11 @@ async function updateButtonTextInAllLanguages(sourceTemplate, newButtonText) {
   
   // Mappa dei testi dei pulsanti in base alla lingua
   const buttonTexts = {
-    'it': templateType === 'REVIEW' ? 'Lascia una recensione' : 'Vedi Menu',
-    'en': templateType === 'REVIEW' ? 'Leave a review' : 'View Menu',
-    'es': templateType === 'REVIEW' ? 'Dejar una reseña' : 'Ver Menú',
-    'de': templateType === 'REVIEW' ? 'Bewertung abgeben' : 'Menü anzeigen',
-    'fr': templateType === 'REVIEW' ? 'Laisser un avis' : 'Voir le Menu'
+    'it': templateType === 'REVIEW' ? 'Lascia Recensione' : 'Menu',
+    'en': templateType === 'REVIEW' ? 'Leave Review' : 'Menu',
+    'es': templateType === 'REVIEW' ? 'Dejar Reseña' : 'Menú',
+    'de': templateType === 'REVIEW' ? 'Bewertung abgeben' : 'Menü',
+    'fr': templateType === 'REVIEW' ? 'Laisser Avis' : 'Menu'
   };
   
   // Se è stato fornito un testo personalizzato, usa quello come predefinito
@@ -191,16 +191,16 @@ async function createConvertedTemplate(sourceTemplate, newType, updatedMessage, 
       }
       
       const buttonTexts = {
-        'it': 'Vedi Menu',
-        'en': 'View Menu',
-        'es': 'Ver Menú',
-        'de': 'Menü anzeigen',
-        'fr': 'Voir le Menu'
+        'it': 'Menu',
+        'en': 'Menu',
+        'es': 'Menú',
+        'de': 'Menü',
+        'fr': 'Menu'
       };
       
       newTemplateData.components.buttons = [{
         type: 'URL',
-        text: buttonTexts[language] || 'View Menu',
+        text: buttonTexts[language] || 'Menu',
         url: menuUrl
       }];
     }
