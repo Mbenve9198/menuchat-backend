@@ -214,7 +214,7 @@ const calculateUserStats = async (userId, restaurantId) => {
     };
     const messageCost = 0.005;
 
-    // Menu messages: assumiamo utility (template MEDIA/CALL_TO_ACTION)
+    // Menu messages: ora sono marketing (template MEDIA/CALL_TO_ACTION)
     const menuConversationType = MessageTracking.getConversationTypeFromTemplate(null, 'menuMessages');
     tracking.messageStats.menuMessages = {
       conversations: menuInteractions,
@@ -222,7 +222,7 @@ const calculateUserStats = async (userId, restaurantId) => {
       cost: menuInteractions * (conversationPrices[menuConversationType] + messageCost)
     };
 
-    // Review messages: assumiamo service (template REVIEW)
+    // Review messages: ora sono utility (template REVIEW)
     const reviewConversationType = MessageTracking.getConversationTypeFromTemplate('REVIEW', 'reviewMessages');
     tracking.messageStats.reviewMessages = {
       conversations: reviewInteractions,

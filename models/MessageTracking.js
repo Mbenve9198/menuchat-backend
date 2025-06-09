@@ -74,18 +74,18 @@ MessageTrackingSchema.index({ lastUpdated: -1 });
 MessageTrackingSchema.statics.getConversationTypeFromTemplate = function(templateType, messageType) {
   // Mappa i tipi di template ai tipi di conversazione Twilio
   const templateToConversationMap = {
-    'MEDIA': 'utility',        // Template media (menu, benvenuto) -> utility
-    'CALL_TO_ACTION': 'utility', // Template con bottoni -> utility  
-    'REVIEW': 'service',       // Template recensioni -> service
+    'MEDIA': 'marketing',        // Template media (menu, benvenuto) -> marketing
+    'CALL_TO_ACTION': 'marketing', // Template con bottoni -> marketing  
+    'REVIEW': 'utility',       // Template recensioni -> utility
     'MARKETING': 'marketing'   // Template campagne -> marketing
   };
   
   // Mappa i tipi di messaggio ai tipi di conversazione
   const messageToConversationMap = {
-    'menuMessages': 'utility',
-    'reviewMessages': 'service', 
-    'campaignMessages': 'marketing',
-    'inboundMessages': 'service'
+    'menuMessages': 'marketing',    // Menu messages -> marketing
+    'reviewMessages': 'utility',    // Review messages -> utility
+    'campaignMessages': 'marketing', // Campaign messages -> marketing
+    'inboundMessages': 'service'    // Inbound messages -> service (non specificato, mantengo service)
   };
   
   // Se abbiamo il tipo di template, usalo
