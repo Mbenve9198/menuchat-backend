@@ -58,20 +58,31 @@ const adminLogin = async (req, res) => {
  */
 const getUsersStats = async (req, res) => {
   try {
+    console.log('🔍 Inizio recupero statistiche utenti...');
+    
     // Ottieni tutti gli utenti con i loro ristoranti
     const users = await User.find({})
       .select('name email createdAt')
       .lean();
 
+    console.log(`📊 Trovati ${users.length} utenti nel database`);
+
     const userStats = [];
 
     for (const user of users) {
+      console.log(`👤 Elaborando utente: ${user.name} (${user.email})`);
+      
       // Trova il ristorante dell'utente
       const restaurant = await Restaurant.findOne({ user: user._id })
         .select('name')
         .lean();
 
-      if (!restaurant) continue;
+      if (!restaurant) {
+        console.log(`⚠️  Nessun ristorante trovato per l'utente ${user.name}`);
+        continue;
+      }
+
+      console.log(`🏪 Ristorante trovato: ${restaurant.name}`);
 
       // Ottieni o crea il tracking per questo utente
       let tracking = await MessageTracking.findOne({
@@ -81,11 +92,12 @@ const getUsersStats = async (req, res) => {
       });
 
       if (!tracking) {
+        console.log(`📈 Calcolando statistiche per ${user.name}...`);
         // Se non esiste, calcoliamo le statistiche dai dati esistenti
         tracking = await calculateUserStats(user._id, restaurant._id);
       }
 
-      userStats.push({
+      const userStat = {
         userId: user._id,
         userName: user.name,
         userEmail: user.email,
@@ -103,26 +115,37 @@ const getUsersStats = async (req, res) => {
           totalMessages: 0,
           totalCost: 0
         }
+      };
+
+      console.log(`💰 Statistiche per ${user.name}:`, {
+        totalMessages: userStat.totalStats.totalMessages,
+        totalCost: userStat.totalStats.totalCost
       });
+
+      userStats.push(userStat);
     }
 
     // Ordina per costo totale decrescente
     userStats.sort((a, b) => b.totalStats.totalCost - a.totalStats.totalCost);
 
+    const summary = {
+      totalUsers: userStats.length,
+      totalCost: userStats.reduce((sum, user) => sum + user.totalStats.totalCost, 0),
+      totalMessages: userStats.reduce((sum, user) => sum + user.totalStats.totalMessages, 0),
+      totalConversations: userStats.reduce((sum, user) => sum + user.totalStats.totalConversations, 0)
+    };
+
+    console.log('📋 Riepilogo finale:', summary);
+
     res.status(200).json({
       success: true,
       data: {
         users: userStats,
-        summary: {
-          totalUsers: userStats.length,
-          totalCost: userStats.reduce((sum, user) => sum + user.totalStats.totalCost, 0),
-          totalMessages: userStats.reduce((sum, user) => sum + user.totalStats.totalMessages, 0),
-          totalConversations: userStats.reduce((sum, user) => sum + user.totalStats.totalConversations, 0)
-        }
+        summary: summary
       }
     });
   } catch (error) {
-    console.error('Errore nel recupero delle statistiche utenti:', error);
+    console.error('❌ Errore nel recupero delle statistiche utenti:', error);
     res.status(500).json({
       success: false,
       message: 'Errore nel recupero delle statistiche',
