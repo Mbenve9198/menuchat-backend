@@ -736,6 +736,13 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
       const contentSid = contentResponse.data.sid;
 
       // 2. Richiedi l'approvazione per WhatsApp
+      console.log('=== INVIO RICHIESTA APPROVAZIONE WHATSAPP ===');
+      console.log('URL:', `${this.contentApiBaseUrl}/${contentSid}/ApprovalRequests/whatsapp`);
+      console.log('Data da inviare:', JSON.stringify({
+        name: template.name.toLowerCase(),
+        category: 'UTILITY'
+      }, null, 2));
+      
       const approvalResponse = await axios({
         method: 'post',
         url: `${this.contentApiBaseUrl}/${contentSid}/ApprovalRequests/whatsapp`,
@@ -751,6 +758,8 @@ CRITICAL: Return ONLY the JSON object. No markdown, no backticks, no explanation
           category: 'UTILITY'
         }
       });
+      
+      console.log('Risposta approvazione:', JSON.stringify(approvalResponse.data, null, 2));
 
       // Aggiorna il template con l'ID Twilio e lo stato
       template.twilioTemplateId = contentSid;
