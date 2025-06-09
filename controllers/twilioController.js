@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 const BotConfiguration = require('../models/BotConfiguration');
 const twilioService = require('../services/twilioService');
+const messageSchedulerService = require('../services/messageSchedulerService');
 const Menu = require('../models/Menu');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
@@ -307,7 +308,7 @@ const webhookHandler = async (req, res) => {
         console.error('❌ Errore nel tracking del messaggio template:', trackingError);
       }
       
-      // Se la configurazione include un timer per le recensioni, programma l'invio tramite Twilio
+      // Se la configurazione include un timer per le recensioni, programma l'invio tramite sistema locale
       if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
         try {
           // Calcola la data pianificata
@@ -329,22 +330,22 @@ const webhookHandler = async (req, res) => {
               reviewTemplate = reviewTemplates.find(t => t.language === 'it') || reviewTemplates[0];
             }
             
-            // Programma il messaggio di recensione con Twilio
-            const scheduledResult = await twilioService.scheduleTemplateMessage(
-              fromNumber,
-              reviewTemplate.twilioTemplateId,
-              {
-                1: profileName || 'Cliente'
-              },
-              restaurant._id,
-              scheduledTime
-            );
+            // Programma il messaggio di recensione con il sistema locale
+            const scheduledResult = await messageSchedulerService.scheduleReviewMessage({
+              restaurantId: restaurant._id,
+              interactionId: interaction._id,
+              phoneNumber: fromNumber,
+              templateId: reviewTemplate.twilioTemplateId,
+              customerName: profileName || 'Cliente',
+              scheduledTime: scheduledTime,
+              language: language
+            });
             
             if (scheduledResult.success) {
               // Salva il riferimento al messaggio programmato
               interaction.scheduledReviewMessageId = scheduledResult.messageId;
               interaction.reviewScheduledFor = scheduledTime;
-              console.log(`✅ Recensione programmata con Twilio (SID: ${scheduledResult.messageId})`);
+              console.log(`✅ Recensione programmata localmente (ID: ${scheduledResult.messageId})`);
 
               // TRACKING: Traccia il messaggio di recensione programmato
               try {

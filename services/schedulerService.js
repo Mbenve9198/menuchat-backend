@@ -1,11 +1,13 @@
 const cron = require('node-cron');
 const { User, Restaurant, Analytics } = require('../models');
 const WhatsAppCampaign = require('../models/WhatsAppCampaign');
+const ScheduledMessage = require('../models/ScheduledMessage');
 const emailService = require('./emailService');
 const campaignSuggestionService = require('./campaignSuggestionService');
 const CustomerInteraction = require('../models/CustomerInteraction');
 const DailyReviewSnapshot = require('../models/DailyReviewSnapshot');
 const googlePlacesService = require('./googlePlacesService');
+const twilioService = require('./twilioService');
 
 class SchedulerService {
   constructor() {
@@ -24,6 +26,9 @@ class SchedulerService {
 
     console.log('🚀 Inizializzazione Scheduler Service...');
 
+    // Job per messaggi programmati - ogni minuto
+    this.scheduleMessageProcessor();
+    
     // Job giornaliero - ogni giorno alle 8:00
     this.scheduleDailyReports();
     
@@ -35,6 +40,97 @@ class SchedulerService {
 
     this.isInitialized = true;
     console.log('✅ Scheduler Service inizializzato con successo');
+  }
+
+  /**
+   * Schedula il processore dei messaggi programmati
+   */
+  scheduleMessageProcessor() {
+    // Ogni minuto controlla i messaggi da inviare
+    const messageJob = cron.schedule('* * * * *', async () => {
+      await this.processScheduledMessages();
+    }, {
+      scheduled: false,
+      timezone: 'Europe/Rome'
+    });
+
+    this.jobs.set('scheduled_messages', messageJob);
+    messageJob.start();
+    console.log('✅ Job messaggi programmati schedulato (ogni minuto)');
+  }
+
+  /**
+   * Processa i messaggi programmati pronti per l'invio
+   */
+  async processScheduledMessages() {
+    try {
+      // Trova tutti i messaggi pronti per l'invio
+      const messagesToSend = await ScheduledMessage.findMessagesToSend();
+      
+      if (messagesToSend.length === 0) {
+        return; // Nessun messaggio da inviare
+      }
+
+      console.log(`📤 Trovati ${messagesToSend.length} messaggi programmati da inviare`);
+
+      for (const message of messagesToSend) {
+        try {
+          // Verifica che il messaggio non sia già stato processato
+          if (message.status !== 'pending') {
+            continue;
+          }
+
+          console.log(`📤 Invio messaggio programmato: ${message.messageType} a ${message.phoneNumber}`);
+
+          // Invia il messaggio tramite Twilio (senza scheduling)
+          const result = await twilioService.sendTemplateMessage(
+            message.phoneNumber,
+            message.templateId,
+            message.templateVariables,
+            message.restaurant._id
+          );
+
+          if (result.success) {
+            // Marca come inviato
+            await message.markAsSent(result.messageId);
+            console.log(`✅ Messaggio inviato con successo: ${result.messageId}`);
+
+            // Aggiorna l'interazione del cliente se presente
+            if (message.customerInteraction) {
+              await CustomerInteraction.findByIdAndUpdate(
+                message.customerInteraction,
+                {
+                  lastMessageSent: `Template inviato: ${message.messageType}`,
+                  lastTemplateId: message.templateId
+                }
+              );
+            }
+          } else {
+            // Marca come fallito
+            await message.markAsFailed(result.error);
+            console.error(`❌ Errore invio messaggio: ${result.error}`);
+
+            // Se ha raggiunto il massimo numero di tentativi, non ritentare
+            if (message.retryCount >= message.maxRetries) {
+              console.error(`❌ Messaggio ${message._id} ha raggiunto il massimo numero di tentativi`);
+            }
+          }
+
+        } catch (error) {
+          console.error(`❌ Errore processamento messaggio ${message._id}:`, error);
+          
+          // Marca come fallito
+          try {
+            await message.markAsFailed(error.message);
+          } catch (updateError) {
+            console.error(`❌ Errore aggiornamento stato messaggio:`, updateError);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Errore generale processamento messaggi programmati:', error);
+    }
   }
 
   /**

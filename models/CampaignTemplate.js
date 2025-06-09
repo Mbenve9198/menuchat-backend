@@ -40,10 +40,10 @@ const campaignTemplateSchema = new mongoose.Schema({
     type: String,
     sparse: true // Permette null/undefined ma deve essere unico se presente
   },
-  // Categoria WhatsApp (UTILITY, MARKETING, AUTHENTICATION)
+  // Categoria WhatsApp (UTILITY, MARKETING, AUTHENTICATION, SERVICE)
   whatsappCategory: {
     type: String,
-    enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION'],
+    enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION', 'SERVICE'],
     default: 'MARKETING'
   },
   // Variabili nel template

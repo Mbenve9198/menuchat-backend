@@ -466,10 +466,10 @@ const submitTemplateToTwilio = async (req, res) => {
     // Categoria del template (richiesta da WhatsApp)
     const { category } = req.body;
     
-    if (!category || !['UTILITY', 'MARKETING', 'AUTHENTICATION'].includes(category)) {
+    if (!category || !['UTILITY', 'MARKETING', 'AUTHENTICATION', 'SERVICE'].includes(category)) {
       return res.status(400).json({
         success: false,
-        message: 'Categoria non valida. Utilizzare UTILITY, MARKETING o AUTHENTICATION'
+        message: 'Categoria non valida. Utilizzare UTILITY, MARKETING, AUTHENTICATION o SERVICE'
       });
     }
 
@@ -569,7 +569,8 @@ const submitTemplateToTwilio = async (req, res) => {
         },
         data: {
           name: templateName,
-          category: category
+          category: category,
+          allow_category_change: false
         }
       });
 
