@@ -1,6 +1,7 @@
 const ScheduledMessage = require('../models/ScheduledMessage');
 const WhatsAppContact = require('../models/WhatsAppContact');
 const crypto = require('crypto');
+const Restaurant = require('../models/Restaurant');
 
 /**
  * Genera un token sicuro per l'unsubscribe
@@ -23,104 +24,77 @@ class MessageSchedulerService {
   
   /**
    * Programma un messaggio di recensione
-   * @param {Object} data - Dati per la programmazione
+   * @param {Object} messageData - Dati del messaggio da programmare
    * @returns {Promise<Object>} - Risultato della programmazione
    */
-  async scheduleReviewMessage(data) {
+  async scheduleReviewMessage(messageData) {
     try {
-      const {
-        restaurantId,
-        interactionId,
-        phoneNumber,
-        templateId,
-        customerName = 'Cliente',
-        scheduledTime,
-        language = 'it'
-      } = data;
-
-      console.log('===== PROGRAMMAZIONE MESSAGGIO RECENSIONE (LOCALE) =====');
-      console.log('Phone Number:', phoneNumber);
-      console.log('Template ID:', templateId);
-      console.log('Scheduled Time:', scheduledTime);
-
-      // Verifica che la data di invio sia nel futuro (almeno 1 minuto dopo)
-      const minScheduleTime = new Date(Date.now() + 1 * 60 * 1000); // 1 minuto nel futuro
-      let finalScheduledTime = new Date(scheduledTime);
-      
-      if (finalScheduledTime < minScheduleTime) {
-        finalScheduledTime = minScheduleTime;
-      }
-
-      // Ottieni o crea il contatto WhatsApp per le variabili del template
-      let contact;
-      try {
-        const normalizedPhone = phoneNumber.replace('whatsapp:', '');
-        const phoneHash = crypto
-          .createHash('sha256')
-          .update(normalizedPhone.replace(/\D/g, ''))
-          .digest('hex');
-        
-        contact = await WhatsAppContact.findOne({
-          restaurant: restaurantId,
-          phoneHash: phoneHash
-        });
-        
-        if (!contact) {
-          console.log(`Contatto non trovato per ${phoneNumber}, creando nuovo contatto...`);
-          contact = new WhatsAppContact({
-            restaurant: restaurantId,
-            phoneNumber: normalizedPhone,
-            phoneHash: phoneHash,
-            name: customerName,
-            language: language
-          });
-          await contact.save();
-        }
-      } catch (error) {
-        console.error('Errore nel recupero/creazione del contatto:', error);
-      }
-
-      // Prepara le variabili del template
-      const templateVariables = {};
-      
-      // Variabile 1: Nome del cliente
-      if (contact && contact.name && contact.name !== 'Cliente') {
-        templateVariables["1"] = contact.name;
-      } else {
-        templateVariables["1"] = customerName;
-      }
-      
-      // Variabile 2: URL di unsubscribe (solo se abbiamo il contatto)
-      if (contact) {
-        const contactId = contact._id.toString();
-        const unsubscribeToken = generateUnsubscribeToken(contactId, contact.phoneNumber);
-        const unsubscribePath = `api/campaign/unsubscribe/${contactId}/${unsubscribeToken}`;
-        templateVariables["2"] = unsubscribePath;
-      }
-
-      // Crea il messaggio programmato
-      const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
-        restaurantId,
-        interactionId,
-        phoneNumber,
-        customerName: templateVariables["1"],
-        templateId,
-        templateVariables,
-        scheduledFor: finalScheduledTime
+      console.log('📅 Programmazione messaggio di recensione:', {
+        restaurantId: messageData.restaurantId,
+        phoneNumber: messageData.phoneNumber,
+        scheduledTime: messageData.scheduledTime
       });
 
-      console.log(`✅ Messaggio recensione programmato localmente: ${scheduledMessage._id}`);
-      console.log(`Variabili utilizzate: ${JSON.stringify(templateVariables)}`);
+      // Controlla se abbiamo un template object (nuovo sistema)
+      if (messageData.template && typeof messageData.template === 'object') {
+        const template = messageData.template;
+        const restaurant = await Restaurant.findById(messageData.restaurantId);
+        
+        // Converti il template in messaggio normale
+        const twilioService = require('./twilioService');
+        const convertedMessage = twilioService.convertTemplateToMessage(
+          template, 
+          messageData.customerName || 'Cliente', 
+          restaurant
+        );
+
+        // Programma usando il nuovo sistema
+        const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
+          restaurantId: messageData.restaurantId,
+          interactionId: messageData.interactionId,
+          phoneNumber: messageData.phoneNumber,
+          customerName: messageData.customerName,
+          template: template._id || template,
+          messageBody: convertedMessage.messageBody,
+          mediaUrl: convertedMessage.mediaUrl,
+          scheduledFor: messageData.scheduledTime
+        });
+
+        console.log(`✅ Messaggio di recensione programmato localmente (ID: ${scheduledMessage._id})`);
+        
+        return {
+          success: true,
+          messageId: scheduledMessage._id,
+          scheduledTime: messageData.scheduledTime,
+          method: 'local_new_system'
+        };
+      }
+      // Fallback al vecchio sistema se non abbiamo template object
+      else if (messageData.templateId) {
+      const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
+          restaurantId: messageData.restaurantId,
+          interactionId: messageData.interactionId,
+          phoneNumber: messageData.phoneNumber,
+          customerName: messageData.customerName,
+          templateId: messageData.templateId,
+          templateVariables: messageData.templateVariables,
+          scheduledFor: messageData.scheduledTime
+      });
+
+        console.log(`✅ Messaggio di recensione programmato (legacy system, ID: ${scheduledMessage._id})`);
 
       return {
         success: true,
-        messageId: scheduledMessage._id.toString(),
-        scheduledTime: finalScheduledTime,
-        status: 'scheduled'
+          messageId: scheduledMessage._id,
+          scheduledTime: messageData.scheduledTime,
+          method: 'local_legacy_system'
       };
+      } else {
+        throw new Error('Nessun template o templateId fornito per il messaggio di recensione');
+      }
 
     } catch (error) {
-      console.error('Errore nella programmazione del messaggio recensione:', error);
+      console.error('❌ Errore nella programmazione del messaggio di recensione:', error);
       return {
         success: false,
         error: error.message

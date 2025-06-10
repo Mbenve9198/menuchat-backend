@@ -267,10 +267,10 @@ const webhookHandler = async (req, res) => {
     await interaction.save();
     console.log(`Nuova interazione salvata: ${interaction._id}`);
     
-    // Usa il template per inviare la risposta tramite Twilio
-    const result = await twilioService.sendTemplateMessage(
+    // NUOVA LOGICA: Usa il nuovo metodo per inviare messaggi normali basati sui template
+    const result = await twilioService.sendMessageFromTemplate(
       fromNumber,
-      template.twilioTemplateId,
+      template,  // Passa l'oggetto template completo invece del solo ID
       {
         1: profileName  // Sostituisce {{1}} con il nome del cliente
       },
@@ -279,8 +279,8 @@ const webhookHandler = async (req, res) => {
     
     if (result.success) {
       // Aggiorna l'interazione con il messaggio inviato
-      interaction.lastMessageSent = 'Invio template: ' + template.name;
-      interaction.lastTemplateId = template.twilioTemplateId;
+      interaction.lastMessageSent = `Messaggio ${template.type}: ${template.name}`;
+      interaction.lastTemplateId = template._id; // Usa l'ID del template dal database
 
       // TRACKING: Traccia il messaggio di menu/template inviato
       try {
@@ -311,9 +311,16 @@ const webhookHandler = async (req, res) => {
       // Se la configurazione include un timer per le recensioni, programma l'invio tramite sistema locale
       if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
         try {
+          // DEBUG: Log dei valori per capire il problema
+          console.log(`🔍 DEBUG - reviewTimer value: ${botConfig.reviewTimer}`);
+          console.log(`🔍 DEBUG - reviewTimer type: ${typeof botConfig.reviewTimer}`);
+          console.log(`🔍 DEBUG - Current time: ${new Date()}`);
+          console.log(`🔍 DEBUG - Milliseconds to add: ${botConfig.reviewTimer * 60 * 1000}`);
+          
           // Calcola la data pianificata
           const scheduledTime = new Date(Date.now() + botConfig.reviewTimer * 60 * 1000);
           console.log(`⏰ Scheduling recensione per ${scheduledTime}`);
+          console.log(`🔍 DEBUG - Scheduled time calculated: ${scheduledTime.toISOString()}`);
           
           // Trova il template di recensione nella lingua appropriata
           const reviewTemplates = await WhatsAppTemplate.find({
@@ -331,11 +338,12 @@ const webhookHandler = async (req, res) => {
             }
             
             // Programma il messaggio di recensione con il sistema locale
+            // AGGIORNATO: Passa l'oggetto template invece dell'ID Twilio
             const scheduledResult = await messageSchedulerService.scheduleReviewMessage({
               restaurantId: restaurant._id,
               interactionId: interaction._id,
               phoneNumber: fromNumber,
-              templateId: reviewTemplate.twilioTemplateId,
+              template: reviewTemplate,  // Oggetto template completo invece di templateId
               customerName: profileName || 'Cliente',
               scheduledTime: scheduledTime,
               language: language

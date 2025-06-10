@@ -30,15 +30,32 @@ const ScheduledMessageSchema = new Schema({
     type: String,
     default: 'Cliente'
   },
-  // Dati del messaggio
+  // Dati del messaggio - NUOVO SISTEMA (messaggi normali)
   messageType: {
     type: String,
-    enum: ['review', 'campaign', 'followup'],
+    enum: ['review', 'campaign', 'followup', 'menu'],
     required: true
   },
+  // Riferimento al template del database (nuovo sistema)
+  template: {
+    type: Schema.Types.ObjectId,
+    ref: 'WhatsAppTemplate',
+    required: false // Opzionale per retrocompatibilità
+  },
+  // Corpo del messaggio già processato (nuovo sistema)
+  messageBody: {
+    type: String,
+    required: false // Sarà richiesto dopo la migrazione
+  },
+  // URL del media se presente (nuovo sistema)
+  mediaUrl: {
+    type: String,
+    required: false
+  },
+  // VECCHIO SISTEMA (template WhatsApp) - mantenuto per retrocompatibilità
   templateId: {
     type: String,
-    required: true
+    required: false // Non più obbligatorio dopo la migrazione
   },
   templateVariables: {
     type: Object,
@@ -99,40 +116,78 @@ ScheduledMessageSchema.methods.cancel = function() {
   return this.save();
 };
 
+// Metodo per verificare se usa il nuovo sistema
+ScheduledMessageSchema.methods.usesNewSystem = function() {
+  return this.template && this.messageBody;
+};
+
+// Metodo per verificare se usa il vecchio sistema
+ScheduledMessageSchema.methods.usesLegacySystem = function() {
+  return this.templateId && !this.template;
+};
+
 // Metodo statico per trovare messaggi da inviare
 ScheduledMessageSchema.statics.findMessagesToSend = function() {
   return this.find({
     status: 'pending',
     scheduledFor: { $lte: new Date() }
-  }).populate('restaurant');
+  }).populate('restaurant').populate('template');
 };
 
-// Metodo statico per programmare un messaggio di recensione
+// Metodo statico per programmare un messaggio di recensione (NUOVO SISTEMA)
 ScheduledMessageSchema.statics.scheduleReviewMessage = function(data) {
-  return this.create({
+  const messageData = {
     restaurant: data.restaurantId,
     customerInteraction: data.interactionId,
     phoneNumber: data.phoneNumber,
     customerName: data.customerName,
     messageType: 'review',
-    templateId: data.templateId,
-    templateVariables: data.templateVariables,
     scheduledFor: data.scheduledFor
-  });
+  };
+
+  // Nuovo sistema: usa template object e messageBody
+  if (data.template && data.messageBody) {
+    messageData.template = data.template._id || data.template;
+    messageData.messageBody = data.messageBody;
+    if (data.mediaUrl) {
+      messageData.mediaUrl = data.mediaUrl;
+    }
+  }
+  // Vecchio sistema: usa templateId (retrocompatibilità)
+  else if (data.templateId) {
+    messageData.templateId = data.templateId;
+    messageData.templateVariables = data.templateVariables || {};
+  }
+
+  return this.create(messageData);
 };
 
-// Metodo statico per programmare un messaggio di campagna
+// Metodo statico per programmare un messaggio di campagna (NUOVO SISTEMA)
 ScheduledMessageSchema.statics.scheduleCampaignMessage = function(data) {
-  return this.create({
+  const messageData = {
     restaurant: data.restaurantId,
     campaign: data.campaignId,
     phoneNumber: data.phoneNumber,
     customerName: data.customerName,
     messageType: 'campaign',
-    templateId: data.templateId,
-    templateVariables: data.templateVariables,
     scheduledFor: data.scheduledFor
-  });
+  };
+
+  // Nuovo sistema: usa template object e messageBody
+  if (data.template && data.messageBody) {
+    messageData.template = data.template._id || data.template;
+    messageData.messageBody = data.messageBody;
+    if (data.mediaUrl) {
+      messageData.mediaUrl = data.mediaUrl;
+    }
+  }
+  // Vecchio sistema: usa templateId (retrocompatibilità)
+  else if (data.templateId) {
+    messageData.templateId = data.templateId;
+    messageData.templateVariables = data.templateVariables || {};
+  }
+
+  return this.create(messageData);
 };
 
 module.exports = mongoose.model('ScheduledMessage', ScheduledMessageSchema); 

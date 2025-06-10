@@ -82,10 +82,22 @@ class SchedulerService {
 
           console.log(`📤 Invio messaggio programmato: ${message.messageType} a ${message.phoneNumber}`);
 
-          // Invia il messaggio tramite Twilio (senza scheduling)
-          const result = await twilioService.sendTemplateMessage(
+          // Ottieni il template completo dal templateId
+          const WhatsAppTemplate = require('../models/WhatsAppTemplate');
+          const template = await WhatsAppTemplate.findOne({ 
+            twilioTemplateId: message.templateId 
+          });
+
+          if (!template) {
+            console.error(`❌ Template non trovato per ID: ${message.templateId}`);
+            await message.markAsFailed(`Template non trovato: ${message.templateId}`);
+            continue;
+          }
+
+          // Invia il messaggio tramite il nuovo metodo (senza scheduling, dato che è già schedulato localmente)
+          const result = await twilioService.sendMessageFromTemplate(
             message.phoneNumber,
-            message.templateId,
+            template,
             message.templateVariables,
             message.restaurant._id
           );
@@ -100,7 +112,7 @@ class SchedulerService {
               await CustomerInteraction.findByIdAndUpdate(
                 message.customerInteraction,
                 {
-                  lastMessageSent: `Template inviato: ${message.messageType}`,
+                  lastMessageSent: `Messaggio inviato: ${message.messageType}`,
                   lastTemplateId: message.templateId
                 }
               );

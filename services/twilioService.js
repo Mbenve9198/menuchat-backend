@@ -486,6 +486,397 @@ class TwilioService {
       };
     }
   }
+
+  /**
+   * Invia un messaggio normale tramite Twilio (testo semplice)
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {string} messageBody - Testo del messaggio
+   * @param {string} restaurantId - ID del ristorante
+   * @returns {Promise<Object>} - Risultato dell'invio
+   */
+  async sendNormalMessage(phoneNumber, messageBody, restaurantId) {
+    try {
+      console.log('===== INVIO MESSAGGIO NORMALE =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Message Body:', messageBody);
+      
+      if (!phoneNumber || !messageBody) {
+        throw new Error('Numero di telefono e testo del messaggio obbligatori');
+      }
+      
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
+
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const whatsappNumber = botConfig.whatsappNumber || process.env.TWILIO_WHATSAPP_NUMBER;
+
+      if (!twilioSid || !twilioToken || !messagingServiceSid || !whatsappNumber) {
+        throw new Error('Credenziali Twilio non configurate correttamente');
+      }
+
+      // Inizializza il client Twilio
+      const twilioClient = twilio(twilioSid, twilioToken);
+      
+      // Formatta il numero di destinazione per WhatsApp
+      const toNumber = phoneNumber.startsWith('whatsapp:') ? phoneNumber : `whatsapp:${phoneNumber}`;
+      const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
+
+      // Prepara i dati del messaggio
+      const messageData = {
+        body: messageBody,
+        from: fromNumber,
+        to: toNumber,
+        messagingServiceSid: messagingServiceSid
+      };
+
+      console.log('Dati messaggio normale:', JSON.stringify(messageData));
+
+      // Invia il messaggio
+      const message = await twilioClient.messages.create(messageData);
+
+      console.log(`Messaggio normale inviato con SID: ${message.sid}`);
+      
+      return {
+        success: true,
+        messageId: message.sid,
+        sentAt: new Date()
+      };
+    } catch (error) {
+      console.error('Errore nell\'invio del messaggio normale:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Invia un messaggio con media (PDF, immagine, ecc.) tramite Twilio
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {string} messageBody - Testo del messaggio
+   * @param {string} mediaUrl - URL del media da allegare
+   * @param {string} restaurantId - ID del ristorante
+   * @returns {Promise<Object>} - Risultato dell'invio
+   */
+  async sendMediaMessage(phoneNumber, messageBody, mediaUrl, restaurantId) {
+    try {
+      console.log('===== INVIO MESSAGGIO CON MEDIA =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Message Body:', messageBody);
+      console.log('Media URL:', mediaUrl);
+      
+      if (!phoneNumber || !messageBody || !mediaUrl) {
+        throw new Error('Numero di telefono, testo del messaggio e URL media obbligatori');
+      }
+      
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
+
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const whatsappNumber = botConfig.whatsappNumber || process.env.TWILIO_WHATSAPP_NUMBER;
+
+      if (!twilioSid || !twilioToken || !messagingServiceSid || !whatsappNumber) {
+        throw new Error('Credenziali Twilio non configurate correttamente');
+      }
+
+      // Inizializza il client Twilio
+      const twilioClient = twilio(twilioSid, twilioToken);
+      
+      // Formatta il numero di destinazione per WhatsApp
+      const toNumber = phoneNumber.startsWith('whatsapp:') ? phoneNumber : `whatsapp:${phoneNumber}`;
+      const fromNumber = whatsappNumber.startsWith('whatsapp:') ? whatsappNumber : `whatsapp:${whatsappNumber}`;
+
+      // Prepara i dati del messaggio con media
+      const messageData = {
+        body: messageBody,
+        from: fromNumber,
+        to: toNumber,
+        messagingServiceSid: messagingServiceSid,
+        mediaUrl: [mediaUrl]
+      };
+
+      console.log('Dati messaggio con media:', JSON.stringify(messageData));
+
+      // Invia il messaggio
+      const message = await twilioClient.messages.create(messageData);
+
+      console.log(`Messaggio con media inviato con SID: ${message.sid}`);
+      
+      return {
+        success: true,
+        messageId: message.sid,
+        sentAt: new Date()
+      };
+    } catch (error) {
+      console.error('Errore nell\'invio del messaggio con media:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Pianifica un messaggio normale per invio futuro
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {string} messageBody - Testo del messaggio
+   * @param {string} restaurantId - ID del ristorante
+   * @param {Date} scheduledTime - Data e ora programmata per l'invio
+   * @param {string} mediaUrl - URL del media (opzionale)
+   * @returns {Promise<Object>} - Risultato della programmazione
+   */
+  async scheduleNormalMessage(phoneNumber, messageBody, restaurantId, scheduledTime, mediaUrl = null) {
+    try {
+      console.log('===== PROGRAMMAZIONE MESSAGGIO NORMALE =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Message Body:', messageBody);
+      console.log('Media URL:', mediaUrl);
+      console.log('Scheduled Time:', scheduledTime);
+      
+      if (!phoneNumber || !messageBody || !scheduledTime) {
+        throw new Error('Numero di telefono, testo del messaggio e orario programmato sono obbligatori');
+      }
+
+      // Verifica che la data di invio sia nel futuro (almeno 5 minuti dopo)
+      const minScheduleTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minuti nel futuro
+      if (scheduledTime < minScheduleTime) {
+        scheduledTime = minScheduleTime; // Imposta a 5 minuti nel futuro se troppo vicino
+      }
+
+      // Verifica che la data di invio non sia troppo lontana (max 35 giorni)
+      const maxScheduleTime = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000); // 35 giorni nel futuro
+      if (scheduledTime > maxScheduleTime) {
+        throw new Error('La data di invio non può essere oltre 35 giorni nel futuro');
+      }
+
+      // Ottieni la configurazione del bot per il ristorante
+      const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (!botConfig) {
+        throw new Error('Configurazione bot non trovata');
+      }
+
+      // Utilizza le credenziali personalizzate se disponibili, altrimenti usa le variabili d'ambiente
+      const twilioSid = botConfig.twilioAccountSid || process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = botConfig.twilioAuthToken || process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = botConfig.messagingServiceSid || process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+      if (!twilioSid || !twilioToken || !messagingServiceSid) {
+        throw new Error('Credenziali Twilio non configurate correttamente');
+      }
+
+      // Inizializza il client Twilio
+      const twilioClient = twilio(twilioSid, twilioToken);
+      
+      // Formatta il numero di destinazione per WhatsApp
+      const toNumber = phoneNumber.startsWith('whatsapp:') ? phoneNumber : `whatsapp:${phoneNumber}`;
+
+      // Prepara i dati del messaggio programmato
+      const messageData = {
+        body: messageBody,
+        to: toNumber,
+        messagingServiceSid: messagingServiceSid,
+        scheduleType: "fixed",
+        sendAt: scheduledTime.toISOString()
+      };
+
+      // Aggiungi media se presente
+      if (mediaUrl) {
+        messageData.mediaUrl = [mediaUrl];
+      }
+
+      console.log('Dati messaggio normale programmato:', JSON.stringify(messageData));
+
+      // Pianifica il messaggio
+      const message = await twilioClient.messages.create(messageData);
+
+      console.log(`Messaggio normale programmato con SID: ${message.sid} per il: ${scheduledTime}`);
+      
+      return {
+        success: true,
+        messageId: message.sid,
+        scheduledTime: scheduledTime,
+        status: message.status
+      };
+    } catch (error) {
+      console.error('Errore nella programmazione del messaggio normale:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Converte un template in un messaggio testuale normale
+   * @param {Object} template - Template WhatsApp da convertire
+   * @param {string} customerName - Nome del cliente per sostituire le variabili
+   * @param {Object} restaurant - Dati del ristorante 
+   * @returns {Object} - Dati del messaggio convertito
+   */
+  convertTemplateToMessage(template, customerName = 'Cliente', restaurant = null) {
+    try {
+      let messageBody = template.components.body.text;
+      let mediaUrl = null;
+
+      // Sostituisci le variabili nel testo
+      messageBody = messageBody.replace(/\{\{1\}\}/g, customerName);
+      if (restaurant) {
+        messageBody = messageBody.replace(/\{restaurantName\}/g, restaurant.name);
+      }
+
+      // Gestisci i diversi tipi di template
+      switch (template.type) {
+        case 'MEDIA':
+          // Estrai l'URL del PDF dal header se presente
+          if (template.components.header && template.components.header.example) {
+            mediaUrl = template.components.header.example;
+          }
+          break;
+
+        case 'CALL_TO_ACTION':
+          // Aggiungi l'URL del pulsante al corpo del messaggio
+          if (template.components.buttons && template.components.buttons.length > 0) {
+            const button = template.components.buttons[0];
+            if (button.url) {
+              messageBody += `\n\n🔗 ${button.text}: ${button.url}`;
+            }
+          }
+          break;
+
+        case 'REVIEW':
+          // Aggiungi l'URL di recensione al corpo del messaggio
+          if (template.components.buttons && template.components.buttons.length > 0) {
+            const button = template.components.buttons[0];
+            if (button.url) {
+              messageBody += `\n\n⭐ ${button.text}: ${button.url}`;
+            }
+          }
+          break;
+      }
+
+      return {
+        messageBody,
+        mediaUrl,
+        messageType: template.type === 'REVIEW' ? 'review' : 'menu'
+      };
+    } catch (error) {
+      console.error('Errore nella conversione del template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Invia un messaggio basato su un template (versione compatibile che sostituisce sendTemplateMessage)
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {Object} template - Template da utilizzare (oggetto completo del template)
+   * @param {Object} variables - Variabili da sostituire (es. {1: "Nome Cliente"})
+   * @param {string} restaurantId - ID del ristorante
+   * @returns {Promise<Object>} - Risultato dell'invio
+   */
+  async sendMessageFromTemplate(phoneNumber, template, variables, restaurantId) {
+    try {
+      console.log('===== INVIO MESSAGGIO DA TEMPLATE =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Template Type:', template.type);
+      console.log('Variables:', JSON.stringify(variables));
+
+      // Ottieni i dati del ristorante se necessario
+      const restaurant = await Restaurant.findById(restaurantId);
+      
+      // Estrai il nome del cliente dalle variabili
+      const customerName = variables && variables['1'] ? variables['1'] : 'Cliente';
+
+      // Converti il template in messaggio
+      const messageData = this.convertTemplateToMessage(template, customerName, restaurant);
+
+      // Invia il messaggio appropriato
+      let result;
+      if (messageData.mediaUrl) {
+        // Messaggio con media (PDF)
+        result = await this.sendMediaMessage(
+          phoneNumber,
+          messageData.messageBody,
+          messageData.mediaUrl,
+          restaurantId
+        );
+      } else {
+        // Messaggio normale
+        result = await this.sendNormalMessage(
+          phoneNumber,
+          messageData.messageBody,
+          restaurantId
+        );
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Errore nell\'invio del messaggio da template:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Pianifica un messaggio basato su un template per invio futuro
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {Object} template - Template da utilizzare
+   * @param {Object} variables - Variabili da sostituire
+   * @param {string} restaurantId - ID del ristorante
+   * @param {Date} scheduledTime - Data e ora programmata per l'invio
+   * @returns {Promise<Object>} - Risultato della programmazione
+   */
+  async scheduleMessageFromTemplate(phoneNumber, template, variables, restaurantId, scheduledTime) {
+    try {
+      console.log('===== PROGRAMMAZIONE MESSAGGIO DA TEMPLATE =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Template Type:', template.type);
+      console.log('Variables:', JSON.stringify(variables));
+      console.log('Scheduled Time:', scheduledTime);
+
+      // Ottieni i dati del ristorante se necessario
+      const restaurant = await Restaurant.findById(restaurantId);
+      
+      // Estrai il nome del cliente dalle variabili
+      const customerName = variables && variables['1'] ? variables['1'] : 'Cliente';
+
+      // Converti il template in messaggio
+      const messageData = this.convertTemplateToMessage(template, customerName, restaurant);
+
+      // Pianifica il messaggio
+      const result = await this.scheduleNormalMessage(
+        phoneNumber,
+        messageData.messageBody,
+        restaurantId,
+        scheduledTime,
+        messageData.mediaUrl
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Errore nella programmazione del messaggio da template:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 }
 
 module.exports = new TwilioService(); 
