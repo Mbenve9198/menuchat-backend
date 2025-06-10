@@ -339,99 +339,84 @@ class SetupController {
       // Mappatura delle lingue con le istruzioni corrispondenti
       const languageInstructions = {
         en: {
-          welcomeText: "Analyze these restaurant details and reviews to create a very concise welcome message (max 40 words):",
-          context: menuType === 'pdf' 
-            ? "The menu will be attached as a PDF file to this message."
-            : "The menu will be accessible via a button below this message.",
+          welcomeText: "Create a very brief welcome message (max 2-3 lines, 30 words max) for this restaurant:",
+          context: "The menu will be automatically handled by the system - do NOT mention menu access, buttons, or attachments.",
           requirements: [
-            "Maximum 40 words",
-            "Include {{1}} as a placeholder for the customer's name (IMPORTANT: use exactly {{1}}, not {customerName} or other variations)",
+            "Maximum 30 words total",
+            "Maximum 2-3 lines",
+            "Include {{1}} as placeholder for customer's name (IMPORTANT: use exactly {{1}})",
             "Include restaurant name",
-            "Add relevant food emojis based on cuisine and reviews",
-            "Highlight what customers love most based on reviews",
-            "Keep it friendly and welcoming",
-            "DO NOT include any URLs or placeholders for menu links",
-            "IMPORTANT: Return ONLY the welcome message without any description, explanation, or comments. Do not include quotes around the message."
+            "Add 1-2 relevant food emojis based on cuisine",
+            "Focus on warm welcome and restaurant's specialty",
+            "DO NOT mention menu, buttons, links, or attachments",
+            "Keep it simple and friendly",
+            "IMPORTANT: Return ONLY the message without quotes or explanations"
           ],
-          example: menuType === 'pdf'
-            ? "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta has 200+ five-star reviews! I've attached our menu."
-            : "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta has 200+ five-star reviews! Our menu is available below."
+          example: "Hi {{1}}! Welcome to Luigi's 🍝\nOur homemade pasta is loved by hundreds of customers!"
         },
         it: {
-          welcomeText: "Analizza i dettagli e le recensioni di questo ristorante per creare un messaggio di benvenuto molto conciso (massimo 40 parole):",
-          context: menuType === 'pdf' 
-            ? "Il menu sarà allegato come file PDF a questo messaggio."
-            : "Il menu sarà accessibile tramite un pulsante sotto questo messaggio.",
+          welcomeText: "Crea un messaggio di benvenuto molto breve (max 2-3 righe, 30 parole max) per questo ristorante:",
+          context: "Il menu sarà gestito automaticamente dal sistema - NON menzionare accesso al menu, pulsanti o allegati.",
           requirements: [
-            "Massimo 40 parole",
-            "Includi {{1}} come segnaposto per il nome del cliente (IMPORTANTE: usa esattamente {{1}}, non {customerName} o altre variazioni)",
+            "Massimo 30 parole totali",
+            "Massimo 2-3 righe",
+            "Includi {{1}} come segnaposto per il nome del cliente (IMPORTANTE: usa esattamente {{1}})",
             "Includi il nome del ristorante",
-            "Aggiungi emoji di cibo pertinenti in base alla cucina e alle recensioni",
-            "Metti in evidenza ciò che i clienti apprezzano di più in base alle recensioni",
-            "Mantieni un tono amichevole e accogliente",
-            "NON includere URL o segnaposto per link al menu",
-            "IMPORTANTE: Restituisci SOLO il messaggio di benvenuto senza descrizioni, spiegazioni o commenti. Non includere virgolette attorno al messaggio."
+            "Aggiungi 1-2 emoji di cibo pertinenti in base alla cucina",
+            "Concentrati su un caloroso benvenuto e la specialità del ristorante",
+            "NON menzionare menu, pulsanti, link o allegati",
+            "Mantieni semplice e amichevole",
+            "IMPORTANTE: Restituisci SOLO il messaggio senza virgolette o spiegazioni"
           ],
-          example: menuType === 'pdf'
-            ? "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha oltre 200 recensioni a cinque stelle! Ho allegato il nostro menu."
-            : "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa ha oltre 200 recensioni a cinque stelle! Il nostro menu è disponibile qui sotto."
+          example: "Ciao {{1}}! Benvenuto da Luigi's 🍝\nLa nostra pasta fatta in casa è amata da centinaia di clienti!"
         },
         fr: {
-          welcomeText: "Analysez ces détails et avis de restaurant pour créer un message d'accueil très concis (max 40 mots) :",
-          context: menuType === 'pdf' 
-            ? "Le menu sera joint en fichier PDF à ce message."
-            : "Le menu sera accessible via un bouton ci-dessous.",
+          welcomeText: "Créez un message d'accueil très bref (max 2-3 lignes, 30 mots max) pour ce restaurant :",
+          context: "Le menu sera géré automatiquement par le système - NE PAS mentionner l'accès au menu, boutons ou pièces jointes.",
           requirements: [
-            "Maximum 40 mots",
-            "Incluez {{1}} comme espace réservé pour le nom du client (IMPORTANT : utilisez exactement {{1}}, pas {customerName} ou autres variations)",
+            "Maximum 30 mots au total",
+            "Maximum 2-3 lignes",
+            "Incluez {{1}} comme espace réservé pour le nom du client (IMPORTANT : utilisez exactement {{1}})",
             "Incluez le nom du restaurant",
-            "Ajoutez des émojis d'aliments pertinents selon la cuisine et les avis",
-            "Soulignez ce que les clients apprécient le plus d'après les avis",
-            "Restez amical et accueillant",
-            "N'incluez PAS d'URL ou d'espaces réservés pour les liens vers le menu",
-            "IMPORTANT : Retournez UNIQUEMENT le message d'accueil sans description, explication ou commentaires. N'incluez pas de guillemets autour du message."
+            "Ajoutez 1-2 émojis d'aliments pertinents selon la cuisine",
+            "Concentrez-vous sur un accueil chaleureux et la spécialité du restaurant",
+            "NE PAS mentionner menu, boutons, liens ou pièces jointes",
+            "Restez simple et amical",
+            "IMPORTANT : Retournez UNIQUEMENT le message sans guillemets ou explications"
           ],
-          example: menuType === 'pdf'
-            ? "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont plus de 200 avis 5 étoiles! J'ai joint notre menu."
-            : "Bonjour {{1}}! Bienvenue chez Luigi's 🍝\nNos pâtes maison ont plus de 200 avis 5 étoiles! Notre menu est disponible ci-dessous."
+          example: "Bonjour {{1}} ! Bienvenue chez Luigi's 🍝\nNos pâtes maison sont adorées par des centaines de clients !"
         },
         de: {
-          welcomeText: "Analysieren Sie diese Restaurantdetails und Bewertungen, um eine sehr prägnante Willkommensnachricht zu erstellen (max. 40 Wörter):",
-          context: menuType === 'pdf' 
-            ? "Das Menü wird dieser Nachricht als PDF-Datei beigefügt."
-            : "Das Menü wird über eine Schaltfläche unter dieser Nachricht zugänglich sein.",
+          welcomeText: "Erstellen Sie eine sehr kurze Willkommensnachricht (max. 2-3 Zeilen, 30 Wörter max) für dieses Restaurant:",
+          context: "Das Menü wird automatisch vom System verwaltet - NICHT Menüzugang, Schaltflächen oder Anhänge erwähnen.",
           requirements: [
-            "Maximal 40 Wörter",
-            "Fügen Sie {{1}} als Platzhalter für den Namen des Kunden ein (WICHTIG: Verwenden Sie genau {{1}}, nicht {customerName} oder andere Variationen)",
+            "Maximal 30 Wörter insgesamt",
+            "Maximal 2-3 Zeilen",
+            "Fügen Sie {{1}} als Platzhalter für den Namen des Kunden ein (WICHTIG: Verwenden Sie genau {{1}})",
             "Nennen Sie den Namen des Restaurants",
-            "Fügen Sie relevante Lebensmittel-Emojis basierend auf Küche und Bewertungen hinzu",
-            "Heben Sie hervor, was Kunden laut Bewertungen am meisten schätzen",
-            "Halten Sie es freundlich und einladend",
-            "Fügen Sie KEINE URLs oder Platzhalter für Menülinks ein",
-            "WICHTIG: Geben Sie NUR die Willkommensnachricht ohne Beschreibung, Erklärung oder Kommentare zurück. Verwenden Sie keine Anführungszeichen um die Nachricht."
+            "Fügen Sie 1-2 relevante Lebensmittel-Emojis basierend auf der Küche hinzu",
+            "Konzentrieren Sie sich auf einen warmen Empfang und die Spezialität des Restaurants",
+            "NICHT Menü, Schaltflächen, Links oder Anhänge erwähnen",
+            "Halten Sie es einfach und freundlich",
+            "WICHTIG: Geben Sie NUR die Nachricht ohne Anführungszeichen oder Erklärungen zurück"
           ],
-          example: menuType === 'pdf'
-            ? "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen! Ich habe unser Menü beigefügt."
-            : "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta hat über 200 Fünf-Sterne-Bewertungen! Unser Menü ist unten verfügbar."
+          example: "Hallo {{1}}! Willkommen bei Luigi's 🍝\nUnsere hausgemachte Pasta wird von Hunderten von Kunden geliebt!"
         },
         es: {
-          welcomeText: "Analiza estos detalles y reseñas del restaurante para crear un mensaje de bienvenida muy conciso (máx. 40 palabras):",
-          context: menuType === 'pdf' 
-            ? "El menú se adjuntará como archivo PDF a este mensaje."
-            : "El menú será accesible mediante un botón debajo de este mensaje.",
+          welcomeText: "Crea un mensaje de bienvenida muy breve (máx. 2-3 líneas, 30 palabras máx.) para este restaurante:",
+          context: "El menú será manejado automáticamente por el sistema - NO mencionar acceso al menú, botones o archivos adjuntos.",
           requirements: [
-            "Máximo 40 palabras",
-            "Incluye {{1}} como marcador de posición para el nombre del cliente (IMPORTANTE: usa exactamente {{1}}, no {customerName} u otras variaciones)",
+            "Máximo 30 palabras en total",
+            "Máximo 2-3 líneas",
+            "Incluye {{1}} como marcador de posición para el nombre del cliente (IMPORTANTE: usa exactamente {{1}})",
             "Incluye el nombre del restaurante",
-            "Agrega emojis de comida relevantes según la cocina y las reseñas",
-            "Destaca lo que más les gusta a los clientes según las reseñas",
-            "Mantenlo amigable y acogedor",
-            "NO incluyas URLs o marcadores de posición para enlaces al menú",
-            "IMPORTANTE: Devuelve SOLO el mensaje de bienvenida sin descripción, explicación o comentarios. No incluyas comillas alrededor del mensaje."
+            "Agrega 1-2 emojis de comida relevantes según la cocina",
+            "Enfócate en una bienvenida cálida y la especialidad del restaurante",
+            "NO mencionar menú, botones, enlaces o archivos adjuntos",
+            "Mantenlo simple y amigable",
+            "IMPORTANTE: Devuelve SOLO el mensaje sin comillas o explicaciones"
           ],
-          example: menuType === 'pdf'
-            ? "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! He adjuntado nuestro menú."
-            : "¡Hola {{1}}! Bienvenido a Luigi's 🍝\nNuestra pasta casera ha recibido más de 200 reseñas de cinco estrellas! Nuestro menú está disponible a continuación."
+          example: "¡Hola {{1}}! Bienvenido a Luigi's 🍝\n¡Nuestra pasta casera es amada por cientos de clientes!"
         }
       };
 
