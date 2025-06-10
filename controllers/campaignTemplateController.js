@@ -1,7 +1,6 @@
 const Restaurant = require('../models/Restaurant');
 const CampaignTemplate = require('../models/CampaignTemplate');
 const BotConfiguration = require('../models/BotConfiguration');
-const whatsappTemplateService = require('../services/whatsappTemplateService');
 const axios = require('axios');
 
 /**
