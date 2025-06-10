@@ -337,6 +337,19 @@ const webhookHandler = async (req, res) => {
               reviewTemplate = reviewTemplates.find(t => t.language === 'it') || reviewTemplates[0];
             }
             
+            // LOG DETTAGLIATO: Mostra quale template di recensione è stato selezionato
+            console.log(`⭐ PROGRAMMAZIONE MESSAGGIO RECENSIONE:`);
+            console.log(`   - Ristorante: ${restaurant.name}`);
+            console.log(`   - Cliente: ${profileName} (${fromNumber})`);
+            console.log(`   - Lingua richiesta: ${language}`);
+            console.log(`   - Template selezionato:`);
+            console.log(`     * Nome: ${reviewTemplate.name}`);
+            console.log(`     * ID: ${reviewTemplate._id}`);
+            console.log(`     * Lingua: ${reviewTemplate.language}`);
+            console.log(`     * Testo template: "${reviewTemplate.components?.body?.text || 'N/A'}"`);
+            console.log(`   - Programmato per: ${scheduledTime.toISOString()}`);
+            console.log(`   - Timer impostato: ${botConfig.reviewTimer} minuti`);
+            
             // Programma il messaggio di recensione con il sistema locale
             // AGGIORNATO: Passa l'oggetto template invece dell'ID Twilio
             const scheduledResult = await messageSchedulerService.scheduleReviewMessage({

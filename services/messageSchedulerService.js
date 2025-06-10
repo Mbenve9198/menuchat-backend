@@ -40,6 +40,16 @@ class MessageSchedulerService {
         const template = messageData.template;
         const restaurant = await Restaurant.findById(messageData.restaurantId);
         
+        // LOG DETTAGLIATO: Template ricevuto
+        console.log(`⭐ PROCESSAMENTO TEMPLATE RECENSIONE (NUOVO SISTEMA):`);
+        console.log(`   - Template Nome: ${template.name}`);
+        console.log(`   - Template ID: ${template._id}`);
+        console.log(`   - Template Lingua: ${template.language}`);
+        console.log(`   - Template Tipo: ${template.type}`);
+        console.log(`   - Ristorante: ${restaurant?.name || 'N/A'}`);
+        console.log(`   - Cliente: ${messageData.customerName || 'Cliente'}`);
+        console.log(`   - Template Body originale: "${template.components?.body?.text || 'N/A'}"`);
+        
         // Converti il template in messaggio normale
         const twilioService = require('./twilioService');
         const convertedMessage = twilioService.convertTemplateToMessage(
@@ -47,6 +57,14 @@ class MessageSchedulerService {
           messageData.customerName || 'Cliente', 
           restaurant
         );
+
+        // LOG DETTAGLIATO: Messaggio convertito
+        console.log(`   - Messaggio convertito:`);
+        console.log(`     "${convertedMessage.messageBody}"`);
+        if (convertedMessage.mediaUrl) {
+          console.log(`   - Media URL: ${convertedMessage.mediaUrl}`);
+        }
+        console.log(`   - Tipo messaggio: ${convertedMessage.messageType}`);
 
         // Programma usando il nuovo sistema
         const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
@@ -61,6 +79,12 @@ class MessageSchedulerService {
         });
 
         console.log(`✅ Messaggio di recensione programmato localmente (ID: ${scheduledMessage._id})`);
+        console.log(`⭐ RIEPILOGO PROGRAMMAZIONE:`);
+        console.log(`   - Scheduled Message ID: ${scheduledMessage._id}`);
+        console.log(`   - Ristorante: ${restaurant?.name}`);
+        console.log(`   - Template: ${template.name} (${template.language})`);
+        console.log(`   - Telefono: ${messageData.phoneNumber}`);
+        console.log(`   - Programmato per: ${messageData.scheduledTime}`);
         
         return {
           success: true,
@@ -71,7 +95,11 @@ class MessageSchedulerService {
       }
       // Fallback al vecchio sistema se non abbiamo template object
       else if (messageData.templateId) {
-      const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
+        console.log(`⭐ PROCESSAMENTO TEMPLATE RECENSIONE (SISTEMA LEGACY):`);
+        console.log(`   - Template ID: ${messageData.templateId}`);
+        console.log(`   - Variabili: ${JSON.stringify(messageData.templateVariables)}`);
+        
+        const scheduledMessage = await ScheduledMessage.scheduleReviewMessage({
           restaurantId: messageData.restaurantId,
           interactionId: messageData.interactionId,
           phoneNumber: messageData.phoneNumber,
@@ -79,16 +107,16 @@ class MessageSchedulerService {
           templateId: messageData.templateId,
           templateVariables: messageData.templateVariables,
           scheduledFor: messageData.scheduledTime
-      });
+        });
 
         console.log(`✅ Messaggio di recensione programmato (legacy system, ID: ${scheduledMessage._id})`);
 
-      return {
-        success: true,
+        return {
+          success: true,
           messageId: scheduledMessage._id,
           scheduledTime: messageData.scheduledTime,
           method: 'local_legacy_system'
-      };
+        };
       } else {
         throw new Error('Nessun template o templateId fornito per il messaggio di recensione');
       }

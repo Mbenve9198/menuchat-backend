@@ -82,50 +82,124 @@ class SchedulerService {
 
           console.log(`📤 Invio messaggio programmato: ${message.messageType} a ${message.phoneNumber}`);
 
-          // Ottieni il template completo dal templateId
-          const WhatsAppTemplate = require('../models/WhatsAppTemplate');
-          const template = await WhatsAppTemplate.findOne({ 
-            twilioTemplateId: message.templateId 
-          });
+          // NUOVO SISTEMA: Se il messaggio ha template ObjectId e messageBody
+          if (message.usesNewSystem()) {
+            console.log(`📤 Usando nuovo sistema per messaggio ${message._id}`);
+            
+            // LOG DETTAGLIATO: Mostra il contenuto del messaggio di recensione
+            if (message.messageType === 'review') {
+              console.log(`⭐ MESSAGGIO RECENSIONE PROGRAMMATO:`);
+              console.log(`   - Ristorante: ${message.restaurant?.name || 'N/A'}`);
+              console.log(`   - Template ID: ${message.template}`);
+              console.log(`   - Telefono: ${message.phoneNumber}`);
+              console.log(`   - Testo messaggio:`);
+              console.log(`     "${message.messageBody}"`);
+              if (message.mediaUrl) {
+                console.log(`   - Media URL: ${message.mediaUrl}`);
+              }
+              console.log(`   - Programmato per: ${message.scheduledTime}`);
+              console.log(`   - Lingua: ${message.language || 'N/A'}`);
+            }
+            
+            // Invia direttamente il messaggio normale (già processato)
+            let result;
+            if (message.mediaUrl) {
+              // Messaggio con media
+              result = await twilioService.sendMediaMessage(
+                message.phoneNumber,
+                message.messageBody,
+                message.mediaUrl,
+                message.restaurant._id
+              );
+            } else {
+              // Messaggio normale
+              result = await twilioService.sendNormalMessage(
+                message.phoneNumber,
+                message.messageBody,
+                message.restaurant._id
+              );
+            }
 
-          if (!template) {
-            console.error(`❌ Template non trovato per ID: ${message.templateId}`);
-            await message.markAsFailed(`Template non trovato: ${message.templateId}`);
+            if (result.success) {
+              await message.markAsSent(result.messageId);
+              console.log(`✅ Messaggio (nuovo sistema) inviato con successo: ${result.messageId}`);
+              
+              // LOG AGGIUNTIVO per messaggi di recensione inviati
+              if (message.messageType === 'review') {
+                console.log(`⭐ RECENSIONE INVIATA CON SUCCESSO:`);
+                console.log(`   - Twilio Message ID: ${result.messageId}`);
+                console.log(`   - Ristorante: ${message.restaurant?.name || 'N/A'}`);
+                console.log(`   - Cliente: ${message.phoneNumber}`);
+              }
+            } else {
+              await message.markAsFailed(result.error);
+              console.error(`❌ Errore invio messaggio (nuovo sistema): ${result.error}`);
+            }
+          }
+          // VECCHIO SISTEMA: Se il messaggio ha templateId
+          else if (message.usesLegacySystem()) {
+            console.log(`📤 Usando sistema legacy per messaggio ${message._id}`);
+            
+            // Ottieni il template completo dal templateId
+            const WhatsAppTemplate = require('../models/WhatsAppTemplate');
+            const template = await WhatsAppTemplate.findOne({ 
+              twilioTemplateId: message.templateId 
+            });
+
+            if (!template) {
+              console.error(`❌ Template non trovato per ID: ${message.templateId}`);
+              await message.markAsFailed(`Template non trovato: ${message.templateId}`);
+              continue;
+            }
+
+            // LOG DETTAGLIATO per sistema legacy
+            if (message.messageType === 'review') {
+              console.log(`⭐ MESSAGGIO RECENSIONE LEGACY:`);
+              console.log(`   - Ristorante: ${message.restaurant?.name || 'N/A'}`);
+              console.log(`   - Template Name: ${template.name}`);
+              console.log(`   - Template ID: ${message.templateId}`);
+              console.log(`   - Telefono: ${message.phoneNumber}`);
+              console.log(`   - Template Body: "${template.components?.body?.text || 'N/A'}"`);
+              console.log(`   - Variabili: ${JSON.stringify(message.templateVariables)}`);
+            }
+
+            // Invia il messaggio tramite il metodo template
+            const result = await twilioService.sendMessageFromTemplate(
+              message.phoneNumber,
+              template,
+              message.templateVariables,
+              message.restaurant._id
+            );
+
+            if (result.success) {
+              await message.markAsSent(result.messageId);
+              console.log(`✅ Messaggio (sistema legacy) inviato con successo: ${result.messageId}`);
+            } else {
+              await message.markAsFailed(result.error);
+              console.error(`❌ Errore invio messaggio (sistema legacy): ${result.error}`);
+            }
+          }
+          else {
+            // Messaggio senza template valido
+            console.error(`❌ Messaggio ${message._id} non ha né template né templateId validi`);
+            await message.markAsFailed('Messaggio senza template valido');
             continue;
           }
 
-          // Invia il messaggio tramite il nuovo metodo (senza scheduling, dato che è già schedulato localmente)
-          const result = await twilioService.sendMessageFromTemplate(
-            message.phoneNumber,
-            template,
-            message.templateVariables,
-            message.restaurant._id
-          );
+          // Aggiorna l'interazione del cliente se presente
+          if (message.customerInteraction) {
+            await CustomerInteraction.findByIdAndUpdate(
+              message.customerInteraction,
+              {
+                lastMessageSent: `Messaggio inviato: ${message.messageType}`,
+                lastTemplateId: message.templateId || (message.template ? message.template.toString() : null)
+              }
+            );
+          }
 
-          if (result.success) {
-            // Marca come inviato
-            await message.markAsSent(result.messageId);
-            console.log(`✅ Messaggio inviato con successo: ${result.messageId}`);
-
-            // Aggiorna l'interazione del cliente se presente
-            if (message.customerInteraction) {
-              await CustomerInteraction.findByIdAndUpdate(
-                message.customerInteraction,
-                {
-                  lastMessageSent: `Messaggio inviato: ${message.messageType}`,
-                  lastTemplateId: message.templateId
-                }
-              );
-            }
-          } else {
-            // Marca come fallito
-            await message.markAsFailed(result.error);
-            console.error(`❌ Errore invio messaggio: ${result.error}`);
-
-            // Se ha raggiunto il massimo numero di tentativi, non ritentare
-            if (message.retryCount >= message.maxRetries) {
-              console.error(`❌ Messaggio ${message._id} ha raggiunto il massimo numero di tentativi`);
-            }
+          // Se ha raggiunto il massimo numero di tentativi, non ritentare
+          if (message.retryCount >= message.maxRetries) {
+            console.error(`❌ Messaggio ${message._id} ha raggiunto il massimo numero di tentativi`);
           }
 
         } catch (error) {
