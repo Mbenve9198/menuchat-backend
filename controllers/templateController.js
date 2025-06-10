@@ -697,6 +697,84 @@ class TemplateController {
       });
     }
   }
+
+  // @desc    Rigenera un messaggio con IA
+  // @route   POST /api/templates/:templateId/regenerate
+  // @access  Private
+  async regenerateMessage(req, res) {
+    try {
+      const { templateId } = req.params;
+      const { restaurantId, language, messageType, menuUrl, menuPdfUrl, reviewLink, reviewPlatform } = req.body;
+
+      // Trova il template
+      const template = await WhatsAppTemplate.findById(templateId);
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          error: 'Template non trovato'
+        });
+      }
+
+      // Trova il ristorante
+      const restaurant = await Restaurant.findById(restaurantId);
+      if (!restaurant) {
+        return res.status(404).json({
+          success: false,
+          error: 'Ristorante non trovato'
+        });
+      }
+
+      let newMessage = '';
+
+      // Rigenera il messaggio in base al tipo
+      if (messageType === 'review') {
+        // Rigenera messaggio di recensione
+        const aiService = require('../services/aiService');
+        newMessage = await aiService.generateReviewMessage({
+          restaurantName: restaurant.name,
+          reviewLink: reviewLink || restaurant.reviewLink,
+          reviewPlatform: reviewPlatform || restaurant.reviewPlatform || 'google',
+          language: language || 'it'
+        });
+      } else if (messageType === 'media' || messageType === 'menu_url') {
+        // Rigenera messaggio di menu
+        const aiService = require('../services/aiService');
+        newMessage = await aiService.generateWelcomeMessage({
+          restaurantName: restaurant.name,
+          restaurantDetails: {
+            cuisineTypes: restaurant.cuisineTypes || [],
+            location: restaurant.address?.formattedAddress || ''
+          },
+          menuType: messageType === 'media' ? 'pdf' : 'url',
+          language: language || 'it'
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Tipo di messaggio non supportato'
+        });
+      }
+
+      // Aggiorna il template con il nuovo messaggio
+      template.components.body.text = newMessage;
+      template.updatedAt = new Date();
+      await template.save();
+
+      res.json({
+        success: true,
+        message: 'Messaggio rigenerato con successo',
+        newMessage: newMessage
+      });
+
+    } catch (error) {
+      console.error('Errore nella rigenerazione del messaggio:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Errore interno del server',
+        details: error.message
+      });
+    }
+  }
 }
 
 module.exports = new TemplateController(); 
