@@ -1,237 +1,19 @@
 const WhatsAppTemplate = require('../models/WhatsAppTemplate');
-const whatsappTemplateService = require('../services/whatsappTemplateService');
 const Restaurant = require('../models/Restaurant');
+const Anthropic = require('@anthropic-ai/sdk');
 
-/**
- * Aggiorna un template in tutte le lingue disponibili
- */
-async function updateTemplatesInAllLanguages(sourceTemplate, newMessage, menuUrl = null, menuPdfUrl = null) {
-  // Estrai le informazioni necessarie dal template sorgente
-  const templateType = sourceTemplate.type;
-  const restaurantId = sourceTemplate.restaurant;
-  const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
-  
-  // Trova tutti i template correlati (stesso tipo e ristorante)
-  const relatedTemplates = await WhatsAppTemplate.find({
-    restaurant: restaurantId,
-    type: templateType,
-    isActive: true,
-    name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
-  });
-  
-  // Se non ci sono template correlati, ritorna un array vuoto
-  if (!relatedTemplates || relatedTemplates.length === 0) {
-    return [];
-  }
-  
-  // Estrai le lingue disponibili
-  const languages = relatedTemplates.map(t => t.language);
-  
-  // Traduci il messaggio in tutte le lingue
-  let translatedMessages;
-  if (templateType === 'REVIEW') {
-    translatedMessages = await whatsappTemplateService.translateReviewMessage(newMessage, languages);
-  } else {
-    translatedMessages = await whatsappTemplateService.translateWelcomeMessage(newMessage, languages);
-  }
-  
-  // Aggiorna i template in tutte le lingue e invia a Twilio
-  const updatedTemplates = [];
-  for (const template of relatedTemplates) {
-    const lang = template.language;
-    if (translatedMessages[lang]) {
-      template.components.body.text = translatedMessages[lang];
-      
-      // Aggiorna l'URL del menu per template CALL_TO_ACTION
-      if (menuUrl && template.type === 'CALL_TO_ACTION') {
-        if (template.components.buttons && template.components.buttons.length > 0) {
-          template.components.buttons[0].url = menuUrl;
-        }
-      }
-      
-      // Aggiorna il PDF del menu per template MEDIA
-      if (menuPdfUrl && template.type === 'MEDIA') {
-        if (!template.components.header) {
-          template.components.header = {};
-        }
-        template.components.header.example = menuPdfUrl;
-      }
-      
-      template.status = 'PENDING';
-      await template.save();
-      
-      // Invia il template aggiornato a Twilio
-      await whatsappTemplateService.submitTemplateToTwilio(template);
-      updatedTemplates.push(template);
-    }
-  }
-  
-  return updatedTemplates;
-}
-
-/**
- * Aggiorna il testo del pulsante in tutte le lingue disponibili
- */
-async function updateButtonTextInAllLanguages(sourceTemplate, newButtonText) {
-  // Estrai le informazioni necessarie dal template sorgente
-  const templateType = sourceTemplate.type;
-  const restaurantId = sourceTemplate.restaurant;
-  const baseName = sourceTemplate.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
-  
-  // Trova tutti i template correlati (stesso tipo e ristorante)
-  const relatedTemplates = await WhatsAppTemplate.find({
-    restaurant: restaurantId,
-    type: templateType,
-    isActive: true,
-    name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
-  });
-  
-  // Se non ci sono template correlati, ritorna un array vuoto
-  if (!relatedTemplates || relatedTemplates.length === 0) {
-    return [];
-  }
-  
-  // Mappa dei testi dei pulsanti in base alla lingua
-  const buttonTexts = {
-    'it': templateType === 'REVIEW' ? 'Lascia Recensione' : 'Menu',
-    'en': templateType === 'REVIEW' ? 'Leave Review' : 'Menu',
-    'es': templateType === 'REVIEW' ? 'Dejar Reseña' : 'Menú',
-    'de': templateType === 'REVIEW' ? 'Bewertung abgeben' : 'Menü',
-    'fr': templateType === 'REVIEW' ? 'Laisser Avis' : 'Menu'
-  };
-  
-  // Se è stato fornito un testo personalizzato, usa quello come predefinito
-  if (newButtonText) {
-    Object.keys(buttonTexts).forEach(lang => {
-      buttonTexts[lang] = newButtonText;
-    });
-  }
-  
-  // Aggiorna i template in tutte le lingue e invia a Twilio
-  const updatedTemplates = [];
-  for (const template of relatedTemplates) {
-    const lang = template.language;
-    if (template.components.buttons && template.components.buttons.length > 0 && buttonTexts[lang]) {
-      template.components.buttons[0].text = buttonTexts[lang];
-      template.status = 'PENDING';
-      await template.save();
-      
-      // Invia il template aggiornato a Twilio
-      await whatsappTemplateService.submitTemplateToTwilio(template);
-      updatedTemplates.push(template);
-    }
-  }
-  
-  return updatedTemplates;
-}
-
-/**
- * Crea un nuovo template per sostituirne uno esistente con un tipo diverso
- */
-async function createConvertedTemplate(sourceTemplate, newType, updatedMessage, menuUrl, menuPdfUrl) {
-  try {
-    // Ottieni i dati dal template sorgente
-    const restaurantId = sourceTemplate.restaurant;
-    const language = sourceTemplate.language;
-    
-    // Ottieni il nome del ristorante per includere nel nome del template
-    const restaurant = await Restaurant.findById(restaurantId);
-    if (!restaurant) {
-      throw new Error('Ristorante non trovato');
-    }
-    
-    // Sanitizza il nome del ristorante per l'uso nel nome del template
-    const sanitizedName = restaurant.name
-      .toLowerCase()
-      .replace(/[']/g, '') // rimuove apostrofi
-      .replace(/[^a-z0-9]/g, '_') // sostituisce caratteri speciali e spazi con underscore
-      .replace(/_+/g, '_') // rimuove underscore multipli
-      .replace(/^_|_$/g, ''); // rimuove underscore iniziali e finali
-    
-    // Determina il tipo di template in un formato leggibile
-    const templateTypeLabel = newType === 'MEDIA' ? 'menu_pdf' : 'menu_url';
-    
-    // Genera un timestamp e un identificatore univoco
-    const timestamp = Date.now();
-    const randomId = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    
-    // Formato: {nome_ristorante}_{tipo_template}_{timestamp}_{id}_{lingua}
-    const newName = `${sanitizedName}_${templateTypeLabel}_${timestamp}_${randomId}_${language}`;
-    
-    // Prepara il nuovo oggetto template
-    const newTemplateData = {
-      restaurant: restaurantId,
-      type: newType,
-      name: newName,
-      language: language,
-      status: 'PENDING',
-      variables: sourceTemplate.variables || [],
-      components: {
-        body: {
-          text: updatedMessage || sourceTemplate.components.body.text
-        }
-      },
-      isActive: true
-    };
-    
-    // Configura i componenti specifici in base al nuovo tipo
-    if (newType === 'MEDIA') {
-      if (!menuPdfUrl) {
-        throw new Error('Menu PDF URL is required for MEDIA template');
-      }
-      
-      newTemplateData.components.header = {
-        type: 'DOCUMENT',
-        format: 'PDF',
-        example: menuPdfUrl
-      };
-    } else if (newType === 'CALL_TO_ACTION') {
-      if (!menuUrl) {
-        throw new Error('Menu URL is required for CALL_TO_ACTION template');
-      }
-      
-      const buttonTexts = {
-        'it': 'Menu',
-        'en': 'Menu',
-        'es': 'Menú',
-        'de': 'Menü',
-        'fr': 'Menu'
-      };
-      
-      newTemplateData.components.buttons = [{
-        type: 'URL',
-        text: buttonTexts[language] || 'Menu',
-        url: menuUrl
-      }];
-    }
-    
-    // Crea il nuovo template nel database
-    const newTemplate = new WhatsAppTemplate(newTemplateData);
-    await newTemplate.save();
-    
-    // Invia il nuovo template a Twilio per approvazione
-    await whatsappTemplateService.submitTemplateToTwilio(newTemplate);
-    
-    // Disattiva il vecchio template
-    sourceTemplate.isActive = false;
-    await sourceTemplate.save();
-    
-    return newTemplate;
-  } catch (error) {
-    console.error('Error creating converted template:', error);
-    throw error;
-  }
-}
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 class TemplateController {
   /**
-   * Ottiene tutti i template di un ristorante
+   * Ottieni tutti i template per un ristorante
    */
   async getTemplates(req, res) {
     try {
-      // Accetta sia path parameter che query parameter
-      const restaurantId = req.params.restaurantId || req.query.restaurantId;
-      
+      const { restaurantId } = req.query;
+
       if (!restaurantId) {
         return res.status(400).json({
           success: false,
@@ -239,20 +21,39 @@ class TemplateController {
         });
       }
 
-      const templates = await WhatsAppTemplate.find({
+      // Se viene richiesto solo reviewSettings
+      if (req.query.reviewSettings === 'true') {
+        const restaurant = await Restaurant.findById(restaurantId);
+        if (!restaurant) {
+          return res.status(404).json({
+            success: false,
+            error: 'Restaurant not found'
+          });
+        }
+
+        return res.json({
+          success: true,
+          reviewSettings: {
+            reviewLink: restaurant.reviewLink || '',
+            reviewPlatform: restaurant.reviewPlatform || 'google'
+          }
+        });
+      }
+
+      const templates = await WhatsAppTemplate.find({ 
         restaurant: restaurantId,
-        isActive: true
-      }).sort('-createdAt');
+        isActive: true 
+      }).sort({ createdAt: -1 });
 
       res.json({
         success: true,
         templates
       });
     } catch (error) {
-      console.error('Error getting templates:', error);
+      console.error('Error fetching templates:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to get templates'
+        error: 'Failed to fetch templates'
       });
     }
   }
@@ -263,9 +64,24 @@ class TemplateController {
   async updateTemplate(req, res) {
     try {
       const { templateId } = req.params;
-      const { message, updateAllLanguages, menuUrl, menuPdfUrl, buttonText } = req.body;
+      const { 
+        messageBody, 
+        messageType, 
+        menuUrl, 
+        mediaUrl, 
+        language,
+        restaurantId,
+        reviewButtonText,
+        updateAllLanguages = false
+      } = req.body;
 
-      // Trova il template esistente
+      if (!templateId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Template ID is required'
+        });
+      }
+
       const template = await WhatsAppTemplate.findById(templateId);
       if (!template) {
         return res.status(404).json({
@@ -274,56 +90,69 @@ class TemplateController {
         });
       }
 
-      if (updateAllLanguages) {
-        // Se richiesto, aggiorna il template in tutte le lingue
-        const updatedTemplates = await updateTemplatesInAllLanguages(template, message, menuUrl, menuPdfUrl);
-        
-        // Se è stato fornito un buttonText, aggiorna anche quello in tutte le lingue
-        if (buttonText && template.type === 'REVIEW') {
-          await updateButtonTextInAllLanguages(template, buttonText);
-        }
-        
-        return res.json({
-          success: true,
-          templates: updatedTemplates
-        });
-      } else {
-        // Aggiorna solo il template specifico
-        template.components.body.text = message;
-        
-        // Gestisci l'aggiornamento dell'URL del menu per template CALL_TO_ACTION
-        if (menuUrl && template.type === 'CALL_TO_ACTION') {
-          if (template.components.buttons && template.components.buttons.length > 0) {
-            template.components.buttons[0].url = menuUrl;
-          }
-        }
-        
-        // Gestisci l'aggiornamento del PDF del menu per template MEDIA
-        if (menuPdfUrl && template.type === 'MEDIA') {
-          if (!template.components.header) {
-            template.components.header = {};
-          }
-          template.components.header.example = menuPdfUrl;
-        }
-        
-        // Gestisci l'aggiornamento del testo del pulsante per template REVIEW
-        if (buttonText && template.type === 'REVIEW') {
-          if (template.components.buttons && template.components.buttons.length > 0) {
-            template.components.buttons[0].text = buttonText;
-          }
-        }
-        
-        template.status = 'PENDING'; // Reset status since we're submitting a new version
-        await template.save();
+      // Aggiorna il messaggio
+      template.components.body.text = messageBody;
 
-        // Invia il template aggiornato a Twilio per approvazione
-        await whatsappTemplateService.submitTemplateToTwilio(template);
-
-        return res.json({
-          success: true,
-          template
-        });
+      // Aggiorna i componenti in base al tipo
+      if (messageType === 'media' && mediaUrl) {
+        template.type = 'MEDIA';
+        template.components.header = {
+          type: 'DOCUMENT',
+          format: 'DOCUMENT',
+          example: mediaUrl
+        };
+        template.components.buttons = [];
+      } else if (messageType === 'menu_url' && menuUrl) {
+        template.type = 'CALL_TO_ACTION';
+        template.components.header = { type: 'NONE' };
+        template.components.buttons = [{
+          type: 'URL',
+          text: 'Menu',
+          url: menuUrl
+        }];
+      } else if (messageType === 'review') {
+        template.type = 'REVIEW';
+        template.components.header = { type: 'NONE' };
+        
+        // Ottieni le impostazioni di recensione dal ristorante
+        const restaurant = await Restaurant.findById(restaurantId);
+        const reviewUrl = restaurant?.reviewLink || '';
+        
+        template.components.buttons = [{
+          type: 'URL',
+          text: reviewButtonText || 'Leave Review',
+          url: reviewUrl
+        }];
       }
+
+      await template.save();
+
+      // Se richiesto, aggiorna tutti i template nelle altre lingue
+      if (updateAllLanguages) {
+        const otherTemplates = await WhatsAppTemplate.find({
+          restaurant: restaurantId,
+          type: template.type,
+          language: { $ne: language },
+          isActive: true
+        });
+
+        for (const otherTemplate of otherTemplates) {
+          // Traduci il messaggio per le altre lingue usando Claude
+          const translatedMessage = await this.translateMessage(messageBody, otherTemplate.language);
+          otherTemplate.components.body.text = translatedMessage;
+          
+          // Copia la stessa struttura
+          otherTemplate.components.header = template.components.header;
+          otherTemplate.components.buttons = template.components.buttons;
+          
+          await otherTemplate.save();
+        }
+      }
+
+      res.json({
+        success: true,
+        template
+      });
     } catch (error) {
       console.error('Error updating template:', error);
       res.status(500).json({
@@ -334,127 +163,51 @@ class TemplateController {
   }
 
   /**
-   * Controlla lo stato di approvazione di un template
-   */
-  async checkTemplateStatus(req, res) {
-    try {
-      const { templateId } = req.params;
-
-      const template = await whatsappTemplateService.checkTemplateStatus(templateId);
-
-      res.json({
-        success: true,
-        template
-      });
-    } catch (error) {
-      console.error('Error checking template status:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to check template status'
-      });
-    }
-  }
-
-  /**
-   * Elimina un template
-   */
-  async deleteTemplate(req, res) {
-    try {
-      const { templateId } = req.params;
-
-      // Soft delete impostando isActive a false
-      const template = await WhatsAppTemplate.findByIdAndUpdate(
-        templateId,
-        { isActive: false },
-        { new: true }
-      );
-
-      if (!template) {
-        return res.status(404).json({
-          success: false,
-          error: 'Template not found'
-        });
-      }
-
-      res.json({
-        success: true,
-        template
-      });
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete template'
-      });
-    }
-  }
-
-  /**
-   * Aggiorna l'URL di recensione e la piattaforma per i template di recensione
+   * Aggiorna le impostazioni di recensione
    */
   async updateReviewSettings(req, res) {
     try {
-      const { restaurantId } = req.params;
-      const { reviewLink, reviewPlatform } = req.body;
+      const { restaurantId, reviewLink, reviewPlatform } = req.body;
 
       if (!restaurantId) {
         return res.status(400).json({
           success: false,
-          error: 'ID ristorante richiesto'
+          error: 'Restaurant ID is required'
         });
       }
 
-      // Valida la piattaforma di recensione
-      const validPlatforms = ['google', 'yelp', 'tripadvisor', 'custom'];
-      if (reviewPlatform && !validPlatforms.includes(reviewPlatform)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Piattaforma di recensione non valida'
-        });
-      }
-
-      // Aggiorna il ristorante con i nuovi dati
-      const restaurant = await Restaurant.findByIdAndUpdate(
-        restaurantId,
-        {
-          customReviewLink: reviewLink,
-          reviewPlatform: reviewPlatform
-        },
-        { new: true }
-      );
-
+      const restaurant = await Restaurant.findById(restaurantId);
       if (!restaurant) {
         return res.status(404).json({
           success: false,
-          error: 'Ristorante non trovato'
+          error: 'Restaurant not found'
         });
       }
 
-      // Trova tutti i template di recensione per questo ristorante
+      restaurant.reviewLink = reviewLink;
+      restaurant.reviewPlatform = reviewPlatform;
+      await restaurant.save();
+
+      // Aggiorna tutti i template di recensione con il nuovo URL
       const reviewTemplates = await WhatsAppTemplate.find({
         restaurant: restaurantId,
         type: 'REVIEW',
         isActive: true
       });
 
-      // Aggiorna l'URL di recensione in tutti i template di recensione
-      if (reviewTemplates.length > 0 && reviewLink) {
-        for (const template of reviewTemplates) {
-          if (template.components.buttons && template.components.buttons.length > 0) {
-            template.components.buttons[0].url = reviewLink;
-            template.status = 'PENDING'; // Reset dello stato visto che è stato modificato
-            await template.save();
-
-            // Invia il template aggiornato a Twilio per approvazione
-            await whatsappTemplateService.submitTemplateToTwilio(template);
-          }
+      let updatedTemplates = 0;
+      for (const template of reviewTemplates) {
+        if (template.components.buttons && template.components.buttons.length > 0) {
+          template.components.buttons[0].url = reviewLink;
+          await template.save();
+          updatedTemplates++;
         }
       }
 
       res.json({
         success: true,
-        restaurant,
-        updatedTemplates: reviewTemplates.length
+        message: 'Review settings updated successfully',
+        updatedTemplates
       });
     } catch (error) {
       console.error('Error updating review settings:', error);
@@ -466,275 +219,41 @@ class TemplateController {
   }
 
   /**
-   * Ottiene le impostazioni di recensione di un ristorante
+   * Rigenera un messaggio usando Claude AI
    */
-  async getReviewSettings(req, res) {
-    try {
-      const { restaurantId } = req.params;
-
-      if (!restaurantId) {
-        return res.status(400).json({
-          success: false,
-          error: 'ID ristorante richiesto'
-        });
-      }
-
-      const restaurant = await Restaurant.findById(restaurantId);
-
-      if (!restaurant) {
-        return res.status(404).json({
-          success: false,
-          error: 'Ristorante non trovato'
-        });
-      }
-
-      res.json({
-        success: true,
-        reviewSettings: {
-          reviewLink: restaurant.customReviewLink,
-          reviewPlatform: restaurant.reviewPlatform
-        }
-      });
-    } catch (error) {
-      console.error('Error getting review settings:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get review settings'
-      });
-    }
-  }
-
-  /**
-   * Aggiorna il testo del pulsante di un template
-   */
-  async updateButtonText(req, res) {
-    try {
-      const { templateId } = req.params;
-      const { buttonText, updateAllLanguages } = req.body;
-
-      if (!buttonText) {
-        return res.status(400).json({
-          success: false,
-          error: 'Il testo del pulsante è richiesto'
-        });
-      }
-
-      // Trova il template esistente
-      const template = await WhatsAppTemplate.findById(templateId);
-      if (!template) {
-        return res.status(404).json({
-          success: false,
-          error: 'Template not found'
-        });
-      }
-
-      // Verifica che il template abbia dei pulsanti
-      if (!template.components.buttons || template.components.buttons.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'Il template non ha pulsanti'
-        });
-      }
-
-      if (updateAllLanguages) {
-        // Se richiesto, aggiorna il testo del pulsante in tutte le lingue
-        const updatedTemplates = await updateButtonTextInAllLanguages(template, buttonText);
-        
-        return res.json({
-          success: true,
-          templates: updatedTemplates
-        });
-      } else {
-        // Aggiorna solo il testo del pulsante specifico
-        template.components.buttons[0].text = buttonText;
-        template.status = 'PENDING'; // Reset status since we're submitting a new version
-        await template.save();
-
-        // Invia il template aggiornato a Twilio per approvazione
-        await whatsappTemplateService.submitTemplateToTwilio(template);
-
-        return res.json({
-          success: true,
-          template
-        });
-      }
-    } catch (error) {
-      console.error('Error updating button text:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update button text'
-      });
-    }
-  }
-
-  /**
-   * Ottiene il testo del pulsante di un template
-   */
-  async getButtonText(req, res) {
-    try {
-      const { templateId } = req.params;
-
-      // Trova il template
-      const template = await WhatsAppTemplate.findById(templateId);
-      if (!template) {
-        return res.status(404).json({
-          success: false,
-          error: 'Template not found'
-        });
-      }
-
-      // Verifica che il template abbia dei pulsanti
-      if (!template.components.buttons || template.components.buttons.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'Il template non ha pulsanti'
-        });
-      }
-
-      res.json({
-        success: true,
-        buttonText: template.components.buttons[0].text
-      });
-    } catch (error) {
-      console.error('Error getting button text:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get button text'
-      });
-    }
-  }
-
-  /**
-   * Converte un template da un tipo all'altro (MEDIA <-> CALL_TO_ACTION)
-   */
-  async convertTemplate(req, res) {
-    try {
-      const { templateId } = req.params;
-      const { message, newType, updateAllLanguages, menuUrl, menuPdfUrl } = req.body;
-
-      // Verifica dati obbligatori
-      if (!newType || !['MEDIA', 'CALL_TO_ACTION'].includes(newType)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Valid new template type is required'
-        });
-      }
-
-      // Trova il template esistente
-      const template = await WhatsAppTemplate.findById(templateId);
-      if (!template) {
-        return res.status(404).json({
-          success: false,
-          error: 'Template not found'
-        });
-      }
-
-      // Verifica che il tipo sia effettivamente diverso
-      if (template.type === newType) {
-        return res.status(400).json({
-          success: false,
-          error: 'New type must be different from current type'
-        });
-      }
-
-      let convertedTemplates = [];
-
-      if (updateAllLanguages) {
-        // Estrai le informazioni necessarie dal template sorgente
-        const templateType = template.type;
-        const restaurantId = template.restaurant;
-        const baseName = template.name.split('_').slice(0, -1).join('_'); // Rimuovi il suffisso lingua
-        
-        // Trova tutti i template correlati (stesso tipo e ristorante)
-        const relatedTemplates = await WhatsAppTemplate.find({
-          restaurant: restaurantId,
-          type: templateType,
-          isActive: true,
-          name: { $regex: new RegExp(`^${baseName}`) } // Cerca template con lo stesso nome base
-        });
-        
-        // Estrai le lingue disponibili
-        const languages = relatedTemplates.map(t => t.language);
-        
-        // Traduci il messaggio in tutte le lingue
-        const translatedMessages = await whatsappTemplateService.translateWelcomeMessage(message, languages);
-        
-        // Crea nuovi template per ogni lingua
-        for (const template of relatedTemplates) {
-          const lang = template.language;
-          if (translatedMessages[lang]) {
-            const convertedTemplate = await createConvertedTemplate(
-              template,
-              newType,
-              translatedMessages[lang],
-              menuUrl,
-              menuPdfUrl
-            );
-            convertedTemplates.push(convertedTemplate);
-          }
-        }
-      } else {
-        // Converti solo il template specifico
-        const convertedTemplate = await createConvertedTemplate(
-          template,
-          newType,
-          message,
-          menuUrl,
-          menuPdfUrl
-        );
-        convertedTemplates.push(convertedTemplate);
-      }
-
-      return res.json({
-        success: true,
-        templates: convertedTemplates
-      });
-    } catch (error) {
-      console.error('Error converting template:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to convert template'
-      });
-    }
-  }
-
-  // @desc    Rigenera un messaggio con IA
-  // @route   POST /api/templates/:templateId/regenerate
-  // @access  Private
   async regenerateMessage(req, res) {
     try {
       const { templateId } = req.params;
-      const { restaurantId, language, messageType, menuUrl, menuPdfUrl, reviewLink, reviewPlatform } = req.body;
+      const { 
+        restaurantId, 
+        language = 'en', 
+        messageType,
+        menuPdfUrl,
+        menuUrl,
+        reviewLink,
+        reviewPlatform
+      } = req.body;
 
-      // Trova il template
       const template = await WhatsAppTemplate.findById(templateId);
       if (!template) {
         return res.status(404).json({
           success: false,
-          error: 'Template non trovato'
+          error: 'Template not found'
         });
       }
 
-      // Trova il ristorante
       const restaurant = await Restaurant.findById(restaurantId);
       if (!restaurant) {
         return res.status(404).json({
           success: false,
-          error: 'Ristorante non trovato'
+          error: 'Restaurant not found'
         });
       }
 
       let newMessage = '';
 
-      // Rigenera il messaggio in base al tipo
       if (messageType === 'review') {
-        // Rigenera messaggio di recensione usando la logica del setupController
-        const Anthropic = require('@anthropic-ai/sdk');
-        const anthropic = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY
-        });
-
-        // Mappatura delle lingue con le istruzioni corrispondenti per recensioni
+        // Rigenera messaggio di recensione
         const languageInstructions = {
           en: {
             welcomeText: "Create an optimized review request message for a restaurant. The message should encourage customers to leave a review by clicking a button that will be shown below the message.",
@@ -836,9 +355,6 @@ ${langInstructions.requirements.map(req => req).join('\n')}
 
 ${language !== 'en' ? `IMPORTANT: The message MUST be in ${language} language.` : ''}
 
-Response format:
-Return ONLY the message text, without quotes or any additional explanation.
-
 Example:
 ${langInstructions.example}`;
 
@@ -859,12 +375,6 @@ ${langInstructions.example}`;
 
       } else if (messageType === 'media' || messageType === 'menu_url') {
         // Rigenera messaggio di menu usando la logica del setupController
-        const Anthropic = require('@anthropic-ai/sdk');
-        const anthropic = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY
-        });
-
-        // Mappatura delle lingue con le istruzioni corrispondenti per messaggi di benvenuto
         const languageInstructions = {
           en: {
             welcomeText: "Create a very brief welcome message (max 2-3 lines, 30 words max) for this restaurant:",
@@ -978,52 +488,53 @@ ${langInstructions.example}`;
           ]
         });
 
-        const fullText = response.content[0].text;
-        let generatedMessage = fullText;
-        
-        if (fullText.includes("\n\n")) {
-          const parts = fullText.split("\n\n");
-          if (parts.length === 2 && 
-              (parts[1].startsWith("This welcome message") || 
-               parts[1].startsWith("I've created") || 
-               parts[1].startsWith("This message"))) {
-            generatedMessage = parts[0];
-          } else {
-            generatedMessage = fullText.replace(/\n\n/g, "\n");
-          }
-        }
-        
-        newMessage = generatedMessage.replace(/^["']|["']$/g, "");
-
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: 'Tipo di messaggio non supportato'
-        });
+        const rawResponse = response.content[0].text;
+        newMessage = rawResponse.trim().replace(/^["']|["']$/g, "");
       }
 
       // Aggiorna il template con il nuovo messaggio
       template.components.body.text = newMessage;
-      template.status = 'PENDING'; // Reset status since we're submitting a new version
-      template.updatedAt = new Date();
       await template.save();
-
-      // Invia il template aggiornato a Twilio per approvazione
-      await whatsappTemplateService.submitTemplateToTwilio(template);
 
       res.json({
         success: true,
-        message: 'Messaggio rigenerato con successo',
-        newMessage: newMessage
+        template,
+        newMessage
       });
-
     } catch (error) {
-      console.error('Errore nella rigenerazione del messaggio:', error);
+      console.error('Error regenerating message:', error);
       res.status(500).json({
         success: false,
-        error: 'Errore interno del server',
-        details: error.message
+        error: 'Failed to regenerate message'
       });
+    }
+  }
+
+  /**
+   * Traduce un messaggio in una lingua specifica
+   */
+  async translateMessage(message, targetLanguage) {
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 200,
+        temperature: 0.3,
+        messages: [
+          {
+            role: "user",
+            content: `Translate this message to ${targetLanguage} language, keeping the same tone and style. Preserve the {{1}} placeholder exactly as is:
+
+"${message}"
+
+Return only the translated message without quotes or explanations.`
+          }
+        ]
+      });
+
+      return response.content[0].text.trim().replace(/^["']|["']$/g, "");
+    } catch (error) {
+      console.error('Error translating message:', error);
+      return message; // Fallback al messaggio originale
     }
   }
 }

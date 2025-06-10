@@ -1,7 +1,6 @@
 const userService = require('../services/userService');
 const restaurantService = require('../services/restaurantService');
 const botConfigurationService = require('../services/botConfigurationService');
-const whatsappTemplateService = require('../services/whatsappTemplateService');
 const Restaurant = require('../models/Restaurant');
 const Anthropic = require('@anthropic-ai/sdk');
 const BotConfiguration = require('../models/BotConfiguration');
@@ -68,93 +67,14 @@ class SetupController {
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
-      let menuTemplate = null;
-      let reviewTemplate = null;
-      let templateError = null;
-
-      try {
-        // Determina il tipo di menu e crea il template appropriato
-        const menuLanguages = formData.menuLanguages || [];
-
-        console.log('Menu languages ricevute:', JSON.stringify(menuLanguages, null, 2));
-
-        // Verifica che ci sia almeno una lingua con un menu
-        const languagesWithMenu = menuLanguages.filter(lang => {
-          const hasUrl = lang.menuUrl && lang.menuUrl.trim() !== '';
-          const hasPdf = lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '';
-          return hasUrl || hasPdf;
-        });
-
-        if (languagesWithMenu.length === 0) {
-          console.error('Nessuna lingua con menu trovata');
-          throw new Error('È necessario configurare almeno un menu (URL o PDF) per una lingua');
-        }
-
-        console.log('Lingue con menu valide:', languagesWithMenu.map(l => 
-          `${l.language.code} - ${l.menuUrl ? 'URL: ' + l.menuUrl : 'PDF: ' + l.menuPdfUrl}`
-        ));
-
-        // Determina il tipo principale di menu (se c'è almeno un PDF, usa 'pdf', altrimenti 'url')
-        const hasAnyPdf = languagesWithMenu.some(lang => lang.menuPdfUrl && lang.menuPdfUrl.trim() !== '');
-        const menuType = hasAnyPdf ? 'pdf' : 'url';
-
-        // Per retrocompatibilità, trova un URL di fallback
-        const fallbackLanguage = languagesWithMenu[0];
-        const fallbackUrl = fallbackLanguage.menuPdfUrl || fallbackLanguage.menuUrl || '';
-
-        console.log('Tipo di menu determinato:', menuType);
-        console.log('URL di fallback:', fallbackUrl);
-
-        // Crea il template del menu passando le lingue specifiche
-        console.log('=== CREAZIONE TEMPLATE MENU ===');
-        menuTemplate = await whatsappTemplateService.createMenuTemplate(
-          restaurant._id,
-          menuType,
-          formData.welcomeMessage,
-          fallbackUrl,
-          menuLanguages // Passa l'array completo delle lingue
-        );
-        console.log('Template menu creato:', menuTemplate ? `ID: ${menuTemplate._id}, Status: ${menuTemplate.status}` : 'FALLITO');
-
-        // Crea il template per le recensioni
-        console.log('=== CREAZIONE TEMPLATE REVIEW ===');
-        console.log('Review message:', formData.reviewTemplate);
-        console.log('Review link:', formData.reviewLink);
-        
-        if (!formData.reviewLink || formData.reviewLink.trim() === '') {
-          console.error('Review link mancante, salto la creazione del template di review');
-          throw new Error('Review link è richiesto per creare il template di recensione');
-        }
-        
-        reviewTemplate = await whatsappTemplateService.createReviewTemplate(
-          restaurant._id,
-          formData.reviewTemplate || "Grazie per aver ordinato da noi! 🌟 La tua opinione è importante - ci piacerebbe sapere cosa ne pensi della tua esperienza.",
-          formData.reviewLink
-        );
-        console.log('Template review creato:', reviewTemplate ? `ID: ${reviewTemplate._id}, Status: ${reviewTemplate.status}` : 'FALLITO');
-
-      } catch (error) {
-        console.error('Errore nella creazione dei template WhatsApp:', error);
-        templateError = error.message;
-      }
-
-      // Ritorna la risposta con i dati dell'utente, del ristorante e dei template
+      // Ritorna la risposta con i dati dell'utente e del ristorante
+      // Non creiamo più template dato che ora generiamo messaggi normali direttamente
       res.status(201).json({
         success: true,
         userId: user._id,
         restaurantId: restaurant._id,
         botConfigId: botConfig._id,
-        templates: {
-          menu: menuTemplate ? {
-            id: menuTemplate._id,
-            status: menuTemplate.status
-          } : null,
-          review: reviewTemplate ? {
-            id: reviewTemplate._id,
-            status: reviewTemplate.status
-          } : null,
-          error: templateError
-        }
+        message: 'Ristorante configurato con successo. I messaggi verranno generati automaticamente.'
       });
 
     } catch (error) {

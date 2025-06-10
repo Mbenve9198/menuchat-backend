@@ -20,15 +20,6 @@ const whatsAppTemplateSchema = new mongoose.Schema({
     required: true,
     default: 'it'
   },
-  status: {
-    type: String,
-    enum: ['PENDING', 'APPROVED', 'REJECTED'],
-    default: 'PENDING'
-  },
-  twilioTemplateId: {
-    type: String,
-    sparse: true // Permette null/undefined ma deve essere unico se presente
-  },
   variables: [{
     index: Number,
     name: String,
@@ -76,9 +67,7 @@ const whatsAppTemplateSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  },
-  lastSubmissionDate: Date,
-  rejectionReason: String
+  }
 });
 
 // Middleware per aggiornare updatedAt
@@ -87,10 +76,8 @@ whatsAppTemplateSchema.pre('save', function(next) {
   next();
 });
 
-// Indici
-whatsAppTemplateSchema.index({ restaurant: 1, type: 1, isActive: 1 });
-whatsAppTemplateSchema.index({ twilioTemplateId: 1 }, { sparse: true });
+// Indici per migliorare le performance
+whatsAppTemplateSchema.index({ restaurant: 1, type: 1, language: 1 });
+whatsAppTemplateSchema.index({ restaurant: 1, isActive: 1 });
 
-const WhatsAppTemplate = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema);
-
-module.exports = WhatsAppTemplate; 
+module.exports = mongoose.model('WhatsAppTemplate', whatsAppTemplateSchema); 
