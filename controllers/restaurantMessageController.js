@@ -1,5 +1,6 @@
 const RestaurantMessage = require('../models/RestaurantMessage');
 const Restaurant = require('../models/Restaurant');
+const BotConfiguration = require('../models/BotConfiguration');
 const Anthropic = require('@anthropic-ai/sdk');
 
 const anthropic = new Anthropic({
@@ -24,6 +25,8 @@ class RestaurantMessageController {
       // Se viene richiesto solo reviewSettings
       if (req.query.reviewSettings === 'true') {
         const restaurant = await Restaurant.findById(restaurantId);
+        const botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+        
         if (!restaurant) {
           return res.status(404).json({
             success: false,
@@ -35,7 +38,8 @@ class RestaurantMessageController {
           success: true,
           reviewSettings: {
             reviewLink: restaurant.reviewLink || '',
-            reviewPlatform: restaurant.reviewPlatform || 'google'
+            reviewPlatform: restaurant.reviewPlatform || 'google',
+            reviewTimer: botConfig?.reviewTimer || 120 // Default 2 ore
           }
         });
       }
@@ -237,7 +241,7 @@ Translated message (${msg.language}):`;
    */
   async updateReviewSettings(req, res) {
     try {
-      const { restaurantId, reviewLink, reviewPlatform } = req.body;
+      const { restaurantId, reviewLink, reviewPlatform, reviewTimer } = req.body;
 
       if (!restaurantId) {
         return res.status(400).json({
@@ -254,25 +258,40 @@ Translated message (${msg.language}):`;
         });
       }
 
-      restaurant.reviewLink = reviewLink;
-      restaurant.reviewPlatform = reviewPlatform;
+      // Aggiorna le impostazioni del ristorante
+      if (reviewLink !== undefined) restaurant.reviewLink = reviewLink;
+      if (reviewPlatform !== undefined) restaurant.reviewPlatform = reviewPlatform;
       await restaurant.save();
 
-      // Aggiorna tutti i messaggi di recensione con il nuovo URL
-      const updatedMessages = await RestaurantMessage.updateMany(
-        {
-          restaurant: restaurantId,
-          messageType: 'review',
-          isActive: true
-        },
-        {
-          $set: {
-            ctaUrl: reviewLink,
-            lastModified: new Date(),
-            modifiedBy: 'user'
-          }
+      // Aggiorna il reviewTimer nella BotConfiguration se fornito
+      if (reviewTimer !== undefined) {
+        let botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+        if (botConfig) {
+          botConfig.reviewTimer = reviewTimer;
+          await botConfig.save();
+        } else {
+          console.warn(`BotConfiguration non trovata per il ristorante ${restaurantId}`);
         }
-      );
+      }
+
+      // Aggiorna tutti i messaggi di recensione con il nuovo URL se fornito
+      let updatedMessages = { modifiedCount: 0 };
+      if (reviewLink !== undefined) {
+        updatedMessages = await RestaurantMessage.updateMany(
+          {
+            restaurant: restaurantId,
+            messageType: 'review',
+            isActive: true
+          },
+          {
+            $set: {
+              ctaUrl: reviewLink,
+              lastModified: new Date(),
+              modifiedBy: 'user'
+            }
+          }
+        );
+      }
 
       res.json({
         success: true,
