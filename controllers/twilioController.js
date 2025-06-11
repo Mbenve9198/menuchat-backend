@@ -153,114 +153,25 @@ const webhookHandler = async (req, res) => {
       
       // FALLBACK AL SISTEMA PRECEDENTE per retrocompatibilità
       console.log('🔄 FALLBACK: Uso sistema template precedente');
+    
+    // Trova i template attivi per il ristorante
+    const templates = await WhatsAppTemplate.find({
+      restaurant: restaurant._id,
+      isActive: true,
+      status: 'APPROVED'
+    });
+    
+    // Cerca i template di benvenuto
+    const welcomeTemplates = templates.filter(t => 
+      (t.type === 'MEDIA' || t.type === 'CALL_TO_ACTION') && 
+      !t.name.includes('review')
+    );
+    
+    if (!welcomeTemplates.length) {
+      console.log('⚠️ Nessun template di benvenuto trovato');
       
-      // Trova i template attivi per il ristorante
-      const templates = await WhatsAppTemplate.find({
-        restaurant: restaurant._id,
-        isActive: true,
-        status: 'APPROVED'
-      });
-      
-      // Cerca i template di benvenuto
-      const welcomeTemplates = templates.filter(t => 
-        (t.type === 'MEDIA' || t.type === 'CALL_TO_ACTION') && 
-        !t.name.includes('review')
-      );
-      
-      if (!welcomeTemplates.length) {
-        console.log('⚠️ Nessun template di benvenuto trovato');
-        
-        // Fallback al comportamento originale
-        const menu = await Menu.findOne({ restaurant: restaurant._id });
-        
-        // Salva l'interazione del cliente
-        const interaction = new CustomerInteraction({
-          restaurant: restaurant._id,
-          customerPhoneNumber: fromNumber,
-          customerPhoneHash: require('crypto').createHash('md5').update(fromNumber).digest('hex'),
-          customerName: profileName,
-          lastMessageReceived: messageBody,
-          lastMessageSent: null,
-          status: 'active',
-          language
-        });
-        
-        await interaction.save();
-        console.log(`Nuova interazione salvata: ${interaction._id}`);
-
-        // Prepara la risposta con il menu
-        let responseMessage = botConfig.welcomeMessage || `Benvenuto a ${restaurant.name}!`;
-        
-        // Sostituisci eventuali segnaposto
-        responseMessage = responseMessage
-          .replace('{{1}}', profileName)
-          .replace('{restaurantName}', restaurant.name);
-        
-        // Aggiungi il menu se disponibile
-        if (menu) {
-          responseMessage += "\n\nEcco il nostro menu:";
-          
-          if (menu.categories && menu.categories.length > 0) {
-            menu.categories.forEach(category => {
-              responseMessage += `\n\n*${category.name}*`;
-              
-              if (category.items && category.items.length > 0) {
-                category.items.forEach(item => {
-                  responseMessage += `\n- ${item.name}: ${item.price}€`;
-                  if (item.description) responseMessage += ` (${item.description})`;
-                });
-              }
-            });
-          } else if (menu.menuUrl) {
-            responseMessage += `\n\nVisita il nostro menu completo qui: ${menu.menuUrl}`;
-          }
-        }
-        
-        // Aggiorna l'interazione con il messaggio inviato
-        interaction.lastMessageSent = responseMessage;
-        await interaction.save();
-
-        // TRACKING: Traccia il messaggio di menu inviato
-        try {
-          const user = await User.findById(restaurant.user);
-          if (user) {
-            // Tracking totale
-            const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
-            tracking.addMessage('menuMessages', 'service');
-            await tracking.save();
-            
-            // Tracking mensile
-            const currentDate = new Date();
-            const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
-              restaurant._id, 
-              user._id, 
-              currentDate.getFullYear(), 
-              currentDate.getMonth() + 1
-            );
-            monthlyTracking.addMessage('menuMessages', 'service');
-            await monthlyTracking.save();
-            
-            console.log('✅ Messaggio menu tracciato (totale e mensile)');
-          }
-        } catch (trackingError) {
-          console.error('❌ Errore nel tracking del messaggio menu:', trackingError);
-        }
-        
-        // Invia la risposta
-        const twiml = new twilio.twiml.MessagingResponse();
-        twiml.message(responseMessage);
-        
-        console.log(`✅ Risposta inviata a ${fromNumber}`);
-        console.log('Contenuto risposta:', responseMessage);
-        console.log('TwiML generato:', twiml.toString());
-        return res.type('text/xml').send(twiml.toString());
-      }
-      
-      // Trova il template nella lingua appropriata o usa il default (italiano)
-      let template = welcomeTemplates.find(t => t.language === language);
-      if (!template) {
-        template = welcomeTemplates.find(t => t.language === 'it') || welcomeTemplates[0];
-      }
+      // Fallback al comportamento originale
+      const menu = await Menu.findOne({ restaurant: restaurant._id });
       
       // Salva l'interazione del cliente
       const interaction = new CustomerInteraction({
@@ -276,23 +187,112 @@ const webhookHandler = async (req, res) => {
       
       await interaction.save();
       console.log(`Nuova interazione salvata: ${interaction._id}`);
+
+      // Prepara la risposta con il menu
+      let responseMessage = botConfig.welcomeMessage || `Benvenuto a ${restaurant.name}!`;
       
-      // NUOVA LOGICA: Usa il nuovo metodo per inviare messaggi normali basati sui template
-      const result = await twilioService.sendMessageFromTemplate(
-        fromNumber,
-        template,  // Passa l'oggetto template completo invece del solo ID
-        {
-          1: profileName  // Sostituisce {{1}} con il nome del cliente
-        },
-        restaurant._id
-      );
+      // Sostituisci eventuali segnaposto
+      responseMessage = responseMessage
+        .replace('{{1}}', profileName)
+        .replace('{restaurantName}', restaurant.name);
       
-      if (result.success) {
-        // Aggiorna l'interazione con il messaggio inviato
+      // Aggiungi il menu se disponibile
+      if (menu) {
+        responseMessage += "\n\nEcco il nostro menu:";
+        
+        if (menu.categories && menu.categories.length > 0) {
+          menu.categories.forEach(category => {
+            responseMessage += `\n\n*${category.name}*`;
+            
+            if (category.items && category.items.length > 0) {
+              category.items.forEach(item => {
+                responseMessage += `\n- ${item.name}: ${item.price}€`;
+                if (item.description) responseMessage += ` (${item.description})`;
+              });
+            }
+          });
+        } else if (menu.menuUrl) {
+          responseMessage += `\n\nVisita il nostro menu completo qui: ${menu.menuUrl}`;
+        }
+      }
+      
+      // Aggiorna l'interazione con il messaggio inviato
+      interaction.lastMessageSent = responseMessage;
+      await interaction.save();
+
+      // TRACKING: Traccia il messaggio di menu inviato
+      try {
+        const user = await User.findById(restaurant.user);
+        if (user) {
+          // Tracking totale
+          const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+          tracking.addMessage('menuMessages', 'service');
+          await tracking.save();
+          
+          // Tracking mensile
+          const currentDate = new Date();
+          const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+            restaurant._id, 
+            user._id, 
+            currentDate.getFullYear(), 
+            currentDate.getMonth() + 1
+          );
+          monthlyTracking.addMessage('menuMessages', 'service');
+          await monthlyTracking.save();
+          
+          console.log('✅ Messaggio menu tracciato (totale e mensile)');
+        }
+      } catch (trackingError) {
+        console.error('❌ Errore nel tracking del messaggio menu:', trackingError);
+      }
+      
+      // Invia la risposta
+      const twiml = new twilio.twiml.MessagingResponse();
+      twiml.message(responseMessage);
+      
+      console.log(`✅ Risposta inviata a ${fromNumber}`);
+      console.log('Contenuto risposta:', responseMessage);
+      console.log('TwiML generato:', twiml.toString());
+      return res.type('text/xml').send(twiml.toString());
+    }
+    
+    // Trova il template nella lingua appropriata o usa il default (italiano)
+    let template = welcomeTemplates.find(t => t.language === language);
+    if (!template) {
+      template = welcomeTemplates.find(t => t.language === 'it') || welcomeTemplates[0];
+    }
+    
+    // Salva l'interazione del cliente
+    const interaction = new CustomerInteraction({
+      restaurant: restaurant._id,
+      customerPhoneNumber: fromNumber,
+      customerPhoneHash: require('crypto').createHash('md5').update(fromNumber).digest('hex'),
+      customerName: profileName,
+      lastMessageReceived: messageBody,
+      lastMessageSent: null,
+      status: 'active',
+      language
+    });
+    
+    await interaction.save();
+    console.log(`Nuova interazione salvata: ${interaction._id}`);
+    
+    // NUOVA LOGICA: Usa il nuovo metodo per inviare messaggi normali basati sui template
+    const result = await twilioService.sendMessageFromTemplate(
+      fromNumber,
+      template,  // Passa l'oggetto template completo invece del solo ID
+      {
+        1: profileName  // Sostituisce {{1}} con il nome del cliente
+      },
+      restaurant._id
+    );
+    
+    if (result.success) {
+      // Aggiorna l'interazione con il messaggio inviato
         interaction.lastMessageSent = result.messageBody;
         
         // Programma automaticamente il messaggio di recensione se configurato
-        if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
+      if (botConfig.reviewTimer && botConfig.reviewTimer > 0) {
           const scheduledTime = new Date(Date.now() + (botConfig.reviewTimer * 60 * 1000));
           
           // Cerca i template di recensione
@@ -401,30 +401,30 @@ const webhookHandler = async (req, res) => {
         // Aggiorna l'interazione con il messaggio inviato
         interaction.lastMessageSent = finalMessage.messageBody;
         await interaction.save();
-        
+
         // TRACKING: Traccia il messaggio di menu inviato
-        try {
-          const user = await User.findById(restaurant.user);
-          if (user) {
-            // Tracking totale
-            const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
+              try {
+                const user = await User.findById(restaurant.user);
+                if (user) {
+                  // Tracking totale
+                  const tracking = await MessageTracking.getOrCreateTracking(restaurant._id, user._id);
             tracking.addMessage('menuMessages', 'service');
-            await tracking.save();
-            
-            // Tracking mensile
-            const currentDate = new Date();
-            const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
-              restaurant._id, 
-              user._id, 
-              currentDate.getFullYear(), 
-              currentDate.getMonth() + 1
-            );
+                  await tracking.save();
+                  
+                  // Tracking mensile
+                  const currentDate = new Date();
+                  const monthlyTracking = await MessageTracking.getOrCreateMonthlyTracking(
+                    restaurant._id, 
+                    user._id, 
+                    currentDate.getFullYear(), 
+                    currentDate.getMonth() + 1
+                  );
             monthlyTracking.addMessage('menuMessages', 'service');
-            await monthlyTracking.save();
-            
+                  await monthlyTracking.save();
+                  
             console.log('✅ Messaggio menu tracciato (totale e mensile)');
-          }
-        } catch (trackingError) {
+                }
+              } catch (trackingError) {
           console.error('❌ Errore nel tracking del messaggio menu:', trackingError);
         }
         
@@ -476,7 +476,7 @@ const webhookHandler = async (req, res) => {
               let reviewTemplate = templates.find(t => t.language === language);
               if (!reviewTemplate) {
                 reviewTemplate = templates.find(t => t.language === 'it') || templates[0];
-              }
+          }
               
               // Programma con il vecchio sistema
               const scheduledResult = await messageSchedulerService.scheduleReviewMessage({
@@ -493,8 +493,8 @@ const webhookHandler = async (req, res) => {
                 console.log(`✅ FALLBACK: Messaggio recensione programmato: ${scheduledResult.messageId}`);
               } else {
                 console.error(`❌ FALLBACK: Errore programmazione recensione: ${scheduledResult.error}`);
-              }
-            }
+        }
+      }
           }
         } else {
           console.log('⏸️ Timer di recensione non configurato o disabilitato');
@@ -504,12 +504,12 @@ const webhookHandler = async (req, res) => {
         console.error(`❌ NUOVO SISTEMA: Errore invio messaggio: ${sendResult.error}`);
         
         // Fallback al metodo tradizionale
-        const twiml = new twilio.twiml.MessagingResponse();
-        twiml.message(`Benvenuto a ${restaurant.name}! Per vedere il nostro menu visita il nostro sito web.`);
-        
-        console.log(`⚠️ Fallback: Risposta TwiML inviata a ${fromNumber}`);
-        return res.type('text/xml').send(twiml.toString());
-      }
+      const twiml = new twilio.twiml.MessagingResponse();
+      twiml.message(`Benvenuto a ${restaurant.name}! Per vedere il nostro menu visita il nostro sito web.`);
+      
+      console.log(`⚠️ Fallback: Risposta TwiML inviata a ${fromNumber}`);
+      return res.type('text/xml').send(twiml.toString());
+    }
     }
     
     console.log(`✅ Webhook elaborato con successo per ${restaurant.name}`);
