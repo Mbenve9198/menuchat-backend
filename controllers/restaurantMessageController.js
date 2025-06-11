@@ -43,47 +43,11 @@ class RestaurantMessageController {
       const messages = await RestaurantMessage.find({ 
         restaurant: restaurantId,
         isActive: true 
-      }).sort({ createdAt: -1 });
-
-      // Popola le informazioni del ristorante
-      const messagesWithRestaurant = await RestaurantMessage.find({ 
-        restaurant: restaurantId,
-        isActive: true 
       }).populate('restaurant', 'name').sort({ createdAt: -1 });
-
-      // Converti i messaggi in formato template per compatibilità frontend
-      const templatesFormat = messagesWithRestaurant.map(message => ({
-        _id: message._id,
-        type: message.messageType === 'menu' 
-          ? (message.mediaUrl ? 'MEDIA' : 'CALL_TO_ACTION')
-          : 'REVIEW',
-        name: message.restaurant?.name || 'Restaurant Message',
-        language: message.language,
-        status: 'APPROVED', // I RestaurantMessage sono sempre approvati
-        restaurant: message.restaurant,
-        components: {
-          body: {
-            text: message.messageBody
-          },
-          buttons: message.ctaUrl ? [{
-            type: 'URL',
-            text: message.ctaText || (message.messageType === 'menu' ? 'Menu' : 'Lascia Recensione'),
-            url: message.ctaUrl
-          }] : [],
-          header: message.mediaUrl ? {
-            type: 'DOCUMENT',
-            format: 'DOCUMENT',
-            example: message.mediaUrl
-          } : { type: 'NONE' }
-        },
-        createdAt: message.createdAt,
-        updatedAt: message.updatedAt
-      }));
 
       res.json({
         success: true,
-        messages: messagesWithRestaurant, // Formato nuovo per fetchTemplates
-        templates: templatesFormat // Formato legacy per compatibilità
+        messages: messages
       });
     } catch (error) {
       console.error('Error fetching restaurant messages:', error);
@@ -154,9 +118,11 @@ class RestaurantMessageController {
             {
               $set: {
                 mediaUrl: mediaUrl,
-                mediaType: 'pdf',
-                ctaUrl: null,
-                ctaText: null
+                mediaType: 'pdf'
+              },
+              $unset: {
+                ctaUrl: "",
+                ctaText: ""
               }
             }
           );
@@ -170,9 +136,11 @@ class RestaurantMessageController {
             {
               $set: {
                 ctaUrl: menuUrl,
-                ctaText: 'Menu',
-                mediaUrl: null,
-                mediaType: null
+                ctaText: 'Menu'
+              },
+              $unset: {
+                mediaUrl: "",
+                mediaType: ""
               }
             }
           );
@@ -187,13 +155,13 @@ class RestaurantMessageController {
         if (messageType === 'media' && mediaUrl) {
           message.mediaUrl = mediaUrl;
           message.mediaType = 'pdf';
-          message.ctaUrl = null;
-          message.ctaText = null;
+          message.ctaUrl = undefined;
+          message.ctaText = undefined;
         } else if ((messageType === 'menu_url' || messageType === 'menu') && menuUrl) {
           message.ctaUrl = menuUrl;
           message.ctaText = 'Menu';
-          message.mediaUrl = null;
-          message.mediaType = null;
+          message.mediaUrl = undefined;
+          message.mediaType = undefined;
         } else if (messageType === 'review') {
           message.ctaText = reviewButtonText || 'Lascia Recensione';
           
