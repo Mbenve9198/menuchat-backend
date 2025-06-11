@@ -131,6 +131,89 @@ class MessageSchedulerService {
   }
 
   /**
+   * Programma un messaggio di recensione usando il nuovo sistema RestaurantMessage
+   * @param {Object} messageData - Dati del messaggio da programmare
+   * @returns {Promise<Object>} - Risultato della programmazione
+   */
+  async scheduleReviewMessageNew(messageData) {
+    try {
+      console.log('📅 NUOVO SISTEMA: Programmazione messaggio di recensione:', {
+        restaurantId: messageData.restaurantId,
+        phoneNumber: messageData.phoneNumber,
+        scheduledTime: messageData.scheduledTime
+      });
+
+      const restaurantMessage = messageData.restaurantMessage;
+      const restaurant = await Restaurant.findById(messageData.restaurantId);
+      
+      // LOG DETTAGLIATO: RestaurantMessage ricevuto
+      console.log(`⭐ PROCESSAMENTO RESTAURANT MESSAGE (NUOVO SISTEMA):`);
+      console.log(`   - Message Type: ${restaurantMessage.messageType}`);
+      console.log(`   - Message ID: ${restaurantMessage._id}`);
+      console.log(`   - Lingua: ${restaurantMessage.language}`);
+      console.log(`   - Ristorante: ${restaurant?.name || 'N/A'}`);
+      console.log(`   - Cliente: ${messageData.customerName || 'Cliente'}`);
+      console.log(`   - Message Body template: "${restaurantMessage.messageBody}"`);
+      if (restaurantMessage.ctaUrl) {
+        console.log(`   - CTA URL: ${restaurantMessage.ctaUrl}`);
+      }
+      
+      // Genera il messaggio finale sostituendo le variabili
+      const finalMessage = restaurantMessage.generateFinalMessage(
+        messageData.customerName || 'Cliente', 
+        restaurant?.name || ''
+      );
+
+      // LOG DETTAGLIATO: Messaggio finale generato
+      console.log(`   - Messaggio finale generato:`);
+      console.log(`     "${finalMessage.messageBody}"`);
+      if (finalMessage.mediaUrl) {
+        console.log(`   - Media URL: ${finalMessage.mediaUrl}`);
+      }
+
+      // Crea il messaggio programmato con il nuovo sistema
+      const scheduledMessage = new ScheduledMessage({
+        restaurant: messageData.restaurantId,
+        customerInteraction: messageData.interactionId,
+        phoneNumber: messageData.phoneNumber,
+        customerName: messageData.customerName || 'Cliente',
+        messageType: 'review',
+        // NUOVO SISTEMA: Salva il messaggio già processato
+        messageBody: finalMessage.messageBody,
+        mediaUrl: finalMessage.mediaUrl,
+        // Mantieni riferimento al RestaurantMessage per retrocompatibilità
+        template: restaurantMessage._id,
+        scheduledFor: messageData.scheduledTime,
+        status: 'pending'
+      });
+
+      await scheduledMessage.save();
+
+      console.log(`✅ NUOVO SISTEMA: Messaggio recensione programmato (ID: ${scheduledMessage._id})`);
+      console.log(`⭐ RIEPILOGO PROGRAMMAZIONE:`);
+      console.log(`   - Scheduled Message ID: ${scheduledMessage._id}`);
+      console.log(`   - Ristorante: ${restaurant?.name}`);
+      console.log(`   - RestaurantMessage: ${restaurantMessage.messageType} (${restaurantMessage.language})`);
+      console.log(`   - Telefono: ${messageData.phoneNumber}`);
+      console.log(`   - Programmato per: ${messageData.scheduledTime}`);
+      
+      return {
+        success: true,
+        messageId: scheduledMessage._id,
+        scheduledTime: messageData.scheduledTime,
+        method: 'new_restaurant_message_system'
+      };
+
+    } catch (error) {
+      console.error('❌ NUOVO SISTEMA: Errore nella programmazione del messaggio di recensione:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Programma un messaggio di campagna
    * @param {Object} data - Dati per la programmazione
    * @returns {Promise<Object>} - Risultato della programmazione

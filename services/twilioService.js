@@ -558,6 +558,38 @@ class TwilioService {
   }
 
   /**
+   * Invia un messaggio (normale o con media) tramite Twilio
+   * Metodo unificato per il nuovo sistema RestaurantMessage
+   * @param {string} phoneNumber - Numero di telefono di destinazione
+   * @param {string} messageBody - Testo del messaggio
+   * @param {string} mediaUrl - URL del media (opzionale)
+   * @param {string} restaurantId - ID del ristorante
+   * @returns {Promise<Object>} - Risultato dell'invio
+   */
+  async sendRegularMessage(phoneNumber, messageBody, mediaUrl, restaurantId) {
+    try {
+      console.log('===== INVIO MESSAGGIO REGOLARE (NUOVO SISTEMA) =====');
+      console.log('Phone Number:', phoneNumber);
+      console.log('Message Body:', messageBody);
+      console.log('Media URL:', mediaUrl || 'Nessun media');
+      
+      // Se c'è un media URL, usa sendMediaMessage, altrimenti sendNormalMessage
+      if (mediaUrl && mediaUrl.trim() !== '') {
+        return await this.sendMediaMessage(phoneNumber, messageBody, mediaUrl, restaurantId);
+      } else {
+        return await this.sendNormalMessage(phoneNumber, messageBody, restaurantId);
+      }
+      
+    } catch (error) {
+      console.error('Errore nell\'invio del messaggio regolare:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Invia un messaggio con media (PDF, immagine, ecc.) tramite Twilio
    * @param {string} phoneNumber - Numero di telefono di destinazione
    * @param {string} messageBody - Testo del messaggio
