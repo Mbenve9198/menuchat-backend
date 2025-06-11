@@ -90,24 +90,63 @@ class RestaurantMessageController {
         });
       }
 
-      // Se updateAllLanguages è true, aggiorna tutti i messaggi dello stesso tipo
+      // Se updateAllLanguages è true, traduci e aggiorna tutti i messaggi dello stesso tipo
       if (updateAllLanguages) {
-        await RestaurantMessage.updateMany(
-          {
-            restaurant: message.restaurant,
-            messageType: message.messageType,
-            isActive: true
-          },
-          {
-            $set: {
-              messageBody: messageBody,
-              lastModified: new Date(),
-              modifiedBy: 'user'
+        // Trova tutti i messaggi dello stesso tipo per questo ristorante
+        const allMessages = await RestaurantMessage.find({
+          restaurant: message.restaurant,
+          messageType: message.messageType,
+          isActive: true
+        });
+
+        // Traduci il messaggio per ogni lingua
+        for (const msg of allMessages) {
+          let translatedMessage = messageBody;
+          
+          // Se la lingua è diversa da quella originale, traduci
+          if (msg.language !== language) {
+            try {
+              const translationPrompt = `Translate the following ${message.messageType === 'review' ? 'review request' : 'restaurant welcome'} message from ${language} to ${msg.language}. 
+              
+Keep the same tone, style, and formatting. Preserve any placeholders like {{1}} exactly as they are.
+Keep emojis and maintain the same message structure.
+
+Original message (${language}):
+${messageBody}
+
+Translate to ${msg.language}:`;
+
+              const response = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 500,
+                temperature: 0.3,
+                messages: [
+                  {
+                    role: "user",
+                    content: translationPrompt
+                  }
+                ]
+              });
+
+              translatedMessage = response.content[0].text.trim();
+            } catch (translationError) {
+              console.error(`Error translating to ${msg.language}:`, translationError);
+              // Se la traduzione fallisce, usa il messaggio originale
+              translatedMessage = messageBody;
             }
           }
-        );
 
-        // Aggiorna anche gli URL/media per tutti
+          // Aggiorna il messaggio con la traduzione
+          await RestaurantMessage.findByIdAndUpdate(msg._id, {
+            $set: {
+              messageBody: translatedMessage,
+              lastModified: new Date(),
+              modifiedBy: 'claude-translation'
+            }
+          });
+        }
+
+        // Aggiorna anche gli URL/media per tutti i messaggi
         if (messageType === 'media' && mediaUrl) {
           await RestaurantMessage.updateMany(
             {
