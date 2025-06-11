@@ -18,7 +18,6 @@ router.patch('/', protect, restaurantMessageController.updateReviewSettings);
 router.get('/legacy', protect, templateController.getTemplates);
 router.put('/legacy/:templateId', protect, templateController.updateTemplate);
 router.post('/legacy/:templateId/regenerate', protect, templateController.regenerateMessage);
-router.get('/legacy/:templateId/status', protect, templateController.checkTemplateStatus);
 router.patch('/legacy', protect, templateController.updateReviewSettings);
 
 module.exports = router;
