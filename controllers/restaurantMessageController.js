@@ -180,7 +180,7 @@ Translated message (${msg.language}):`;
             {
               $set: {
                 ctaUrl: menuUrl,
-                ctaText: 'Menu'
+                ctaText: '🔗 Menu'
               },
               $unset: {
                 mediaUrl: "",
@@ -203,11 +203,11 @@ Translated message (${msg.language}):`;
           message.ctaText = undefined;
         } else if ((messageType === 'menu_url' || messageType === 'menu') && menuUrl) {
           message.ctaUrl = menuUrl;
-          message.ctaText = 'Menu';
+          message.ctaText = '🔗 Menu';
           message.mediaUrl = undefined;
           message.mediaType = undefined;
         } else if (messageType === 'review') {
-          message.ctaText = reviewButtonText || 'Lascia Recensione';
+          message.ctaText = reviewButtonText || '⭐ Lascia una recensione';
           
           // Ottieni le impostazioni di recensione dal ristorante
           const restaurant = await Restaurant.findById(restaurantId || message.restaurant);
