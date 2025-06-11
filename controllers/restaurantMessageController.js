@@ -106,15 +106,20 @@ class RestaurantMessageController {
           // Se la lingua è diversa da quella originale, traduci
           if (msg.language !== language) {
             try {
-              const translationPrompt = `Translate the following ${message.messageType === 'review' ? 'review request' : 'restaurant welcome'} message from ${language} to ${msg.language}. 
-              
-Keep the same tone, style, and formatting. Preserve any placeholders like {{1}} exactly as they are.
-Keep emojis and maintain the same message structure.
+              const translationPrompt = `You are a professional translator. Translate the following ${message.messageType === 'review' ? 'review request' : 'restaurant welcome'} message from ${language} to ${msg.language}. 
+
+IMPORTANT: Return ONLY the translated text, no explanations, no quotes, no additional text.
+
+Rules:
+- Keep the same tone, style, and formatting
+- Preserve any placeholders like {{1}} exactly as they are
+- Keep emojis and maintain the same message structure
+- Return only the translated message text
 
 Original message (${language}):
 ${messageBody}
 
-Translate to ${msg.language}:`;
+Translated message (${msg.language}):`;
 
               const response = await anthropic.messages.create({
                 model: "claude-3-5-sonnet-20241022",
