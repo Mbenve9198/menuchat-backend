@@ -69,6 +69,29 @@ const BotConfigurationSchema = new Schema({
   },
   // Messaggio per la richiesta di recensione
   reviewMessage: String,
+  // Configurazione fasce orarie per l'invio dei messaggi
+  messagingHours: {
+    enabled: {
+      type: Boolean,
+      default: true // Abilitato di default
+    },
+    startHour: {
+      type: Number,
+      min: 0,
+      max: 23,
+      default: 9 // Inizia a inviare dalle 9:00
+    },
+    endHour: {
+      type: Number,
+      min: 0,
+      max: 23,
+      default: 23 // Smette di inviare alle 23:00 (fino alle 23:59)
+    },
+    timezone: {
+      type: String,
+      default: 'Europe/Rome' // Timezone di default per l'Italia
+    }
+  },
   // Configurazione attiva o inattiva
   active: {
     type: Boolean,
@@ -128,6 +151,78 @@ BotConfigurationSchema.methods.getMenuForLanguage = async function(languageCode)
   } catch (error) {
     console.error('Error getting menu for language:', error);
     return null;
+  }
+};
+
+// Metodo per verificare se è possibile inviare messaggi nell'orario corrente
+BotConfigurationSchema.methods.canSendMessageNow = function() {
+  try {
+    // Se le fasce orarie sono disabilitate, può sempre inviare
+    if (!this.messagingHours.enabled) {
+      return { canSend: true, reason: 'Fasce orarie disabilitate' };
+    }
+
+    // Ottieni l'ora corrente nel timezone del ristorante
+    const now = new Date();
+    const timezone = this.messagingHours.timezone || 'Europe/Rome';
+    
+    // Converti l'ora corrente nel timezone del ristorante
+    const currentHour = new Date(now.toLocaleString("en-US", { timeZone: timezone })).getHours();
+    
+    const startHour = this.messagingHours.startHour;
+    const endHour = this.messagingHours.endHour;
+    
+    // Verifica se l'ora corrente è nell'intervallo consentito
+    let canSend = false;
+    
+    if (startHour <= endHour) {
+      // Caso normale: es. dalle 9 alle 23
+      canSend = currentHour >= startHour && currentHour <= endHour;
+    } else {
+      // Caso che attraversa la mezzanotte: es. dalle 23 alle 9 (del giorno dopo)
+      canSend = currentHour >= startHour || currentHour <= endHour;
+    }
+    
+    if (canSend) {
+      return { 
+        canSend: true, 
+        reason: `Orario consentito (${currentHour}:xx, fascia ${startHour}:00-${endHour}:59)` 
+      };
+    } else {
+      return { 
+        canSend: false, 
+        reason: `Orario non consentito (${currentHour}:xx, fascia consentita ${startHour}:00-${endHour}:59)`,
+        nextAllowedTime: this.getNextAllowedTime()
+      };
+    }
+  } catch (error) {
+    console.error('Error checking messaging hours:', error);
+    // In caso di errore, permetti l'invio per sicurezza
+    return { canSend: true, reason: 'Errore nel controllo fasce orarie, invio consentito' };
+  }
+};
+
+// Metodo per calcolare il prossimo orario consentito per l'invio
+BotConfigurationSchema.methods.getNextAllowedTime = function() {
+  try {
+    const now = new Date();
+    const timezone = this.messagingHours.timezone || 'Europe/Rome';
+    const startHour = this.messagingHours.startHour;
+    
+    // Crea una data per l'inizio della fascia oraria di oggi
+    const todayStart = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+    todayStart.setHours(startHour, 0, 0, 0);
+    
+    // Se l'orario di inizio di oggi è già passato, usa quello di domani
+    if (todayStart <= now) {
+      todayStart.setDate(todayStart.getDate() + 1);
+    }
+    
+    return todayStart;
+  } catch (error) {
+    console.error('Error calculating next allowed time:', error);
+    // Ritorna un'ora nel futuro come fallback
+    return new Date(Date.now() + 60 * 60 * 1000);
   }
 };
 

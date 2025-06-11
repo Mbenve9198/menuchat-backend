@@ -80,6 +80,36 @@ class SchedulerService {
             continue;
           }
 
+          // Popola il ristorante se non è già popolato
+          if (!message.populated('restaurant')) {
+            await message.populate('restaurant');
+          }
+
+          // Verifica le fasce orarie per questo ristorante
+          const BotConfiguration = require('../models/BotConfiguration');
+          const botConfig = await BotConfiguration.findOne({ restaurant: message.restaurant._id });
+          
+          if (botConfig) {
+            const timeCheck = botConfig.canSendMessageNow();
+            
+            if (!timeCheck.canSend) {
+              console.log(`⏰ Messaggio ${message._id} rimandato: ${timeCheck.reason}`);
+              
+              // Riprogramma il messaggio per il prossimo orario consentito
+              if (timeCheck.nextAllowedTime) {
+                message.scheduledFor = timeCheck.nextAllowedTime;
+                await message.save();
+                console.log(`⏰ Messaggio riprogrammato per: ${timeCheck.nextAllowedTime.toISOString()}`);
+              }
+              
+              continue; // Salta questo messaggio per ora
+            } else {
+              console.log(`✅ Controllo fasce orarie OK: ${timeCheck.reason}`);
+            }
+          } else {
+            console.log(`⚠️ Configurazione bot non trovata per ristorante ${message.restaurant._id}, invio comunque il messaggio`);
+          }
+
           console.log(`📤 Invio messaggio programmato: ${message.messageType} a ${message.phoneNumber}`);
 
           // NUOVO SISTEMA: Se il messaggio ha template ObjectId e messageBody

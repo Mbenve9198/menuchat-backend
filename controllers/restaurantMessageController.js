@@ -39,7 +39,13 @@ class RestaurantMessageController {
           reviewSettings: {
             reviewLink: restaurant.reviewLink || '',
             reviewPlatform: restaurant.reviewPlatform || 'google',
-            reviewTimer: botConfig?.reviewTimer || 120 // Default 2 ore
+            reviewTimer: botConfig?.reviewTimer || 120, // Default 2 ore
+            messagingHours: {
+              enabled: botConfig?.messagingHours?.enabled ?? true,
+              startHour: botConfig?.messagingHours?.startHour ?? 9,
+              endHour: botConfig?.messagingHours?.endHour ?? 23,
+              timezone: botConfig?.messagingHours?.timezone || 'Europe/Rome'
+            }
           }
         });
       }
@@ -241,7 +247,13 @@ Translated message (${msg.language}):`;
    */
   async updateReviewSettings(req, res) {
     try {
-      const { restaurantId, reviewLink, reviewPlatform, reviewTimer } = req.body;
+      const { 
+        restaurantId, 
+        reviewLink, 
+        reviewPlatform, 
+        reviewTimer,
+        messagingHours
+      } = req.body;
 
       if (!restaurantId) {
         return res.status(400).json({
@@ -263,15 +275,38 @@ Translated message (${msg.language}):`;
       if (reviewPlatform !== undefined) restaurant.reviewPlatform = reviewPlatform;
       await restaurant.save();
 
-      // Aggiorna il reviewTimer nella BotConfiguration se fornito
-      if (reviewTimer !== undefined) {
-        let botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
-        if (botConfig) {
+      // Aggiorna il reviewTimer e le fasce orarie nella BotConfiguration
+      let botConfig = await BotConfiguration.findOne({ restaurant: restaurantId });
+      
+      if (botConfig) {
+        // Aggiorna reviewTimer se fornito
+        if (reviewTimer !== undefined) {
           botConfig.reviewTimer = reviewTimer;
-          await botConfig.save();
-        } else {
-          console.warn(`BotConfiguration non trovata per il ristorante ${restaurantId}`);
         }
+        
+        // Aggiorna le fasce orarie se fornite
+        if (messagingHours !== undefined) {
+          if (!botConfig.messagingHours) {
+            botConfig.messagingHours = {};
+          }
+          
+          if (messagingHours.enabled !== undefined) {
+            botConfig.messagingHours.enabled = messagingHours.enabled;
+          }
+          if (messagingHours.startHour !== undefined) {
+            botConfig.messagingHours.startHour = Math.max(0, Math.min(23, messagingHours.startHour));
+          }
+          if (messagingHours.endHour !== undefined) {
+            botConfig.messagingHours.endHour = Math.max(0, Math.min(23, messagingHours.endHour));
+          }
+          if (messagingHours.timezone !== undefined) {
+            botConfig.messagingHours.timezone = messagingHours.timezone;
+          }
+        }
+        
+        await botConfig.save();
+      } else {
+        console.warn(`BotConfiguration non trovata per il ristorante ${restaurantId}`);
       }
 
       // Aggiorna tutti i messaggi di recensione con il nuovo URL se fornito
