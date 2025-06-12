@@ -159,9 +159,10 @@ class MessageSchedulerService {
       }
       
       // Genera il messaggio finale sostituendo le variabili
-      const finalMessage = restaurantMessage.generateFinalMessage(
+      const finalMessage = await restaurantMessage.generateFinalMessage(
         messageData.customerName || 'Cliente', 
-        restaurant?.name || ''
+        restaurant?.name || '',
+        messageData.phoneNumber
       );
 
       // LOG DETTAGLIATO: Messaggio finale generato

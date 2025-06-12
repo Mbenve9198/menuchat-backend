@@ -110,7 +110,7 @@ RestaurantMessageSchema.index(
 RestaurantMessageSchema.index({ restaurant: 1, messageType: 1, isActive: 1 });
 
 // Metodo per ottenere il messaggio finale sostituendo le variabili
-RestaurantMessageSchema.methods.generateFinalMessage = function(customerName = 'Cliente', restaurantName = '') {
+RestaurantMessageSchema.methods.generateFinalMessage = async function(customerName = 'Cliente', restaurantName = '', customerPhone = null) {
   let finalMessage = this.messageBody;
   
   // Sostituisci le variabili
@@ -119,7 +119,47 @@ RestaurantMessageSchema.methods.generateFinalMessage = function(customerName = '
   
   // Aggiungi la CTA se presente
   if (this.ctaUrl) {
-    finalMessage += `\n\n${this.ctaText}: ${this.ctaUrl}`;
+    let finalCtaUrl = this.ctaUrl;
+    
+    // 🚀 INTEGRAZIONE OPT-IN MARKETING
+    // Se è un messaggio menu con URL esterno, controlla se l'opt-in è abilitato
+    if (this.messageType === 'menu' && !this.mediaUrl) {
+      try {
+        // Popola il ristorante se non è già popolato
+        const Restaurant = require('./Restaurant');
+        let restaurant;
+        
+        if (this.restaurant && typeof this.restaurant === 'object' && this.restaurant.marketingOptinConfig) {
+          restaurant = this.restaurant;
+        } else {
+          restaurant = await Restaurant.findById(this.restaurant);
+        }
+        
+        // Se l'opt-in è abilitato, crea URL di redirect
+        if (restaurant && restaurant.marketingOptinConfig && restaurant.marketingOptinConfig.enabled) {
+          const baseUrl = process.env.FRONTEND_URL || 'https://menuchat.it';
+          const optinParams = new URLSearchParams({
+            menuUrl: this.ctaUrl,
+            lang: this.language
+          });
+          
+          // Aggiungi il numero di telefono se disponibile (per tracking)
+          if (customerPhone) {
+            optinParams.append('phone', customerPhone);
+          }
+          
+          finalCtaUrl = `${baseUrl}/optin/${restaurant._id}?${optinParams.toString()}`;
+          
+          console.log(`🎯 OPT-IN ATTIVO: URL originale ${this.ctaUrl} → URL opt-in ${finalCtaUrl}`);
+        }
+      } catch (error) {
+        console.error('Errore nel controllo opt-in marketing:', error);
+        // In caso di errore, usa l'URL originale
+        finalCtaUrl = this.ctaUrl;
+      }
+    }
+    
+    finalMessage += `\n\n${this.ctaText}: ${finalCtaUrl}`;
   }
   
   return {

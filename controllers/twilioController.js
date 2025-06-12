@@ -379,7 +379,7 @@ const webhookHandler = async (req, res) => {
       console.log(`Nuova interazione salvata: ${interaction._id}`);
       
       // Genera il messaggio finale sostituendo le variabili
-      const finalMessage = menuMessage.generateFinalMessage(profileName, restaurant.name);
+      const finalMessage = await menuMessage.generateFinalMessage(profileName, restaurant.name, fromNumber);
       
       console.log(`📧 MESSAGGIO FINALE GENERATO:`);
       console.log(`   - Testo: "${finalMessage.messageBody}"`);
