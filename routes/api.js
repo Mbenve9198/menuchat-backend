@@ -9,6 +9,18 @@ const menuService = require('../services/menuService');
 const googlePlacesService = require('../services/googlePlacesService');
 const Restaurant = require('../models/Restaurant');
 
+// Import routes
+const authRoutes = require('./auth');
+const templateRoutes = require('./templateRoutes');
+const whatsappRoutes = require('./whatsapp');
+const twilioRoutes = require('./twilio');
+const contactRoutes = require('./contacts');
+const campaignRoutes = require('./campaignRoutes');
+const aiRoutes = require('./ai');
+const integrationRoutes = require('./integrations');
+const restaurantRoutes = require('./restaurants');
+const marketingOptinRoutes = require('./marketingOptin');
+
 // Rotte per il setup del ristorante
 router.post('/restaurants', setupController.setupRestaurant);
 router.get('/restaurants/:id', restaurantController.getRestaurantById);
@@ -221,12 +233,15 @@ router.post('/check-email', async (req, res) => {
 // Endpoint per verificare la disponibilità di una trigger phrase
 
 // Route per i template
-router.use('/templates', require('./templateRoutes'));
+router.use('/templates', templateRoutes);
 
 // NUOVO: Route per l'opt-in marketing
-router.use('/marketing-optin', require('./marketingOptin'));
+router.use('/marketing-optin', marketingOptinRoutes);
 
 // Route per le campagne WhatsApp
-router.use('/whatsapp-campaigns', require('./campaignRoutes'));
+router.use('/whatsapp-campaigns', campaignRoutes);
+
+// Restaurant routes (some public)
+router.use('/restaurants', restaurantRoutes);
 
 module.exports = router; 

@@ -34,11 +34,34 @@ router.get('/', protect, async (req, res) => {
       enabled: restaurant.marketingOptinConfig?.enabled || false,
       messages: restaurant.marketingOptinConfig?.messages || new Map([
         ['it', {
-          title: "🍽️ Resta aggiornato!",
-          message: "Vuoi ricevere le nostre offerte esclusive e novità del menu direttamente su WhatsApp? Solo roba d'oro, promesso! 🌟",
-          checkboxText: "Sì, voglio ricevere offerte esclusive",
-          continueButton: "Continua al Menu",
-          skipButton: "Salta"
+          title: "🍽️ Prima di accedere al menu...",
+          message: "Ciao {customerName}! Prima di mostrarti il nostro delizioso menu, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
+          acceptButton: "Accetta e Continua",
+          skipButton: "Continua senza accettare"
+        }],
+        ['en', {
+          title: "🍽️ Before accessing the menu...",
+          message: "Hi {customerName}! Before showing you our delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
+          acceptButton: "Accept and Continue",
+          skipButton: "Continue without accepting"
+        }],
+        ['es', {
+          title: "🍽️ Antes de acceder al menú...",
+          message: "¡Hola {customerName}! Antes de mostrarte nuestro delicioso menú, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
+          acceptButton: "Aceptar y Continuar",
+          skipButton: "Continuar sin aceptar"
+        }],
+        ['fr', {
+          title: "🍽️ Avant d'accéder au menu...",
+          message: "Salut {customerName}! Avant de te montrer notre délicieux menu, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
+          acceptButton: "Accepter et Continuer",
+          skipButton: "Continuer sans accepter"
+        }],
+        ['de', {
+          title: "🍽️ Bevor Sie das Menü sehen...",
+          message: "Hallo {customerName}! Bevor wir Ihnen unser köstliches Menü zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
+          acceptButton: "Akzeptieren und Weiter",
+          skipButton: "Ohne Akzeptieren fortfahren"
         }]
       ]),
       stats: restaurant.marketingOptinConfig?.stats || {
@@ -133,68 +156,83 @@ router.post('/generate', protect, async (req, res) => {
     // Definisci le istruzioni per lingua
     const languageInstructions = {
       it: {
-        systemPrompt: "Sei un esperto di marketing per ristoranti. Crea un messaggio di opt-in marketing accattivante per WhatsApp.",
+        systemPrompt: "Sei un esperto di marketing per ristoranti. Crea un messaggio di opt-in marketing per WhatsApp che viene mostrato PRIMA che l'utente veda il menu del ristorante.",
         requirements: [
-          "Crea un titolo breve e accattivante (max 30 caratteri) con emoji",
-          "Scrivi un messaggio principale coinvolgente (max 120 caratteri)",
-          "Il messaggio deve essere amichevole e non invadente",
+          "Crea un titolo che chiarisca che è uno step prima di accedere al menu (max 40 caratteri) con emoji",
+          "Il messaggio deve iniziare riferendosi al fatto che è prima di mostrare il menu",
+          "Includi la personalizzazione con {customerName} nel messaggio",
+          "Scrivi un messaggio principale coinvolgente (max 150 caratteri)",
+          "Il messaggio deve essere amichevole e spiegare che dopo potrà comunque vedere il menu",
+          "Menziona che potrà revocare il consenso tramite 'Unsubscribe' nei messaggi futuri",
           "Usa emoji appropriati ma senza esagerare (max 2-3)",
-          "Concentrati sui benefici per il cliente",
+          "Concentrati sui benefici per il cliente (offerte esclusive, novità, etc.)",
           "Evita linguaggio troppo commerciale o aggressivo",
-          "Il testo del checkbox deve essere breve e chiaro",
-          "I pulsanti devono essere semplici e diretti"
+          "Il pulsante di accettazione deve essere invitante e rassicurante",
+          "Il pulsante di rifiuto deve essere neutro (es: 'Continua senza accettare')"
         ]
       },
       en: {
-        systemPrompt: "You are a restaurant marketing expert. Create an engaging marketing opt-in message for WhatsApp.",
+        systemPrompt: "You are a restaurant marketing expert. Create a marketing opt-in message for WhatsApp that is shown BEFORE the user sees the restaurant menu.",
         requirements: [
-          "Create a short and catchy title (max 30 characters) with emoji",
-          "Write an engaging main message (max 120 characters)",
-          "The message should be friendly and non-intrusive",
+          "Create a title that clarifies this is a step before accessing the menu (max 40 characters) with emoji",
+          "The message should start by referring to the fact that it's before showing the menu",
+          "Include personalization with {customerName} in the message",
+          "Write an engaging main message (max 150 characters)",
+          "The message should be friendly and explain they can see the menu anyway",
+          "Mention they can revoke consent via 'Unsubscribe' in future messages",
           "Use appropriate emojis but don't overdo it (max 2-3)",
-          "Focus on customer benefits",
+          "Focus on customer benefits (exclusive offers, news, etc.)",
           "Avoid overly commercial or aggressive language",
-          "Checkbox text should be short and clear",
-          "Buttons should be simple and direct"
+          "The accept button should be inviting and reassuring",
+          "The decline button should be neutral (e.g., 'Continue without accepting')"
         ]
       },
       es: {
-        systemPrompt: "Eres un experto en marketing para restaurantes. Crea un mensaje de opt-in marketing atractivo para WhatsApp.",
+        systemPrompt: "Eres un experto en marketing para restaurantes. Crea un mensaje de opt-in marketing para WhatsApp que se muestra ANTES de que el usuario vea el menú del restaurante.",
         requirements: [
-          "Crea un título corto y atractivo (máx 30 caracteres) con emoji",
-          "Escribe un mensaje principal atractivo (máx 120 caracteres)",
-          "El mensaje debe ser amigable y no intrusivo",
+          "Crea un título que aclare que es un paso antes de acceder al menú (máx 40 caracteres) con emoji",
+          "El mensaje debe comenzar refiriéndose al hecho de que es antes de mostrar el menú",
+          "Incluye personalización con {customerName} en el mensaje",
+          "Escribe un mensaje principal atractivo (máx 150 caracteres)",
+          "El mensaje debe ser amigable y explicar que después podrá ver el menú de todos modos",
+          "Menciona que podrá revocar el consentimiento vía 'Unsubscribe' en mensajes futuros",
           "Usa emojis apropiados pero sin exagerar (máx 2-3)",
-          "Enfócate en los beneficios para el cliente",
+          "Enfócate en los beneficios para el cliente (ofertas exclusivas, novedades, etc.)",
           "Evita lenguaje demasiado comercial o agresivo",
-          "El texto del checkbox debe ser corto y claro",
-          "Los botones deben ser simples y directos"
+          "El botón de aceptar debe ser atractivo y tranquilizador",
+          "El botón de rechazo debe ser neutral (ej: 'Continuar sin aceptar')"
         ]
       },
       fr: {
-        systemPrompt: "Vous êtes un expert en marketing pour restaurants. Créez un message d'opt-in marketing engageant pour WhatsApp.",
+        systemPrompt: "Vous êtes un expert en marketing pour restaurants. Créez un message d'opt-in marketing pour WhatsApp qui est affiché AVANT que l'utilisateur voie le menu du restaurant.",
         requirements: [
-          "Créez un titre court et accrocheur (max 30 caractères) avec emoji",
-          "Rédigez un message principal engageant (max 120 caractères)",
-          "Le message doit être amical et non intrusif",
+          "Créez un titre qui clarifie que c'est une étape avant d'accéder au menu (max 40 caractères) avec emoji",
+          "Le message doit commencer en se référant au fait que c'est avant de montrer le menu",
+          "Incluez la personnalisation avec {customerName} dans le message",
+          "Rédigez un message principal engageant (max 150 caractères)",
+          "Le message doit être amical et expliquer qu'ils pourront voir le menu de toute façon",
+          "Mentionnez qu'ils peuvent révoquer le consentement via 'Unsubscribe' dans les messages futurs",
           "Utilisez des emojis appropriés sans exagérer (max 2-3)",
-          "Concentrez-vous sur les avantages pour le client",
+          "Concentrez-vous sur les avantages pour le client (offres exclusives, nouveautés, etc.)",
           "Évitez un langage trop commercial ou agressif",
-          "Le texte de la case à cocher doit être court et clair",
-          "Les boutons doivent être simples et directs"
+          "Le bouton d'acceptation doit être attrayant et rassurant",
+          "Le bouton de refus doit être neutre (ex: 'Continuer sans accepter')"
         ]
       },
       de: {
-        systemPrompt: "Sie sind ein Restaurant-Marketing-Experte. Erstellen Sie eine ansprechende Marketing-Opt-in-Nachricht für WhatsApp.",
+        systemPrompt: "Sie sind ein Restaurant-Marketing-Experte. Erstellen Sie eine Marketing-Opt-in-Nachricht für WhatsApp, die gezeigt wird, BEVOR der Benutzer das Restaurantmenü sieht.",
         requirements: [
-          "Erstellen Sie einen kurzen und eingängigen Titel (max 30 Zeichen) mit Emoji",
-          "Schreiben Sie eine ansprechende Hauptnachricht (max 120 Zeichen)",
-          "Die Nachricht sollte freundlich und nicht aufdringlich sein",
+          "Erstellen Sie einen Titel, der klar macht, dass dies ein Schritt vor dem Zugriff auf das Menü ist (max 40 Zeichen) mit Emoji",
+          "Die Nachricht sollte damit beginnen, sich darauf zu beziehen, dass es vor dem Zeigen des Menüs ist",
+          "Fügen Sie Personalisierung mit {customerName} in die Nachricht ein",
+          "Schreiben Sie eine ansprechende Hauptnachricht (max 150 Zeichen)",
+          "Die Nachricht sollte freundlich sein und erklären, dass sie das Menü trotzdem sehen können",
+          "Erwähnen Sie, dass sie die Einwilligung über 'Unsubscribe' in zukünftigen Nachrichten widerrufen können",
           "Verwenden Sie angemessene Emojis, aber übertreiben Sie nicht (max 2-3)",
-          "Konzentrieren Sie sich auf Kundenvorteile",
+          "Konzentrieren Sie sich auf Kundenvorteile (exklusive Angebote, Neuigkeiten, etc.)",
           "Vermeiden Sie zu kommerzielle oder aggressive Sprache",
-          "Der Checkbox-Text sollte kurz und klar sein",
-          "Die Schaltflächen sollten einfach und direkt sein"
+          "Der Akzeptieren-Button sollte einladend und beruhigend sein",
+          "Der Ablehnungsbutton sollte neutral sein (z.B. 'Ohne Akzeptieren fortfahren')"
         ]
       }
     };
@@ -216,10 +254,9 @@ ${langInstructions.requirements.map(req => `- ${req}`).join('\n')}
 IMPORTANTE: Rispondi SOLO con un oggetto JSON nel seguente formato (senza spiegazioni aggiuntive):
 {
   "title": "Titolo con emoji",
-  "message": "Messaggio principale coinvolgente",
-  "checkboxText": "Testo per il checkbox",
-  "continueButton": "Testo pulsante continua",
-  "skipButton": "Testo pulsante salta"
+  "message": "Messaggio principale coinvolgente con {customerName}",
+  "acceptButton": "Testo pulsante accetta",
+  "skipButton": "Testo pulsante rifiuta"
 }
 
 ${language !== 'en' ? `IMPORTANTE: Tutto il contenuto DEVE essere in lingua ${language}.` : ''}`;
@@ -245,8 +282,8 @@ ${language !== 'en' ? `IMPORTANTE: Tutto il contenuto DEVE essere in lingua ${la
       const generatedMessage = JSON.parse(generatedContent);
       
       // Validazione dei campi richiesti
-      if (!generatedMessage.title || !generatedMessage.message || !generatedMessage.checkboxText || 
-          !generatedMessage.continueButton || !generatedMessage.skipButton) {
+      if (!generatedMessage.title || !generatedMessage.message || !generatedMessage.acceptButton || 
+          !generatedMessage.skipButton) {
         throw new Error('Campi mancanti nella risposta AI');
       }
 
@@ -261,15 +298,12 @@ ${language !== 'en' ? `IMPORTANTE: Tutto il contenuto DEVE essere in lingua ${la
       
       // Fallback con messaggio di default
       const fallbackMessage = {
-        title: language === 'it' ? "🍽️ Offerte Esclusive!" : "🍽️ Exclusive Offers!",
+        title: language === 'it' ? "🍽️ Prima di accedere al menu..." : "🍽️ Before accessing the menu...",
         message: language === 'it' 
-          ? `${restaurant.name} ha preparato qualcosa di speciale per te! ${prompt} 🌟`
-          : `${restaurant.name} has prepared something special for you! ${prompt} 🌟`,
-        checkboxText: language === 'it' 
-          ? "Sì, voglio le offerte esclusive!" 
-          : "Yes, I want exclusive offers!",
-        continueButton: language === 'it' ? "Continua al Menu" : "Continue to Menu",
-        skipButton: language === 'it' ? "Salta" : "Skip"
+          ? `Ciao {customerName}! Prima di mostrarti il delizioso menu di ${restaurant.name}, vorresti ricevere offerte esclusive? ${prompt} 🌟`
+          : `Hi {customerName}! Before showing you ${restaurant.name}'s delicious menu, would you like to receive exclusive offers? ${prompt} 🌟`,
+        acceptButton: language === 'it' ? "Accetta e Continua" : "Accept and Continue",
+        skipButton: language === 'it' ? "Continua senza accettare" : "Continue without accepting"
       };
 
       res.json({

@@ -148,6 +148,11 @@ RestaurantMessageSchema.methods.generateFinalMessage = async function(customerNa
             optinParams.append('phone', customerPhone);
           }
           
+          // Aggiungi il nome del cliente se disponibile (per personalizzazione)
+          if (customerName && customerName !== 'Cliente') {
+            optinParams.append('customerName', customerName);
+          }
+          
           finalCtaUrl = `${baseUrl}/optin/${restaurant._id}?${optinParams.toString()}`;
           
           console.log(`🎯 OPT-IN ATTIVO: URL originale ${this.ctaUrl} → URL opt-in ${finalCtaUrl}`);
