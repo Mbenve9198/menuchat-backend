@@ -66,14 +66,22 @@ router.get('/', protect, async (req, res) => {
     // Converti la Map in oggetto normale se esiste, altrimenti usa i messaggi di default
     let messages = defaultMessages;
     if (restaurant.marketingOptinConfig?.messages) {
+      console.log('🔍 Found existing messages in DB:', restaurant.marketingOptinConfig.messages);
+      console.log('🔍 Type of messages:', typeof restaurant.marketingOptinConfig.messages);
+      console.log('🔍 Is Map?', restaurant.marketingOptinConfig.messages instanceof Map);
+      
       // Se è già un oggetto normale, usalo direttamente
       if (typeof restaurant.marketingOptinConfig.messages === 'object' && 
           !restaurant.marketingOptinConfig.messages instanceof Map) {
         messages = restaurant.marketingOptinConfig.messages;
+        console.log('✅ Using existing object messages:', messages);
       } else {
         // Se è una Map, convertila in oggetto normale
         messages = Object.fromEntries(restaurant.marketingOptinConfig.messages);
+        console.log('🔄 Converted Map to object:', messages);
       }
+    } else {
+      console.log('📋 Using default messages');
     }
 
     const config = {
@@ -105,6 +113,10 @@ router.post('/', protect, async (req, res) => {
   try {
     const { restaurantId, config } = req.body;
 
+    console.log('💾 Received save request for restaurant:', restaurantId);
+    console.log('💾 Config to save:', JSON.stringify(config, null, 2));
+    console.log('📝 Messages to save:', config.messages);
+
     if (!restaurantId || !config) {
       return res.status(400).json({
         success: false,
@@ -131,7 +143,13 @@ router.post('/', protect, async (req, res) => {
       }
     };
 
+    console.log('💾 About to save to DB - enabled:', restaurant.marketingOptinConfig.enabled);
+    console.log('💾 About to save to DB - messages as Map:', restaurant.marketingOptinConfig.messages);
+    console.log('💾 About to save to DB - stats:', restaurant.marketingOptinConfig.stats);
+
     await restaurant.save();
+
+    console.log('✅ Successfully saved to database');
 
     res.json({
       success: true,
