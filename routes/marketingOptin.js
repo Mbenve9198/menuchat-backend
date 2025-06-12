@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Restaurant = require('../models/Restaurant');
 const WhatsAppContact = require('../models/WhatsAppContact');
-const { authenticateToken } = require('../middleware/auth');
+const { protect } = require('../middleware/authMiddleware');
 const Anthropic = require('@anthropic-ai/sdk');
 
 const anthropic = new Anthropic({
@@ -10,7 +10,7 @@ const anthropic = new Anthropic({
 });
 
 // GET /api/marketing-optin - Ottieni configurazione opt-in
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const { restaurantId } = req.query;
 
@@ -63,7 +63,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // POST /api/marketing-optin - Salva configurazione opt-in
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', protect, async (req, res) => {
   try {
     const { restaurantId, config } = req.body;
 
@@ -110,7 +110,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // POST /api/marketing-optin/generate - Genera messaggio con AI
-router.post('/generate', authenticateToken, async (req, res) => {
+router.post('/generate', protect, async (req, res) => {
   try {
     const { restaurantId, prompt, language, restaurantName } = req.body;
 
