@@ -181,8 +181,6 @@ class MessageSchedulerService {
         // NUOVO SISTEMA: Salva il messaggio già processato
         messageBody: finalMessage.messageBody,
         mediaUrl: finalMessage.mediaUrl,
-        // Mantieni riferimento al RestaurantMessage per retrocompatibilità
-        template: restaurantMessage._id,
         scheduledFor: messageData.scheduledTime,
         status: 'pending'
       });

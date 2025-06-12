@@ -118,12 +118,14 @@ ScheduledMessageSchema.methods.cancel = function() {
 
 // Metodo per verificare se usa il nuovo sistema
 ScheduledMessageSchema.methods.usesNewSystem = function() {
-  return this.template && this.messageBody;
+  // NUOVO SISTEMA: Se ha messageBody, è del nuovo sistema (RestaurantMessage o messaggi normali)
+  return this.messageBody && this.messageBody.trim().length > 0;
 };
 
 // Metodo per verificare se usa il vecchio sistema
 ScheduledMessageSchema.methods.usesLegacySystem = function() {
-  return this.templateId && !this.template;
+  // VECCHIO SISTEMA: Se ha templateId ma non ha messageBody valido
+  return this.templateId && (!this.messageBody || this.messageBody.trim().length === 0);
 };
 
 // Metodo statico per trovare messaggi da inviare
