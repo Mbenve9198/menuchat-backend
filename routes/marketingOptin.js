@@ -33,33 +33,23 @@ router.get('/', protect, async (req, res) => {
     const defaultMessages = {
       'it': {
         title: "🍽️ Prima di accedere al menu...",
-        message: "Ciao {customerName}! Prima di mostrarti il delizioso menu di {restaurantName}, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
-        acceptButton: "Accetta e Continua",
-        skipButton: "Continua senza accettare"
+        message: "Ciao {customerName}! Prima di mostrarti il delizioso menu di {restaurantName}, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟"
       },
       'en': {
         title: "🍽️ Before accessing the menu...",
-        message: "Hi {customerName}! Before showing you {restaurantName}'s delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
-        acceptButton: "Accept and Continue",
-        skipButton: "Continue without accepting"
+        message: "Hi {customerName}! Before showing you {restaurantName}'s delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟"
       },
       'es': {
         title: "🍽️ Antes de acceder al menú...",
-        message: "¡Hola {customerName}! Antes de mostrarte el delicioso menú de {restaurantName}, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
-        acceptButton: "Aceptar y Continuar",
-        skipButton: "Continuar sin aceptar"
+        message: "¡Hola {customerName}! Antes de mostrarte el delicioso menú de {restaurantName}, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟"
       },
       'fr': {
         title: "🍽️ Avant d'accéder au menu...",
-        message: "Salut {customerName}! Avant de te montrer le délicieux menu de {restaurantName}, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
-        acceptButton: "Accepter et Continuer",
-        skipButton: "Continuer sans accepter"
+        message: "Salut {customerName}! Avant de te montrer le délicieux menu de {restaurantName}, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟"
       },
       'de': {
         title: "🍽️ Bevor Sie das Menü sehen...",
-        message: "Hallo {customerName}! Bevor wir Ihnen das köstliche Menü von {restaurantName} zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
-        acceptButton: "Akzeptieren und Weiter",
-        skipButton: "Ohne Akzeptieren fortfahren"
+        message: "Hallo {customerName}! Bevor wir Ihnen das köstliche Menü von {restaurantName} zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟"
       }
     };
 
@@ -200,8 +190,7 @@ router.post('/generate', protect, async (req, res) => {
           "Usa emoji appropriati ma senza esagerare (max 2-3)",
           "Concentrati sui benefici per il cliente (offerte esclusive, novità, etc.)",
           "Evita linguaggio troppo commerciale o aggressivo",
-          "Il pulsante di accettazione deve essere invitante e rassicurante",
-          "Il pulsante di rifiuto deve essere neutro (es: 'Continua senza accettare')"
+          "NON includere i pulsanti - sono gestiti automaticamente dal sistema"
         ]
       },
       en: {
@@ -216,8 +205,7 @@ router.post('/generate', protect, async (req, res) => {
           "Use appropriate emojis but don't overdo it (max 2-3)",
           "Focus on customer benefits (exclusive offers, news, etc.)",
           "Avoid overly commercial or aggressive language",
-          "The accept button should be inviting and reassuring",
-          "The decline button should be neutral (e.g., 'Continue without accepting')"
+          "NON includere i pulsanti - sono gestiti automaticamente dal sistema"
         ]
       },
       es: {
@@ -232,8 +220,7 @@ router.post('/generate', protect, async (req, res) => {
           "Usa emojis apropiados pero sin exagerar (máx 2-3)",
           "Enfócate en los beneficios para el cliente (ofertas exclusivas, novedades, etc.)",
           "Evita lenguaje demasiado comercial o agresivo",
-          "El botón de aceptar debe ser atractivo y tranquilizador",
-          "El botón de rechazo debe ser neutral (ej: 'Continuar sin aceptar')"
+          "NON includere i pulsanti - sono gestiti automaticamente dal sistema"
         ]
       },
       fr: {
@@ -248,8 +235,7 @@ router.post('/generate', protect, async (req, res) => {
           "Utilisez des emojis appropriés sans exagérer (max 2-3)",
           "Concentrez-vous sur les avantages pour le client (offres exclusives, nouveautés, etc.)",
           "Évitez un langage trop commercial ou agressif",
-          "Le bouton d'acceptation doit être attrayant et rassurant",
-          "Le bouton de refus doit être neutre (ex: 'Continuer sans accepter')"
+          "NON includere i pulsanti - sono gestiti automaticamente dal sistema"
         ]
       },
       de: {
@@ -264,8 +250,7 @@ router.post('/generate', protect, async (req, res) => {
           "Verwenden Sie angemessene Emojis, aber übertreiben Sie nicht (max 2-3)",
           "Konzentrieren Sie sich auf Kundenvorteile (exklusive Angebote, Neuigkeiten, etc.)",
           "Vermeiden Sie zu kommerzielle oder aggressive Sprache",
-          "Der Akzeptieren-Button sollte einladend und beruhigend sein",
-          "Der Ablehnungsbutton sollte neutral sein (z.B. 'Ohne Akzeptieren fortfahren')"
+          "NON includere i pulsanti - sono gestiti automaticamente dal sistema"
         ]
       }
     };
@@ -287,9 +272,7 @@ ${langInstructions.requirements.map(req => `- ${req}`).join('\n')}
 IMPORTANTE: Rispondi SOLO con un oggetto JSON nel seguente formato (senza spiegazioni aggiuntive):
 {
   "title": "Titolo con emoji",
-  "message": "Messaggio principale coinvolgente con {customerName}",
-  "acceptButton": "Testo pulsante accetta",
-  "skipButton": "Testo pulsante rifiuta"
+  "message": "Messaggio principale coinvolgente con {customerName}"
 }
 
 ${language !== 'en' ? `IMPORTANTE: Tutto il contenuto DEVE essere in lingua ${language}.` : ''}`;
@@ -315,8 +298,7 @@ ${language !== 'en' ? `IMPORTANTE: Tutto il contenuto DEVE essere in lingua ${la
       const generatedMessage = JSON.parse(generatedContent);
       
       // Validazione dei campi richiesti
-      if (!generatedMessage.title || !generatedMessage.message || !generatedMessage.acceptButton || 
-          !generatedMessage.skipButton) {
+      if (!generatedMessage.title || !generatedMessage.message) {
         throw new Error('Campi mancanti nella risposta AI');
       }
 
