@@ -79,6 +79,7 @@ class RestaurantMessageController {
         messageType, 
         menuUrl, 
         mediaUrl, 
+        reviewUrl,
         language,
         restaurantId,
         reviewButtonText,
@@ -219,10 +220,15 @@ Translated message (${msg.language}):`;
         } else if (messageType === 'review') {
           message.ctaText = reviewButtonText || '⭐ Lascia una recensione';
           
-          // Ottieni le impostazioni di recensione dal ristorante
-          const restaurant = await Restaurant.findById(restaurantId || message.restaurant);
-          if (restaurant?.reviewLink) {
-            message.ctaUrl = restaurant.reviewLink;
+          // Usa l'URL di recensione fornito dal frontend, altrimenti quello dal ristorante
+          if (reviewUrl) {
+            message.ctaUrl = reviewUrl;
+          } else {
+            // Ottieni le impostazioni di recensione dal ristorante
+            const restaurant = await Restaurant.findById(restaurantId || message.restaurant);
+            if (restaurant?.reviewLink) {
+              message.ctaUrl = restaurant.reviewLink;
+            }
           }
         }
 
