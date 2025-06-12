@@ -9,11 +9,11 @@ const menuService = require('../services/menuService');
 const googlePlacesService = require('../services/googlePlacesService');
 const Restaurant = require('../models/Restaurant');
 
-// Import routes
-const authRoutes = require('./auth');
+// Import routes che esistono
+const authRoutes = require('./authRoutes');
 const templateRoutes = require('./templateRoutes');
 const whatsappRoutes = require('./whatsapp');
-const twilioRoutes = require('./twilio');
+const twilioRoutes = require('./twilioRoutes');
 const contactRoutes = require('./contacts');
 const campaignRoutes = require('./campaignRoutes');
 const aiRoutes = require('./ai');
