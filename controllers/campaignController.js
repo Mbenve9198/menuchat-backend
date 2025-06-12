@@ -42,24 +42,43 @@ const getContacts = async (req, res) => {
     const processedContacts = contacts.map(contact => {
       const phoneNumber = contact.phoneNumber;
       
-      // Identifica il prefisso internazionale (funzione semplificata)
+      // Identifica il prefisso internazionale (funzione migliorata)
       const getCountryPrefix = (phone) => {
-        // Rimuovi eventuali prefissi 'whatsapp:' o spazi
-        const cleanNumber = phone.replace(/\s+/g, '');
+        // Rimuovi eventuali prefissi 'whatsapp:' o spazi e caratteri speciali
+        let cleanNumber = phone.replace(/whatsapp:/g, '').replace(/\s+/g, '').replace(/[()-]/g, '');
         
-        // Controlla i prefissi più comuni
-        if (cleanNumber.startsWith('+1') || cleanNumber.startsWith('1')) return '+1'; // USA/Canada
-        if (cleanNumber.startsWith('+44') || cleanNumber.startsWith('44')) return '+44'; // UK
-        if (cleanNumber.startsWith('+39') || cleanNumber.startsWith('39')) return '+39'; // Italia
-        if (cleanNumber.startsWith('+34') || cleanNumber.startsWith('34')) return '+34'; // Spagna
-        if (cleanNumber.startsWith('+49') || cleanNumber.startsWith('49')) return '+49'; // Germania
-        if (cleanNumber.startsWith('+33') || cleanNumber.startsWith('33')) return '+33'; // Francia
-        if (cleanNumber.startsWith('+86') || cleanNumber.startsWith('86')) return '+86'; // Cina
-        if (cleanNumber.startsWith('+91') || cleanNumber.startsWith('91')) return '+91'; // India
-        if (cleanNumber.startsWith('+52') || cleanNumber.startsWith('52')) return '+52'; // Messico
-        if (cleanNumber.startsWith('+55') || cleanNumber.startsWith('55')) return '+55'; // Brasile
+        // Assicurati che inizi con +
+        if (!cleanNumber.startsWith('+')) {
+          // Se non inizia con +, prova ad aggiungere + se inizia con un numero
+          if (/^\d/.test(cleanNumber)) {
+            cleanNumber = '+' + cleanNumber;
+          }
+        }
+        
+        console.log(`Processing phone: ${phone} -> cleaned: ${cleanNumber}`);
+        
+        // Controlla i prefissi più comuni (ordine per lunghezza decrescente per evitare conflitti)
+        if (cleanNumber.startsWith('+1')) return '+1'; // USA/Canada
+        if (cleanNumber.startsWith('+44')) return '+44'; // UK
+        if (cleanNumber.startsWith('+39')) return '+39'; // Italia
+        if (cleanNumber.startsWith('+34')) return '+34'; // Spagna
+        if (cleanNumber.startsWith('+49')) return '+49'; // Germania
+        if (cleanNumber.startsWith('+33')) return '+33'; // Francia
+        if (cleanNumber.startsWith('+86')) return '+86'; // Cina
+        if (cleanNumber.startsWith('+91')) return '+91'; // India
+        if (cleanNumber.startsWith('+52')) return '+52'; // Messico
+        if (cleanNumber.startsWith('+55')) return '+55'; // Brasile
+        
+        // Fallback per numeri senza prefisso internazionale
+        // Prova a indovinare basandosi sulla lunghezza e formato
+        if (cleanNumber.length === 10 && cleanNumber.startsWith('3')) {
+          // Probabilmente un numero italiano senza prefisso
+          console.log(`Assuming Italian number for: ${cleanNumber}`);
+          return '+39';
+        }
         
         // Default: assume che sia italiano se non riconosciuto
+        console.log(`Defaulting to +39 for unrecognized number: ${cleanNumber}`);
         return '+39';
       };
 
@@ -77,6 +96,13 @@ const getContacts = async (req, res) => {
         isOptedIn: contact.marketingConsent.status
       };
     });
+
+    // Log per debug dei country codes
+    const countryCodeStats = processedContacts.reduce((acc, contact) => {
+      acc[contact.countryCode] = (acc[contact.countryCode] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('Country code distribution:', countryCodeStats);
 
     // Recupera la lista dei country codes per il frontend
     const countryCodesMap = getCountryCodes();
