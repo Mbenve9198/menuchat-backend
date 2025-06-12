@@ -30,40 +30,55 @@ router.get('/', protect, async (req, res) => {
     }
 
     // Restituisci la configurazione opt-in o quella di default
+    const defaultMessages = {
+      'it': {
+        title: "🍽️ Prima di accedere al menu...",
+        message: "Ciao {customerName}! Prima di mostrarti il delizioso menu di {restaurantName}, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
+        acceptButton: "Accetta e Continua",
+        skipButton: "Continua senza accettare"
+      },
+      'en': {
+        title: "🍽️ Before accessing the menu...",
+        message: "Hi {customerName}! Before showing you {restaurantName}'s delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
+        acceptButton: "Accept and Continue",
+        skipButton: "Continue without accepting"
+      },
+      'es': {
+        title: "🍽️ Antes de acceder al menú...",
+        message: "¡Hola {customerName}! Antes de mostrarte el delicioso menú de {restaurantName}, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
+        acceptButton: "Aceptar y Continuar",
+        skipButton: "Continuar sin aceptar"
+      },
+      'fr': {
+        title: "🍽️ Avant d'accéder au menu...",
+        message: "Salut {customerName}! Avant de te montrer le délicieux menu de {restaurantName}, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
+        acceptButton: "Accepter et Continuer",
+        skipButton: "Continuer sans accepter"
+      },
+      'de': {
+        title: "🍽️ Bevor Sie das Menü sehen...",
+        message: "Hallo {customerName}! Bevor wir Ihnen das köstliche Menü von {restaurantName} zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
+        acceptButton: "Akzeptieren und Weiter",
+        skipButton: "Ohne Akzeptieren fortfahren"
+      }
+    };
+
+    // Converti la Map in oggetto normale se esiste, altrimenti usa i messaggi di default
+    let messages = defaultMessages;
+    if (restaurant.marketingOptinConfig?.messages) {
+      // Se è già un oggetto normale, usalo direttamente
+      if (typeof restaurant.marketingOptinConfig.messages === 'object' && 
+          !restaurant.marketingOptinConfig.messages instanceof Map) {
+        messages = restaurant.marketingOptinConfig.messages;
+      } else {
+        // Se è una Map, convertila in oggetto normale
+        messages = Object.fromEntries(restaurant.marketingOptinConfig.messages);
+      }
+    }
+
     const config = {
       enabled: restaurant.marketingOptinConfig?.enabled || false,
-      messages: restaurant.marketingOptinConfig?.messages || new Map([
-        ['it', {
-          title: "🍽️ Prima di accedere al menu...",
-          message: "Ciao {customerName}! Prima di mostrarti il delizioso menu di {restaurantName}, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
-          acceptButton: "Accetta e Continua",
-          skipButton: "Continua senza accettare"
-        }],
-        ['en', {
-          title: "🍽️ Before accessing the menu...",
-          message: "Hi {customerName}! Before showing you {restaurantName}'s delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
-          acceptButton: "Accept and Continue",
-          skipButton: "Continue without accepting"
-        }],
-        ['es', {
-          title: "🍽️ Antes de acceder al menú...",
-          message: "¡Hola {customerName}! Antes de mostrarte el delicioso menú de {restaurantName}, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
-          acceptButton: "Aceptar y Continuar",
-          skipButton: "Continuar sin aceptar"
-        }],
-        ['fr', {
-          title: "🍽️ Avant d'accéder au menu...",
-          message: "Salut {customerName}! Avant de te montrer le délicieux menu de {restaurantName}, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
-          acceptButton: "Accepter et Continuer",
-          skipButton: "Continuer sans accepter"
-        }],
-        ['de', {
-          title: "🍽️ Bevor Sie das Menü sehen...",
-          message: "Hallo {customerName}! Bevor wir Ihnen das köstliche Menü von {restaurantName} zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
-          acceptButton: "Akzeptieren und Weiter",
-          skipButton: "Ohne Akzeptieren fortfahren"
-        }]
-      ]),
+      messages: messages,
       stats: restaurant.marketingOptinConfig?.stats || {
         totalViews: 0,
         totalOptins: 0,
