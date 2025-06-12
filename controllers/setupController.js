@@ -719,26 +719,23 @@ ${langInstructions.example}`;
         });
       }
 
+      // Ottieni l'immagine del profilo
+      let profileImage = null;
+      
       // Controlla se esiste un'immagine principale
       if (restaurant.mainPhoto) {
-        return res.status(200).json({
-          success: true,
-          profileImage: restaurant.mainPhoto
-        });
-      }
-      
+        profileImage = restaurant.mainPhoto;
+      } 
       // Se non c'è un'immagine principale ma ci sono altre foto, usa la prima
-      if (restaurant.photos && restaurant.photos.length > 0) {
-        return res.status(200).json({
-          success: true,
-          profileImage: restaurant.photos[0]
-        });
+      else if (restaurant.photos && restaurant.photos.length > 0) {
+        profileImage = restaurant.photos[0];
       }
 
-      // Se non ci sono immagini
-      return res.status(404).json({
-        success: false,
-        error: 'Nessuna immagine del profilo trovata per questo ristorante'
+      // Restituisci sempre il nome del ristorante, con o senza immagine
+      return res.status(200).json({
+        success: true,
+        name: restaurant.name,
+        profileImage: profileImage
       });
       
     } catch (error) {

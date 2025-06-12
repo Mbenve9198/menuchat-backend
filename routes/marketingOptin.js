@@ -35,31 +35,31 @@ router.get('/', protect, async (req, res) => {
       messages: restaurant.marketingOptinConfig?.messages || new Map([
         ['it', {
           title: "🍽️ Prima di accedere al menu...",
-          message: "Ciao {customerName}! Prima di mostrarti il nostro delizioso menu, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
+          message: "Ciao {customerName}! Prima di mostrarti il delizioso menu di {restaurantName}, vorresti ricevere le nostre offerte esclusive e novità direttamente su WhatsApp? Solo contenuti di qualità, promesso! 🌟",
           acceptButton: "Accetta e Continua",
           skipButton: "Continua senza accettare"
         }],
         ['en', {
           title: "🍽️ Before accessing the menu...",
-          message: "Hi {customerName}! Before showing you our delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
+          message: "Hi {customerName}! Before showing you {restaurantName}'s delicious menu, would you like to receive our exclusive offers and news directly on WhatsApp? Only quality content, promised! 🌟",
           acceptButton: "Accept and Continue",
           skipButton: "Continue without accepting"
         }],
         ['es', {
           title: "🍽️ Antes de acceder al menú...",
-          message: "¡Hola {customerName}! Antes de mostrarte nuestro delicioso menú, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
+          message: "¡Hola {customerName}! Antes de mostrarte el delicioso menú de {restaurantName}, ¿te gustaría recibir nuestras ofertas exclusivas y novedades directamente en WhatsApp? ¡Solo contenido de calidad, prometido! 🌟",
           acceptButton: "Aceptar y Continuar",
           skipButton: "Continuar sin aceptar"
         }],
         ['fr', {
           title: "🍽️ Avant d'accéder au menu...",
-          message: "Salut {customerName}! Avant de te montrer notre délicieux menu, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
+          message: "Salut {customerName}! Avant de te montrer le délicieux menu de {restaurantName}, aimerais-tu recevoir nos offres exclusives et nouveautés directement sur WhatsApp? Seulement du contenu de qualité, promis! 🌟",
           acceptButton: "Accepter et Continuer",
           skipButton: "Continuer sans accepter"
         }],
         ['de', {
           title: "🍽️ Bevor Sie das Menü sehen...",
-          message: "Hallo {customerName}! Bevor wir Ihnen unser köstliches Menü zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
+          message: "Hallo {customerName}! Bevor wir Ihnen das köstliche Menü von {restaurantName} zeigen, möchten Sie unsere exklusiven Angebote und Neuigkeiten direkt über WhatsApp erhalten? Nur Qualitätsinhalt, versprochen! 🌟",
           acceptButton: "Akzeptieren und Weiter",
           skipButton: "Ohne Akzeptieren fortfahren"
         }]
