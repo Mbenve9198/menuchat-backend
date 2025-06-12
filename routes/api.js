@@ -220,4 +220,13 @@ router.post('/check-email', async (req, res) => {
 
 // Endpoint per verificare la disponibilità di una trigger phrase
 
+// Route per i template
+router.use('/templates', require('./templates'));
+
+// NUOVO: Route per l'opt-in marketing
+router.use('/marketing-optin', require('./marketingOptin'));
+
+// Route per le campagne WhatsApp
+router.use('/whatsapp-campaigns', require('./whatsappCampaigns'));
+
 module.exports = router; 

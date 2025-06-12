@@ -49,8 +49,32 @@ const WhatsAppContactSchema = new Schema({
     // Come è stato ottenuto il consenso
     source: {
       type: String,
-      enum: ['initial_interaction', 'form_submission', 'api_import', 'manual_import'],
+      enum: ['initial_interaction', 'form_submission', 'api_import', 'manual_import', 'menu_optin_dialog'],
       default: 'initial_interaction'
+    }
+  },
+  // NUOVO: Stato specifico per l'opt-in del dialog menu
+  menuOptinConsent: {
+    // true = ha accettato di ricevere messaggi promozionali, false = ha rifiutato, null = non ha ancora scelto
+    status: {
+      type: Boolean,
+      default: null,
+      index: true
+    },
+    // Data della scelta
+    decidedAt: {
+      type: Date,
+      default: null
+    },
+    // IP address per tracking (opzionale, per compliance GDPR)
+    ipAddress: {
+      type: String,
+      default: null
+    },
+    // User agent per tracking (opzionale)
+    userAgent: {
+      type: String,
+      default: null
     }
   },
   // Data della prima interazione
@@ -204,6 +228,29 @@ WhatsAppContactSchema.methods.removeTag = async function(tag) {
   this.tags = this.tags.filter(t => t !== tag);
   await this.save();
   return this;
+};
+
+// NUOVO: Metodo per registrare la scelta dell'opt-in menu
+WhatsAppContactSchema.methods.setMenuOptinChoice = async function(choice, ipAddress = null, userAgent = null) {
+  this.menuOptinConsent.status = choice;
+  this.menuOptinConsent.decidedAt = new Date();
+  this.menuOptinConsent.ipAddress = ipAddress;
+  this.menuOptinConsent.userAgent = userAgent;
+  
+  // Se ha accettato, aggiorna anche il consenso marketing generale
+  if (choice === true) {
+    this.marketingConsent.status = true;
+    this.marketingConsent.updatedAt = new Date();
+    this.marketingConsent.source = 'menu_optin_dialog';
+  }
+  
+  await this.save();
+  return this;
+};
+
+// NUOVO: Metodo per verificare se ha già fatto una scelta sull'opt-in menu
+WhatsAppContactSchema.methods.hasMenuOptinChoice = function() {
+  return this.menuOptinConsent.status !== null;
 };
 
 module.exports = mongoose.model('WhatsAppContact', WhatsAppContactSchema); 

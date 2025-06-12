@@ -180,6 +180,97 @@ const RestaurantSchema = new Schema({
     type: Boolean,
     default: true,
     index: true
+  },
+  // Configurazione per le recensioni
+  reviewLink: {
+    type: String,
+    trim: true
+  },
+  // NUOVO: Configurazione per l'opt-in marketing
+  marketingOptinConfig: {
+    // Se la funzionalità è attiva
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    // Messaggi personalizzati per lingua
+    messages: {
+      type: Map,
+      of: {
+        title: {
+          type: String,
+          default: "🍽️ Resta aggiornato!"
+        },
+        message: {
+          type: String,
+          default: "Vuoi ricevere le nostre offerte esclusive e novità del menu direttamente su WhatsApp? Solo roba d'oro, promesso! 🌟"
+        },
+        checkboxText: {
+          type: String,
+          default: "Sì, voglio ricevere offerte esclusive"
+        },
+        continueButton: {
+          type: String,
+          default: "Continua al Menu"
+        },
+        skipButton: {
+          type: String,
+          default: "Salta"
+        }
+      },
+      default: () => new Map([
+        ['it', {
+          title: "🍽️ Resta aggiornato!",
+          message: "Vuoi ricevere le nostre offerte esclusive e novità del menu direttamente su WhatsApp? Solo roba d'oro, promesso! 🌟",
+          checkboxText: "Sì, voglio ricevere offerte esclusive",
+          continueButton: "Continua al Menu",
+          skipButton: "Salta"
+        }],
+        ['en', {
+          title: "🍽️ Stay in the loop!",
+          message: "Want to receive our exclusive offers and menu updates directly on WhatsApp? Only golden content, we promise! 🌟",
+          checkboxText: "Yes, I want exclusive offers",
+          continueButton: "Continue to Menu",
+          skipButton: "Skip"
+        }],
+        ['es', {
+          title: "🍽️ ¡Mantente al día!",
+          message: "¿Quieres recibir nuestras ofertas exclusivas y novedades del menú directamente en WhatsApp? ¡Solo contenido de oro, lo prometemos! 🌟",
+          checkboxText: "Sí, quiero ofertas exclusivas",
+          continueButton: "Continuar al Menú",
+          skipButton: "Saltar"
+        }],
+        ['fr', {
+          title: "🍽️ Restez informé!",
+          message: "Voulez-vous recevoir nos offres exclusives et les nouveautés du menu directement sur WhatsApp? Que du contenu en or, promis! 🌟",
+          checkboxText: "Oui, je veux des offres exclusives",
+          continueButton: "Continuer vers le Menu",
+          skipButton: "Passer"
+        }],
+        ['de', {
+          title: "🍽️ Bleiben Sie auf dem Laufenden!",
+          message: "Möchten Sie unsere exklusiven Angebote und Menü-Updates direkt über WhatsApp erhalten? Nur goldene Inhalte, versprochen! 🌟",
+          checkboxText: "Ja, ich möchte exklusive Angebote",
+          continueButton: "Weiter zum Menü",
+          skipButton: "Überspringen"
+        }]
+      ])
+    },
+    // Statistiche
+    stats: {
+      totalViews: {
+        type: Number,
+        default: 0
+      },
+      totalOptins: {
+        type: Number,
+        default: 0
+      },
+      totalSkips: {
+        type: Number,
+        default: 0
+      }
+    }
   }
 }, {
   timestamps: true
