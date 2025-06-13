@@ -70,6 +70,7 @@ class SetupController {
       // --- NUOVO: Crea i messaggi RestaurantMessage se presenti nel payload ---
       if (Array.isArray(formData.messages) && formData.messages.length > 0) {
         const RestaurantMessage = require('../models/RestaurantMessage');
+        const createdMessages = [];
         for (const msg of formData.messages) {
           // Costruisci il payload coerente con il modello
           const messageData = {
@@ -86,7 +87,7 @@ class SetupController {
             modifiedBy: 'system'
           };
           // Evita duplicati per ristorante+tipo+lingua
-          await RestaurantMessage.findOneAndUpdate(
+          const saved = await RestaurantMessage.findOneAndUpdate(
             {
               restaurant: messageData.restaurant,
               messageType: messageData.messageType,
@@ -95,9 +96,85 @@ class SetupController {
             messageData,
             { upsert: true, new: true, setDefaultsOnInsert: true }
           );
+          createdMessages.push(saved);
         }
+
+        // --- NUOVO: Traduzione automatica in tutte le lingue selezionate ---
+        if (formData.translateAllLanguages && Array.isArray(formData.selectedLanguages)) {
+          for (const msg of formData.messages) {
+            const mainLang = msg.language;
+            const mainBody = msg.messageBody;
+            const type = (msg.messageType === 'media' || msg.messageType === 'menu_url') ? 'menu' : 'review';
+            for (const lang of formData.selectedLanguages) {
+              if (lang === mainLang) continue; // Salta la lingua principale già creata
+              // Controlla se già esiste
+              const exists = await RestaurantMessage.findOne({
+                restaurant: restaurant._id,
+                messageType: type,
+                language: lang
+              });
+              if (exists) continue;
+              // Prompt di traduzione
+              const translationPrompt = `You are a professional translator. Translate the following ${type === 'review' ? 'review request' : 'restaurant welcome'} message from ${mainLang} to ${lang}.
+
+IMPORTANT: Return ONLY the translated text, no explanations, no quotes, no additional text.
+
+Rules:
+- Keep the same tone, style, and formatting
+- Preserve any placeholders like {{1}} exactly as they are
+- Keep emojis and maintain the same message structure
+- Return only the translated message text
+
+Original message (${mainLang}):
+${mainBody}
+
+Translated message (${lang}):`;
+              let translatedBody = mainBody;
+              try {
+                const response = await anthropic.messages.create({
+                  model: "claude-3-5-sonnet-20241022",
+                  max_tokens: 500,
+                  temperature: 0.3,
+                  messages: [
+                    {
+                      role: "user",
+                      content: translationPrompt
+                    }
+                  ]
+                });
+                translatedBody = response.content[0].text.trim();
+              } catch (err) {
+                console.error(`Errore traduzione ${type} ${mainLang}->${lang}:`, err);
+                // fallback: usa il testo originale
+                translatedBody = mainBody;
+              }
+              // Salva il messaggio tradotto
+              await RestaurantMessage.findOneAndUpdate(
+                {
+                  restaurant: restaurant._id,
+                  messageType: type,
+                  language: lang
+                },
+                {
+                  restaurant: restaurant._id,
+                  messageType: type,
+                  language: lang,
+                  messageBody: translatedBody,
+                  mediaUrl: msg.mediaUrl || '',
+                  mediaType: msg.mediaUrl ? 'pdf' : undefined,
+                  ctaUrl: msg.menuUrl || msg.ctaUrl || '',
+                  ctaText: msg.ctaText || (msg.messageType === 'review' ? '⭐ Lascia una recensione' : '🔗 Menu'),
+                  isActive: true,
+                  lastModified: new Date(),
+                  modifiedBy: 'claude-translation'
+                },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+              );
+            }
+          }
+        }
+        // --- FINE TRADUZIONE ---
       }
-      // --- FINE NUOVO ---
 
       // Ritorna la risposta con i dati dell'utente e del ristorante
       // Non creiamo più template dato che ora generiamo messaggi normali direttamente
