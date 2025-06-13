@@ -10,6 +10,30 @@ const anthropic = new Anthropic({
 });
 
 /**
+ * Funzione helper per ottenere il testo del CTA nella lingua corretta
+ */
+const getCtaTextByLanguage = (messageType, language) => {
+  const ctaTexts = {
+    review: {
+      'it': '⭐ Lascia una recensione',
+      'en': '⭐ Leave a review',
+      'es': '⭐ Deja una reseña',
+      'de': '⭐ Bewertung abgeben',
+      'fr': '⭐ Laisser un avis'
+    },
+    menu: {
+      'it': '🔗 Menu',
+      'en': '🔗 Menu',
+      'es': '🔗 Menú',
+      'de': '🔗 Menü',
+      'fr': '🔗 Menu'
+    }
+  };
+
+  return ctaTexts[messageType]?.[language] || ctaTexts[messageType]?.['en'] || '🔗 Menu';
+};
+
+/**
  * Controller per gestire le richieste di setup
  */
 class SetupController {
@@ -81,7 +105,7 @@ class SetupController {
             mediaUrl: msg.mediaUrl || '',
             mediaType: msg.mediaUrl ? 'pdf' : undefined,
             ctaUrl: msg.menuUrl || msg.ctaUrl || '',
-            ctaText: msg.ctaText || (msg.messageType === 'review' ? '⭐ Lascia una recensione' : '🔗 Menu'),
+            ctaText: getCtaTextByLanguage(msg.messageType, msg.language),
             isActive: true,
             lastModified: new Date(),
             modifiedBy: 'system'
@@ -158,7 +182,7 @@ class SetupController {
                   mediaUrl: msg.mediaUrl || '',
                   mediaType: msg.mediaUrl ? 'pdf' : undefined,
                   ctaUrl: msg.menuUrl || msg.ctaUrl || '',
-                  ctaText: msg.ctaText || (msg.messageType === 'review' ? '⭐ Lascia una recensione' : '🔗 Menu'),
+                  ctaText: getCtaTextByLanguage(type, lang),
                   isActive: true,
                   lastModified: new Date(),
                   modifiedBy: 'claude-translation'
