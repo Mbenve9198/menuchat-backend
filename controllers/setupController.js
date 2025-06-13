@@ -99,13 +99,14 @@ class SetupController {
           createdMessages.push(saved);
         }
 
-        // --- NUOVO: Traduzione automatica in tutte le lingue selezionate (allineata a restaurantMessageController.js) ---
-        if (formData.translateAllLanguages && Array.isArray(formData.selectedLanguages)) {
+        // --- NUOVO: Traduzione automatica in tutte le lingue supportate (allineata a restaurantMessageController.js) ---
+        if (formData.translateAllLanguages) {
+          const SUPPORTED_LANGUAGES = ['it', 'en', 'fr', 'de', 'es'];
           for (const msg of formData.messages) {
             const mainLang = msg.language;
             const mainBody = msg.messageBody;
             const type = (msg.messageType === 'media' || msg.messageType === 'menu_url') ? 'menu' : 'review';
-            for (const lang of formData.selectedLanguages) {
+            for (const lang of SUPPORTED_LANGUAGES) {
               if (lang === mainLang) continue; // Salta la lingua principale già creata
               // Controlla se già esiste
               const exists = await RestaurantMessage.findOne({
