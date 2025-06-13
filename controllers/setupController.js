@@ -99,7 +99,7 @@ class SetupController {
           createdMessages.push(saved);
         }
 
-        // --- NUOVO: Traduzione automatica in tutte le lingue selezionate ---
+        // --- NUOVO: Traduzione automatica in tutte le lingue selezionate (allineata a restaurantMessageController.js) ---
         if (formData.translateAllLanguages && Array.isArray(formData.selectedLanguages)) {
           for (const msg of formData.messages) {
             const mainLang = msg.language;
@@ -114,21 +114,15 @@ class SetupController {
                 language: lang
               });
               if (exists) continue;
-              // Prompt di traduzione
-              const translationPrompt = `You are a professional translator. Translate the following ${type === 'review' ? 'review request' : 'restaurant welcome'} message from ${mainLang} to ${lang}.
-
-IMPORTANT: Return ONLY the translated text, no explanations, no quotes, no additional text.
-
-Rules:
-- Keep the same tone, style, and formatting
-- Preserve any placeholders like {{1}} exactly as they are
-- Keep emojis and maintain the same message structure
-- Return only the translated message text
-
-Original message (${mainLang}):
-${mainBody}
-
-Translated message (${lang}):`;
+              // Prompt di traduzione (stessa logica di restaurantMessageController.js)
+              let translationPrompt = '';
+              if (type === 'review') {
+                translationPrompt = `You are a professional translator. Translate the following review request message from ${mainLang} to ${lang}.
+\nIMPORTANT: Return ONLY the translated text, no explanations, no quotes, no additional text.\n\nRules:\n- Keep the same tone, style, and formatting\n- Preserve any placeholders like {{1}} exactly as they are\n- Keep emojis and maintain the same message structure\n- Return only the translated message text\n\nOriginal message (${mainLang}):\n${mainBody}\n\nTranslated message (${lang}):`;
+              } else {
+                translationPrompt = `You are a professional translator. Translate the following restaurant welcome message from ${mainLang} to ${lang}.
+\nIMPORTANT: Return ONLY the translated text, no explanations, no quotes, no additional text.\n\nRules:\n- Keep the same tone, style, and formatting\n- Preserve any placeholders like {{1}} exactly as they are\n- Keep emojis and maintain the same message structure\n- Return only the translated message text\n\nOriginal message (${mainLang}):\n${mainBody}\n\nTranslated message (${lang}):`;
+              }
               let translatedBody = mainBody;
               try {
                 const response = await anthropic.messages.create({
