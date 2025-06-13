@@ -67,6 +67,38 @@ class SetupController {
       // Crea la configurazione del bot per il ristorante
       const botConfig = await botConfigurationService.createBotConfiguration(formData, restaurant._id);
 
+      // --- NUOVO: Crea i messaggi RestaurantMessage se presenti nel payload ---
+      if (Array.isArray(formData.messages) && formData.messages.length > 0) {
+        const RestaurantMessage = require('../models/RestaurantMessage');
+        for (const msg of formData.messages) {
+          // Costruisci il payload coerente con il modello
+          const messageData = {
+            restaurant: restaurant._id,
+            messageType: (msg.messageType === 'media' || msg.messageType === 'menu_url') ? 'menu' : 'review',
+            language: msg.language,
+            messageBody: msg.messageBody,
+            mediaUrl: msg.mediaUrl || '',
+            mediaType: msg.mediaUrl ? 'pdf' : undefined,
+            ctaUrl: msg.menuUrl || msg.ctaUrl || '',
+            ctaText: msg.ctaText || (msg.messageType === 'review' ? '⭐ Lascia una recensione' : '🔗 Menu'),
+            isActive: true,
+            lastModified: new Date(),
+            modifiedBy: 'system'
+          };
+          // Evita duplicati per ristorante+tipo+lingua
+          await RestaurantMessage.findOneAndUpdate(
+            {
+              restaurant: messageData.restaurant,
+              messageType: messageData.messageType,
+              language: messageData.language
+            },
+            messageData,
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
+        }
+      }
+      // --- FINE NUOVO ---
+
       // Ritorna la risposta con i dati dell'utente e del ristorante
       // Non creiamo più template dato che ora generiamo messaggi normali direttamente
       res.status(201).json({
